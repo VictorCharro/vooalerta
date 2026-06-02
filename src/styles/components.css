@@ -1,0 +1,194 @@
+/* ── Inputs ─────────────────────────────────────────────── */
+input, select, textarea {
+  font-family: var(--font-body);
+  font-size: 14px;
+  background: var(--color-bg-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 10px 14px;
+  width: 100%;
+  outline: none;
+  transition: border-color var(--transition), background var(--transition);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--color-accent);
+  background: var(--color-bg-2);
+}
+input::placeholder, textarea::placeholder { color: var(--color-text-dim); }
+select option { background: var(--color-bg-3); }
+
+/* ── Buttons ─────────────────────────────────────────────── */
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all var(--transition);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: #fff;
+  padding: 10px 20px;
+}
+.btn-primary:hover:not(:disabled) { background: var(--color-accent-hover); transform: translateY(-1px); }
+.btn-primary:active:not(:disabled) { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 10px 20px;
+}
+.btn-ghost:hover { border-color: var(--color-border-hover); color: var(--color-text); }
+
+.btn-danger {
+  background: var(--color-red-dim);
+  color: var(--color-red);
+  border: 1px solid transparent;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.btn-danger:hover { border-color: var(--color-red); }
+
+.btn-icon {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  width: 32px; height: 32px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+}
+.btn-icon:hover { border-color: var(--color-border-hover); color: var(--color-text); }
+
+/* ── Cards ───────────────────────────────────────────────── */
+.card {
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+}
+.card:hover { border-color: var(--color-border-hover); }
+
+/* ── Badges ──────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 20px;
+  letter-spacing: 0.03em;
+}
+.badge-green  { background: var(--color-green-dim); color: var(--color-green); }
+.badge-dim    { background: rgba(255,255,255,0.05); color: var(--color-text-muted); }
+.badge-amber  { background: var(--color-amber-dim); color: var(--color-amber); }
+.badge-red    { background: var(--color-red-dim);   color: var(--color-red); }
+
+.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+/* ── Forms ───────────────────────────────────────────────── */
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-hint { font-size: 11px; color: var(--color-text-muted); margin-top: 3px; }
+.form-optional { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-text-dim); font-size: 10px; }
+
+/* ── Feedback ────────────────────────────────────────────── */
+.error-box {
+  background: var(--color-red-dim);
+  border: 1px solid rgba(240,96,90,0.2);
+  color: var(--color-red);
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+}
+.success-box {
+  background: var(--color-green-dim);
+  border: 1px solid rgba(45,212,160,0.2);
+  color: var(--color-green);
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Toggle switch ───────────────────────────────────────── */
+.toggle { position: relative; width: 38px; height: 22px; cursor: pointer; display: block; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle .track {
+  position: absolute; inset: 0;
+  background: var(--color-bg-3);
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  transition: background var(--transition), border-color var(--transition);
+}
+.toggle input:checked ~ .track { background: var(--color-accent); border-color: var(--color-accent); }
+.toggle .thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: 16px; height: 16px;
+  background: #fff; border-radius: 50%;
+  transition: transform var(--transition);
+  pointer-events: none;
+}
+.toggle input:checked ~ .thumb { transform: translateX(16px); }
+
+/* ── Loading spinner ─────────────────────────────────────── */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.spinner-dark {
+  border-color: rgba(0,0,0,0.1);
+  border-top-color: var(--color-accent);
+}
+
+/* ── Stat cards ──────────────────────────────────────────── */
+.stat-card {
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+}
+.stat-label {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.stat-value { font-family: var(--font-display); font-size: 24px; font-weight: 700; }
+.stat-value.green { color: var(--color-green); }
+.stat-value.muted { color: var(--color-text-muted); }
+.stat-value.accent { color: var(--color-accent); }
+
+/* ── Animations ──────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.fade-up { animation: fadeUp 0.35s ease both; }

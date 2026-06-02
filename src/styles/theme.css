@@ -1,0 +1,74 @@
+/* ============================================================
+   TEMA — edite aqui para mudar cores, fontes e espaçamentos
+   em todo o site de uma vez só.
+   ============================================================ */
+
+:root {
+  /* Cores principais */
+  --color-bg:           #0a0a0f;
+  --color-bg-2:         #111118;
+  --color-bg-3:         #18181f;
+
+  --color-accent:       #7c6dfa;
+  --color-accent-hover: #9585fc;
+  --color-accent-dim:   rgba(124, 109, 250, 0.12);
+
+  --color-green:        #2dd4a0;
+  --color-green-dim:    rgba(45, 212, 160, 0.10);
+
+  --color-red:          #f0605a;
+  --color-red-dim:      rgba(240, 96, 90, 0.10);
+
+  --color-amber:        #f5a623;
+  --color-amber-dim:    rgba(245, 166, 35, 0.10);
+
+  /* Texto */
+  --color-text:         #f0eff6;
+  --color-text-muted:   #7a7988;
+  --color-text-dim:     #3d3c4a;
+
+  /* Bordas */
+  --color-border:       rgba(255, 255, 255, 0.07);
+  --color-border-hover: rgba(255, 255, 255, 0.14);
+
+  /* Tipografia */
+  --font-display: 'Syne', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
+
+  /* Espaçamento base */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  14px;
+  --space-lg:  24px;
+  --space-xl:  40px;
+
+  /* Border radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Navbar height */
+  --navbar-h: 56px;
+
+  /* Max width do conteúdo */
+  --content-w: 860px;
+
+  /* Transições */
+  --transition: 0.2s ease;
+}
+
+/* ── Tema claro (opcional — descomente para ativar) ──────────
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-bg:         #f5f5f8;
+    --color-bg-2:       #ffffff;
+    --color-bg-3:       #ebebf0;
+    --color-text:       #1a1a24;
+    --color-text-muted: #6b6a78;
+    --color-text-dim:   #b0afba;
+    --color-border:     rgba(0, 0, 0, 0.08);
+    --color-border-hover: rgba(0, 0, 0, 0.14);
+  }
+}
+────────────────────────────────────────────────────────── */
