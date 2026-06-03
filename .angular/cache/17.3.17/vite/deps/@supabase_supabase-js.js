@@ -4,7 +4,7 @@ import {
   __rest,
   __spreadValues,
   __superGet
-} from "./chunk-AH636IQZ.js";
+} from "./chunk-L3GUA25S.js";
 
 // node_modules/@supabase/functions-js/dist/module/helper.js
 var resolveFetch = (customFetch) => {
