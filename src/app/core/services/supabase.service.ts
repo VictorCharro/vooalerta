@@ -48,8 +48,8 @@ export class SupabaseService {
   }
 
   async getUser(): Promise<User | null> {
-    const {data} = await this.client.auth.getSession();
-    return data.session?.user ?? null;
+    const { data: { session } } = await this.client.auth.getSession();
+    return session?.user ?? null;
   }
 
   onAuthChange(callback: (user: User | null) => void) {
@@ -59,22 +59,22 @@ export class SupabaseService {
   }
 
   async getAlerts() {
-    const {data: {session}} = await this.client.auth.getSession();
+    const { data: { session } } = await this.client.auth.getSession();
+    if (!session) return { data: [], error: null };
 
     return this.client
         .from('alerts')
         .select('*')
-        .setHeader('Authorization', `Bearer ${session!.access_token}`)
-        .order('criado_em', {ascending: false});
+        .order('criado_em', { ascending: false });
   }
 
   async createAlert(payload: AlertCreate) {
-    const {data: {session}} = await this.client.auth.getSession();
+    const { data: { session } } = await this.client.auth.getSession();
+    if (!session) return { data: null, error: new Error('Não autenticado') };
 
     return this.client
         .from('alerts')
-        .insert({...payload, user_id: session!.user.id})
-        .setHeader('Authorization', `Bearer ${session!.access_token}`);
+        .insert({ ...payload, user_id: session.user.id });
   }
 
   async updateAlert(id: string, changes: Partial<Alert>) {
