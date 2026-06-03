@@ -4,7 +4,7 @@
   "scripts": {
     "start": "ng serve",
     "build": "npx ng build",
-    "build:prod": "npx ng build --configuration production",
+    "build:prod": "node node_modules/@angular/cli/bin/ng build --configuration production",
     "watch": "ng build --watch --configuration development",
     "lint": "ng lint"
   },
