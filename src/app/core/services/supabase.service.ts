@@ -58,6 +58,29 @@ export class SupabaseService {
     });
   }
 
+  async getProfile() {
+    const { data: { session } } = await this.client.auth.getSession();
+    if (!session) return { data: null, error: new Error('Não autenticado') };
+
+    const { data, error } = await this.client
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+    return { data, error };
+  }
+
+  async updateProfile(changes: { whatsapp?: string; callmebot_key?: string }) {
+    const { data: { session } } = await this.client.auth.getSession();
+    if (!session) return { data: null, error: new Error('Não autenticado') };
+
+    return this.client
+        .from('profiles')
+        .update(changes)
+        .eq('id', session.user.id);
+  }
+
   async getAlerts() {
     const { data: { session } } = await this.client.auth.getSession();
     if (!session) return { data: [], error: null };
