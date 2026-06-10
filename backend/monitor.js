@@ -6,7 +6,6 @@
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const SERPAPI_KEY  = process.env.SERPAPI_KEY;
-const CALLMEBOT_KEY = process.env.CALLMEBOT_KEY;
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -31,8 +30,8 @@ async function supabase(method, path, body = null) {
   return text ? JSON.parse(text) : [];
 }
 
-async function sendWhatsApp(phone, message) {
-  const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(message)}&apikey=${CALLMEBOT_KEY}`;
+async function sendWhatsApp(phone, message, callmebotKey) {
+  const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(message)}&apikey=${callmebotKey}`;
   const res = await fetch(url);
   return res.ok;
 }
@@ -199,7 +198,7 @@ async function processarAlerta(alerta, voosCache) {
   ].join('\n');
 
   console.log(`    📱 Enviando WhatsApp para ${alerta.whatsapp}...`);
-  const enviado = await sendWhatsApp(alerta.whatsapp, mensagem);
+  const enviado = await sendWhatsApp(alerta.whatsapp, mensagem, alerta.callmebot_key);
 
   if (!enviado) {
     console.error(`    ❌ Falha ao enviar WhatsApp`);
@@ -222,8 +221,7 @@ async function main() {
   console.log('🚀 VooAlerta — Iniciando monitoramento');
   console.log(`📅 ${new Date().toISOString()}`);
 
-  // Valida variáveis de ambiente
-  const vars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'SERPAPI_KEY', 'CALLMEBOT_KEY'];
+  const vars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'SERPAPI_KEY'];
   for (const v of vars) {
     if (!process.env[v]) {
       console.error(`❌ Variável de ambiente ausente: ${v}`);
