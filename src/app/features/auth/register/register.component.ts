@@ -44,10 +44,10 @@ import { SupabaseService } from '@core/services/supabase.service';
               type="tel"
               [(ngModel)]="whatsapp"
               name="whatsapp"
-              placeholder="+5511999999999"
+              placeholder="5511999999999"
               required
             />
-            <span class="form-hint">Formato internacional: +55 + DDD + número</span>
+            <span class="form-hint">Formato: DDD + número (sem + ou espaços)</span>
           </div>
 
           <div class="form-group" style="margin-top: 14px">

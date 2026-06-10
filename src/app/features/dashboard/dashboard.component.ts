@@ -19,7 +19,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
           <span class="nav-brand-name">VooAlerta</span>
         </div>
         <div class="nav-right">
-          <span class="nav-email">{{ userEmail }}</span>
+          <button class="btn-ghost nav-email" (click)="openProfileModal()">{{ userEmail }}</button>
           <button class="btn-ghost nav-logout" (click)="logout()">Sair</button>
         </div>
       </nav>
@@ -131,6 +131,57 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
 
       </main>
 
+      <!-- ── Modal perfil ── -->
+      <div class="modal-overlay" *ngIf="showProfileModal" (click)="onProfileOverlayClick($event)">
+        <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+
+          <div class="modal-head">
+            <h2 id="profile-modal-title">Meu perfil</h2>
+            <button class="btn-icon" (click)="closeProfileModal()" aria-label="Fechar">✕</button>
+          </div>
+
+          <div *ngIf="profileLoading" class="center-state" style="padding:32px">
+            <div class="spinner spinner-dark" style="width:24px;height:24px;border-width:3px"></div>
+          </div>
+
+          <form *ngIf="!profileLoading" (ngSubmit)="saveProfile()">
+            <div class="form-group">
+              <label>E-mail</label>
+              <input [value]="userEmail" disabled style="opacity:.45;cursor:not-allowed" />
+            </div>
+
+            <div class="form-group" style="margin-top:14px">
+              <label for="p-whatsapp">WhatsApp</label>
+              <input id="p-whatsapp" type="tel" [(ngModel)]="profileForm.whatsapp" name="whatsapp"
+                placeholder="5511999999999" />
+              <span class="form-hint">Formato: DDD + número (sem + ou espaços)</span>
+            </div>
+
+            <div class="form-group" style="margin-top:14px">
+              <label for="p-key">CallMeBot API Key</label>
+              <input id="p-key" type="text" [(ngModel)]="profileForm.callmebot_key" name="callmebot_key"
+                placeholder="Ex: 123456" />
+              <span class="form-hint">
+                Não tem? Envie <strong>I allow callmebot to send me messages</strong> para
+                <strong>+34 644 60 49 16</strong> no WhatsApp — a key chega em segundos.
+              </span>
+            </div>
+
+            <div *ngIf="profileError" class="error-box" style="margin-top:14px">{{ profileError }}</div>
+            <div *ngIf="profileSuccess" class="success-box" style="margin-top:14px">Perfil salvo com sucesso!</div>
+
+            <div class="modal-actions">
+              <button type="button" class="btn-ghost" (click)="closeProfileModal()">Cancelar</button>
+              <button type="submit" class="btn-primary modal-save" [disabled]="profileSaving">
+                <span *ngIf="profileSaving" class="spinner"></span>
+                <span *ngIf="!profileSaving">Salvar</span>
+              </button>
+            </div>
+          </form>
+
+        </div>
+      </div>
+
       <!-- ── Modal novo alerta ── -->
       <div class="modal-overlay" *ngIf="showModal" (click)="onOverlayClick($event)">
         <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -188,8 +239,8 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
             <div class="form-group" style="margin-top: 14px">
               <label for="m-whatsapp">WhatsApp para notificação</label>
               <input id="m-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="whatsapp"
-                placeholder="+5511999999999" required />
-              <span class="form-hint">Formato: +55 + DDD + número</span>
+                placeholder="5511999999999" required />
+              <span class="form-hint">Formato: DDD + número (sem + ou espaços)</span>
             </div>
 
             <div class="form-group" style="margin-top: 14px">
@@ -226,7 +277,8 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
     .nav-brand-icon { width: 32px; height: 32px; background: var(--color-accent-dim); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 16px; }
     .nav-brand-name { font-family: var(--font-display); font-weight: 800; font-size: 15px; }
     .nav-right { display: flex; align-items: center; gap: 12px; }
-    .nav-email { font-size: 12px; color: var(--color-text-muted); }
+    .nav-email { font-size: 12px; color: var(--color-text-muted); padding: 4px 8px; border-radius: var(--radius-sm); transition: background var(--transition), color var(--transition); }
+    .nav-email:hover { background: var(--color-bg-3); color: var(--color-text); }
     .nav-logout { padding: 6px 14px; font-size: 13px; }
     .main { flex: 1; max-width: var(--content-w); margin: 0 auto; width: 100%; padding: 32px var(--space-lg); }
     .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: var(--space-lg); gap: 16px; }
@@ -261,6 +313,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
     .modal-save { min-width: 140px; padding: 10px 20px; }
     .toggle-label { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .success-box { background: var(--color-green-dim); color: var(--color-green); border: 1px solid rgba(45,212,160,0.2); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; }
   `]
 })
 export class DashboardComponent implements OnInit {
@@ -271,6 +324,13 @@ export class DashboardComponent implements OnInit {
   formError  = '';
   userEmail  = '';
   editingId: string | null = null;
+
+  showProfileModal = false;
+  profileLoading   = false;
+  profileSaving    = false;
+  profileError     = '';
+  profileSuccess   = false;
+  profileForm      = { whatsapp: '', callmebot_key: '' };
 
   form: Partial<Alert> = this.emptyForm();
 
@@ -372,6 +432,45 @@ export class DashboardComponent implements OnInit {
   async logout() {
     await this.supabase.signOut();
     this.router.navigate(['/login']);
+  }
+
+  async openProfileModal() {
+    this.showProfileModal = true;
+    this.profileError     = '';
+    this.profileSuccess   = false;
+    this.profileLoading   = true;
+
+    const { data } = await this.supabase.getProfile();
+    this.profileForm = {
+      whatsapp:      data?.whatsapp      ?? '',
+      callmebot_key: data?.callmebot_key ?? ''
+    };
+    this.profileLoading = false;
+  }
+
+  closeProfileModal() {
+    this.showProfileModal = false;
+  }
+
+  onProfileOverlayClick(e: Event) {
+    if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
+      this.closeProfileModal();
+    }
+  }
+
+  async saveProfile() {
+    this.profileSaving  = true;
+    this.profileError   = '';
+    this.profileSuccess = false;
+
+    const { error } = await this.supabase.updateProfile(this.profileForm);
+
+    if (error) {
+      this.profileError = 'Erro ao salvar perfil. Tente novamente.';
+    } else {
+      this.profileSuccess = true;
+    }
+    this.profileSaving = false;
   }
 
   private emptyForm(): Partial<Alert> {

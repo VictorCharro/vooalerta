@@ -24,5 +24,4 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
-          CALLMEBOT_KEY: ${{ secrets.CALLMEBOT_KEY }}
         run: node backend/monitor.js
