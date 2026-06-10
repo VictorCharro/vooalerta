@@ -38,6 +38,12 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
           <button class="btn-primary" (click)="openModal()">+ Novo alerta</button>
         </div>
 
+        <!-- Aviso callmebot_key ausente -->
+        <div class="warn-banner fade-up" *ngIf="missingCallmebotKey">
+          ⚠️ Você ainda não cadastrou sua <strong>CallMeBot API Key</strong>. As notificações não serão enviadas.
+          <button class="btn-ghost warn-action" (click)="openProfileModal()">Configurar agora</button>
+        </div>
+
         <!-- Stats -->
         <div class="stats-grid fade-up" style="animation-delay:.04s" *ngIf="alerts.length > 0">
           <div class="stat-card">
@@ -319,6 +325,9 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
     .modal-save { min-width: 140px; padding: 10px 20px; }
     .toggle-label { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .warn-banner { display: flex; align-items: center; gap: 12px; background: var(--color-amber-dim); color: var(--color-amber); border: 1px solid rgba(245,166,35,0.2); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; margin-bottom: 20px; flex-wrap: wrap; }
+    .warn-action { font-size: 12px; color: var(--color-amber); border: 1px solid rgba(245,166,35,0.3); padding: 4px 10px; margin-left: auto; }
+    .warn-action:hover { background: rgba(245,166,35,0.1); }
     .success-box { background: var(--color-green-dim); color: var(--color-green); border: 1px solid rgba(45,212,160,0.2); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; }
     .phone-input { display: flex; align-items: stretch; }
     .phone-prefix { display: flex; align-items: center; padding: 0 12px; background: var(--color-bg-3); border: 1px solid var(--color-border); border-right: none; border-radius: var(--radius-sm) 0 0 var(--radius-sm); font-size: 14px; color: var(--color-text-muted); white-space: nowrap; }
@@ -334,12 +343,13 @@ export class DashboardComponent implements OnInit {
   userEmail  = '';
   editingId: string | null = null;
 
-  showProfileModal = false;
-  profileLoading   = false;
-  profileSaving    = false;
-  profileError     = '';
-  profileSuccess   = false;
-  profileForm      = { whatsapp: '', callmebot_key: '' };
+  showProfileModal    = false;
+  profileLoading      = false;
+  profileSaving       = false;
+  profileError        = '';
+  profileSuccess      = false;
+  profileForm         = { whatsapp: '', callmebot_key: '' };
+  missingCallmebotKey = false;
 
   form: Partial<Alert> = this.emptyForm();
   readonly today = new Date().toISOString().split('T')[0];
@@ -355,6 +365,8 @@ export class DashboardComponent implements OnInit {
     const user = await this.supabase.getUser();
     this.userEmail = user?.email ?? '';
     await this.loadAlerts();
+    const { data: profile } = await this.supabase.getProfile();
+    this.missingCallmebotKey = !profile?.callmebot_key;
   }
 
   async loadAlerts() {
@@ -503,7 +515,8 @@ export class DashboardComponent implements OnInit {
         ? 'Sua sessão expirou. Faça login novamente.'
         : 'Erro ao salvar perfil. Tente novamente.';
     } else {
-      this.profileSuccess = true;
+      this.profileSuccess      = true;
+      this.missingCallmebotKey = !this.profileForm.callmebot_key;
     }
     this.profileSaving = false;
   }
