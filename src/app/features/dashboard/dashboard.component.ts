@@ -152,9 +152,12 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
 
             <div class="form-group" style="margin-top:14px">
               <label for="p-whatsapp">WhatsApp</label>
-              <input id="p-whatsapp" type="tel" [(ngModel)]="profileForm.whatsapp" name="whatsapp"
-                placeholder="5511999999999" />
-              <span class="form-hint">Formato: DDD + número (sem + ou espaços)</span>
+              <div class="phone-input">
+                <span class="phone-prefix">55</span>
+                <input id="p-whatsapp" type="tel" [(ngModel)]="profileForm.whatsapp" name="whatsapp"
+                  placeholder="11999999999" maxlength="11" />
+              </div>
+              <span class="form-hint">DDD + número (ex: 11999999999)</span>
             </div>
 
             <div class="form-group" style="margin-top:14px">
@@ -238,9 +241,12 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
 
             <div class="form-group" style="margin-top: 14px">
               <label for="m-whatsapp">WhatsApp para notificação</label>
-              <input id="m-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="whatsapp"
-                placeholder="5511999999999" required />
-              <span class="form-hint">Formato: DDD + número (sem + ou espaços)</span>
+              <div class="phone-input">
+                <span class="phone-prefix">55</span>
+                <input id="m-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="whatsapp"
+                  placeholder="11999999999" maxlength="11" required />
+              </div>
+              <span class="form-hint">DDD + número (ex: 11999999999)</span>
             </div>
 
             <div class="form-group" style="margin-top: 14px">
@@ -314,6 +320,9 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
     .modal-save { min-width: 140px; padding: 10px 20px; }
     .toggle-label { display: flex; align-items: center; gap: 10px; cursor: pointer; }
     .success-box { background: var(--color-green-dim); color: var(--color-green); border: 1px solid rgba(45,212,160,0.2); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; }
+    .phone-input { display: flex; align-items: stretch; }
+    .phone-prefix { display: flex; align-items: center; padding: 0 12px; background: var(--color-bg-3); border: 1px solid var(--color-border); border-right: none; border-radius: var(--radius-sm) 0 0 var(--radius-sm); font-size: 14px; color: var(--color-text-muted); white-space: nowrap; }
+    .phone-input input { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; flex: 1; min-width: 0; }
   `]
 })
 export class DashboardComponent implements OnInit {
@@ -371,7 +380,7 @@ export class DashboardComponent implements OnInit {
       meta:           alert.meta,
       horario_minimo: alert.horario_minimo ?? '',
       so_direto:      alert.so_direto,
-      whatsapp:       alert.whatsapp,
+      whatsapp:       this.stripPrefix(alert.whatsapp),
       ativo:          alert.ativo
     };
     this.formError = '';
@@ -398,7 +407,7 @@ export class DashboardComponent implements OnInit {
       meta:            Number(this.form.meta),
       horario_minimo:  this.form.horario_minimo || null,
       so_direto:       this.form.so_direto ?? false,
-      whatsapp:        this.form.whatsapp!,
+      whatsapp:        '55' + this.form.whatsapp!,
       ativo:           true
     };
 
@@ -442,7 +451,7 @@ export class DashboardComponent implements OnInit {
 
     const { data } = await this.supabase.getProfile();
     this.profileForm = {
-      whatsapp:      data?.whatsapp      ?? '',
+      whatsapp:      this.stripPrefix(data?.whatsapp ?? ''),
       callmebot_key: data?.callmebot_key ?? ''
     };
     this.profileLoading = false;
@@ -463,7 +472,10 @@ export class DashboardComponent implements OnInit {
     this.profileError   = '';
     this.profileSuccess = false;
 
-    const { error } = await this.supabase.updateProfile(this.profileForm);
+    const { error } = await this.supabase.updateProfile({
+      whatsapp:      '55' + this.profileForm.whatsapp,
+      callmebot_key: this.profileForm.callmebot_key
+    });
 
     if (error) {
       this.profileError = 'Erro ao salvar perfil. Tente novamente.';
@@ -471,6 +483,10 @@ export class DashboardComponent implements OnInit {
       this.profileSuccess = true;
     }
     this.profileSaving = false;
+  }
+
+  private stripPrefix(phone: string): string {
+    return phone.startsWith('55') ? phone.slice(2) : phone;
   }
 
   private emptyForm(): Partial<Alert> {

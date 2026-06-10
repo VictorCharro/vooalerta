@@ -36,18 +36,20 @@ import { SupabaseService } from '@core/services/supabase.service';
           </div>
 
           <div class="form-group" style="margin-top: 14px">
-            <label for="whatsapp">
-              WhatsApp
-            </label>
-            <input
-              id="whatsapp"
-              type="tel"
-              [(ngModel)]="whatsapp"
-              name="whatsapp"
-              placeholder="5511999999999"
-              required
-            />
-            <span class="form-hint">Formato: DDD + número (sem + ou espaços)</span>
+            <label for="whatsapp">WhatsApp</label>
+            <div class="phone-input">
+              <span class="phone-prefix">55</span>
+              <input
+                id="whatsapp"
+                type="tel"
+                [(ngModel)]="whatsapp"
+                name="whatsapp"
+                placeholder="11999999999"
+                maxlength="11"
+                required
+              />
+            </div>
+            <span class="form-hint">DDD + número (ex: 11999999999)</span>
           </div>
 
           <div class="form-group" style="margin-top: 14px">
@@ -112,7 +114,7 @@ export class RegisterComponent {
   async onSubmit() {
     this.loading = true;
     this.error   = '';
-    const { error } = await this.supabase.signUp(this.email, this.password, this.whatsapp);
+    const { error } = await this.supabase.signUp(this.email, this.password, '55' + this.whatsapp);
     if (error) {
       this.error = error.message;
     } else {
