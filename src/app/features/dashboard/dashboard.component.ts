@@ -213,7 +213,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
             <div class="form-row" style="margin-top: 14px">
               <div class="form-group">
                 <label for="m-ida">Data de ida</label>
-                <input id="m-ida" type="date" [(ngModel)]="form.data_ida" name="data_ida" required />
+                <input id="m-ida" type="date" [(ngModel)]="form.data_ida" name="data_ida" [min]="today" required />
               </div>
               <div class="form-group">
                 <label for="m-volta">
@@ -342,6 +342,7 @@ export class DashboardComponent implements OnInit {
   profileForm      = { whatsapp: '', callmebot_key: '' };
 
   form: Partial<Alert> = this.emptyForm();
+  readonly today = new Date().toISOString().split('T')[0];
 
   get activeCount() { return this.alerts.filter(a => a.ativo).length; }
 
@@ -398,6 +399,12 @@ export class DashboardComponent implements OnInit {
   async saveAlert() {
     this.saving    = true;
     this.formError = '';
+
+    if (this.form.data_ida && this.form.data_ida < this.today) {
+      this.formError = 'A data de ida não pode ser no passado.';
+      this.saving = false;
+      return;
+    }
 
     if ((this.form.whatsapp ?? '').replace(/\D/g, '').length !== 11) {
       this.formError = 'WhatsApp inválido. Digite DDD + número (11 dígitos, ex: 11999999999).';
