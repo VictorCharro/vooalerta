@@ -92,7 +92,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
             <div class="ac-meta">
               <div class="ac-meta-item">
                 <span class="ac-meta-label">Meta</span>
-                <span class="ac-meta-value accent">R$&nbsp;{{ alert.meta | number:'1.0-0':'pt-BR' }}</span>
+                <span class="ac-meta-value accent">R$&nbsp;{{ alert.meta | number:'1.0-0' }}</span>
               </div>
               <div class="ac-meta-item">
                 <span class="ac-meta-label">Ida</span>
