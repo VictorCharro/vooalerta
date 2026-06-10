@@ -52,6 +52,12 @@ export class SupabaseService {
     return session?.user ?? null;
   }
 
+  isSessionError(error: unknown): boolean {
+    if (!error) return false;
+    const msg = (error as any)?.message ?? '';
+    return msg.includes('JWT') || msg.includes('session') || msg.includes('not authenticated') || msg.includes('Não autenticado');
+  }
+
   onAuthChange(callback: (user: User | null) => void) {
     this.client.auth.onAuthStateChange((_, session) => {
       callback(session?.user ?? null);

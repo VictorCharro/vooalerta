@@ -432,7 +432,9 @@ export class DashboardComponent implements OnInit {
     }
 
     if (error) {
-      this.formError = 'Erro ao salvar alerta. Tente novamente.';
+      this.formError = this.supabase.isSessionError(error)
+        ? 'Sua sessão expirou. Faça login novamente.'
+        : 'Erro ao salvar alerta. Tente novamente.';
     } else {
       this.closeModal();
       await this.loadAlerts();
@@ -497,7 +499,9 @@ export class DashboardComponent implements OnInit {
     });
 
     if (error) {
-      this.profileError = 'Erro ao salvar perfil. Tente novamente.';
+      this.profileError = this.supabase.isSessionError(error)
+        ? 'Sua sessão expirou. Faça login novamente.'
+        : 'Erro ao salvar perfil. Tente novamente.';
     } else {
       this.profileSuccess = true;
     }
