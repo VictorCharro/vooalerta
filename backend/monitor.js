@@ -251,6 +251,11 @@ async function main() {
     await processarRota(rota);
   }
 
+  // Limpa cache de rotas com data de ida no passado
+  const hoje = new Date().toISOString().split('T')[0];
+  await supabase('DELETE', `price_cache?data_ida=lt.${hoje}`);
+  console.log('\n🧹 Cache de datas passadas removido');
+
   console.log('\n✅ Monitoramento concluído!');
 }
 
