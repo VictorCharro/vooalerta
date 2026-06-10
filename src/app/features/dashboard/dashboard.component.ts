@@ -102,9 +102,13 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
                 <span class="ac-meta-label">Volta</span>
                 <span class="ac-meta-value">{{ alert.data_volta | date:'dd/MM/yy' }}</span>
               </div>
-              <div class="ac-meta-item">
-                <span class="ac-meta-label">Passageiros</span>
-                <span class="ac-meta-value">{{ alert.adultos }} adulto{{ alert.adultos > 1 ? 's' : '' }}</span>
+              <div class="ac-meta-item" *ngIf="alert.horario_minimo">
+                <span class="ac-meta-label">A partir de</span>
+                <span class="ac-meta-value">{{ alert.horario_minimo }}</span>
+              </div>
+              <div class="ac-meta-item" *ngIf="alert.so_direto">
+                <span class="ac-meta-label">Tipo</span>
+                <span class="ac-meta-value">Só direto</span>
               </div>
             </div>
 
@@ -170,13 +174,11 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
                   placeholder="3000" min="1" required />
               </div>
               <div class="form-group">
-                <label for="m-adultos">Adultos</label>
-                <select id="m-adultos" [(ngModel)]="form.adultos" name="adultos">
-                  <option [value]="1">1 adulto</option>
-                  <option [value]="2">2 adultos</option>
-                  <option [value]="3">3 adultos</option>
-                  <option [value]="4">4 adultos</option>
-                </select>
+                <label for="m-horario">
+                  Horário a partir de
+                  <span class="form-optional">(opcional)</span>
+                </label>
+                <input id="m-horario" type="time" [(ngModel)]="form.horario_minimo" name="horario_minimo" />
               </div>
             </div>
 
@@ -185,6 +187,17 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
               <input id="m-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="whatsapp"
                 placeholder="+5511999999999" required />
               <span class="form-hint">Formato: +55 + DDD + número</span>
+            </div>
+
+            <div class="form-group" style="margin-top: 14px">
+              <label class="toggle-label">
+                <label class="toggle" style="width:38px;height:22px">
+                  <input type="checkbox" [(ngModel)]="form.so_direto" name="so_direto" />
+                  <span class="track"></span>
+                  <span class="thumb"></span>
+                </label>
+                <span style="font-size:14px;color:var(--color-text)">Somente voos diretos</span>
+              </label>
             </div>
 
             <div *ngIf="formError" class="error-box" style="margin-top: 14px">{{ formError }}</div>
@@ -205,129 +218,46 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
   `,
   styles: [`
     .layout { min-height: 100vh; display: flex; flex-direction: column; }
-
-    /* Navbar */
-    .navbar {
-      height: var(--navbar-h);
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 var(--space-lg);
-      border-bottom: 1px solid var(--color-border);
-      background: var(--color-bg);
-      position: sticky; top: 0; z-index: 20;
-    }
+    .navbar { height: var(--navbar-h); display: flex; align-items: center; justify-content: space-between; padding: 0 var(--space-lg); border-bottom: 1px solid var(--color-border); background: var(--color-bg); position: sticky; top: 0; z-index: 20; }
     .nav-brand { display: flex; align-items: center; gap: 10px; }
-    .nav-brand-icon {
-      width: 32px; height: 32px;
-      background: var(--color-accent-dim);
-      border-radius: var(--radius-sm);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px;
-    }
+    .nav-brand-icon { width: 32px; height: 32px; background: var(--color-accent-dim); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 16px; }
     .nav-brand-name { font-family: var(--font-display); font-weight: 800; font-size: 15px; }
     .nav-right { display: flex; align-items: center; gap: 12px; }
     .nav-email { font-size: 12px; color: var(--color-text-muted); }
     .nav-logout { padding: 6px 14px; font-size: 13px; }
-
-    /* Main */
-    .main {
-      flex: 1;
-      max-width: var(--content-w);
-      margin: 0 auto;
-      width: 100%;
-      padding: 32px var(--space-lg);
-    }
-
-    /* Page header */
-    .page-header {
-      display: flex; align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: var(--space-lg);
-      gap: 16px;
-    }
+    .main { flex: 1; max-width: var(--content-w); margin: 0 auto; width: 100%; padding: 32px var(--space-lg); }
+    .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: var(--space-lg); gap: 16px; }
     h1 { font-size: 26px; margin-bottom: 4px; }
     .page-sub { color: var(--color-text-muted); font-size: 13px; }
-
-    /* Stats */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-bottom: 28px;
-    }
-
-    /* States */
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
     .center-state { display: flex; justify-content: center; padding: 60px; }
     .empty-state { text-align: center; padding: 60px var(--space-lg); }
     .empty-icon { font-size: 42px; opacity: 0.15; margin-bottom: 16px; }
     .empty-state h3 { font-size: 18px; margin-bottom: 8px; }
     .empty-state p { color: var(--color-text-muted); font-size: 14px; }
-
-    /* Alert cards */
     .alerts-list { display: grid; gap: 12px; }
-
-    .alert-card {
-      background: var(--color-bg-2);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: 20px 22px;
-      transition: border-color var(--transition), opacity var(--transition);
-    }
+    .alert-card { background: var(--color-bg-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 20px 22px; transition: border-color var(--transition), opacity var(--transition); }
     .alert-card:hover { border-color: var(--color-border-hover); }
     .alert-card.card-inactive { opacity: 0.45; }
-
-    .ac-top {
-      display: flex; align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
+    .ac-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
     .ac-route { display: flex; align-items: center; gap: 10px; }
     .ac-iata { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: 0.02em; }
     .ac-arrow { color: var(--color-text-dim); font-size: 14px; }
-
     .ac-meta { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 16px; }
     .ac-meta-item { display: flex; flex-direction: column; gap: 2px; }
     .ac-meta-label { font-size: 10px; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
     .ac-meta-value { font-size: 14px; font-weight: 500; }
     .ac-meta-value.accent { color: var(--color-accent); font-family: var(--font-display); font-size: 17px; }
-
-    .ac-footer {
-      display: flex; align-items: center;
-      justify-content: space-between;
-      border-top: 1px solid var(--color-border);
-      padding-top: 14px;
-      gap: 12px;
-    }
+    .ac-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--color-border); padding-top: 14px; gap: 12px; }
     .ac-phone { font-size: 12px; color: var(--color-text-muted); }
     .ac-actions { display: flex; align-items: center; gap: 12px; }
-
-    /* Modal */
-    .modal-overlay {
-      position: fixed; inset: 0; z-index: 100;
-      background: rgba(0,0,0,0.72);
-      display: flex; align-items: center; justify-content: center;
-      padding: var(--space-lg);
-    }
-    .modal {
-      width: 100%; max-width: 500px;
-      background: var(--color-bg-2);
-      border: 1px solid var(--color-border-hover);
-      border-radius: var(--radius-lg);
-      padding: 28px 32px;
-    }
-    .modal-head {
-      display: flex; align-items: center;
-      justify-content: space-between;
-      margin-bottom: 24px;
-    }
+    .modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.72); display: flex; align-items: center; justify-content: center; padding: var(--space-lg); }
+    .modal { width: 100%; max-width: 500px; background: var(--color-bg-2); border: 1px solid var(--color-border-hover); border-radius: var(--radius-lg); padding: 28px 32px; max-height: 90vh; overflow-y: auto; }
+    .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
     .modal-head h2 { font-size: 18px; }
-    .modal-actions {
-      display: flex; gap: 10px;
-      justify-content: flex-end;
-      margin-top: 22px;
-    }
-    .modal-save {
-      min-width: 140px; padding: 10px 20px;
-    }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+    .modal-save { min-width: 140px; padding: 10px 20px; }
+    .toggle-label { display: flex; align-items: center; gap: 10px; cursor: pointer; }
   `]
 })
 export class DashboardComponent implements OnInit {
@@ -338,7 +268,7 @@ export class DashboardComponent implements OnInit {
   formError  = '';
   userEmail  = '';
 
-  form: Partial<Alert & { origem: string; destino: string }> = this.emptyForm();
+  form: Partial<Alert> = this.emptyForm();
 
   get activeCount() { return this.alerts.filter(a => a.ativo).length; }
 
@@ -379,14 +309,15 @@ export class DashboardComponent implements OnInit {
     this.formError = '';
 
     const payload: AlertCreate = {
-      origem:     this.form.origem!,
-      destino:    this.form.destino!,
-      data_ida:   this.form.data_ida!,
-      data_volta: this.form.data_volta || null,
-      adultos:    Number(this.form.adultos),
-      meta:       Number(this.form.meta),
-      whatsapp:   this.form.whatsapp!,
-      ativo:      true
+      origem:          this.form.origem!,
+      destino:         this.form.destino!,
+      data_ida:        this.form.data_ida!,
+      data_volta:      this.form.data_volta || null,
+      meta:            Number(this.form.meta),
+      horario_minimo:  this.form.horario_minimo || null,
+      so_direto:       this.form.so_direto ?? false,
+      whatsapp:        this.form.whatsapp!,
+      ativo:           true
     };
 
     const { error } = await this.supabase.createAlert(payload);
@@ -417,14 +348,15 @@ export class DashboardComponent implements OnInit {
 
   private emptyForm(): Partial<Alert> {
     return {
-      origem:     '',
-      destino:    '',
-      data_ida:   '',
-      data_volta: '',
-      adultos:    1,
-      meta:       undefined,
-      whatsapp:   '',
-      ativo:      true
+      origem:         '',
+      destino:        '',
+      data_ida:       '',
+      data_volta:     '',
+      meta:           undefined,
+      horario_minimo: '',
+      so_direto:      false,
+      whatsapp:       '',
+      ativo:          true
     };
   }
 }

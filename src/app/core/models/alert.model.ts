@@ -5,8 +5,9 @@ export interface Alert {
   destino: string;
   data_ida: string;
   data_volta?: string | null;
-  adultos: number;
   meta: number;
+  horario_minimo?: string | null;
+  so_direto: boolean;
   whatsapp: string;
   ativo: boolean;
   criado_em?: string;
