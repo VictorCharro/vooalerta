@@ -114,6 +114,13 @@ export class RegisterComponent {
   async onSubmit() {
     this.loading = true;
     this.error   = '';
+
+    if (this.whatsapp.replace(/\D/g, '').length !== 11) {
+      this.error   = 'WhatsApp inválido. Digite DDD + número (11 dígitos, ex: 11999999999).';
+      this.loading = false;
+      return;
+    }
+
     const { error } = await this.supabase.signUp(this.email, this.password, '55' + this.whatsapp);
     if (error) {
       this.error = error.message;

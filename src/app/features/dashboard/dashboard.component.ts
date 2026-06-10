@@ -399,6 +399,12 @@ export class DashboardComponent implements OnInit {
     this.saving    = true;
     this.formError = '';
 
+    if ((this.form.whatsapp ?? '').replace(/\D/g, '').length !== 11) {
+      this.formError = 'WhatsApp inválido. Digite DDD + número (11 dígitos, ex: 11999999999).';
+      this.saving = false;
+      return;
+    }
+
     const payload = {
       origem:          this.form.origem!,
       destino:         this.form.destino!,
@@ -471,6 +477,12 @@ export class DashboardComponent implements OnInit {
     this.profileSaving  = true;
     this.profileError   = '';
     this.profileSuccess = false;
+
+    if (this.profileForm.whatsapp && this.profileForm.whatsapp.replace(/\D/g, '').length !== 11) {
+      this.profileError  = 'WhatsApp inválido. Digite DDD + número (11 dígitos, ex: 11999999999).';
+      this.profileSaving = false;
+      return;
+    }
 
     const { error } = await this.supabase.updateProfile({
       whatsapp:      '55' + this.profileForm.whatsapp,
