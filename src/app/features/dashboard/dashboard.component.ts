@@ -83,16 +83,19 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
                 <span class="ac-arrow">→</span>
                 <span class="ac-iata">{{ alert.destino }}</span>
               </div>
-              <span class="badge" [class.badge-green]="alert.ativo" [class.badge-dim]="!alert.ativo">
-                <span class="dot"></span>
-                {{ alert.ativo ? 'Ativo' : 'Pausado' }}
-              </span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="badge" [class.badge-green]="alert.ativo" [class.badge-dim]="!alert.ativo">
+                  <span class="dot"></span>
+                  {{ alert.ativo ? 'Ativo' : 'Pausado' }}
+                </span>
+                <button class="btn-icon" (click)="openEditModal(alert)" title="Editar alerta" aria-label="Editar alerta">✏️</button>
+              </div>
             </div>
 
             <div class="ac-meta">
               <div class="ac-meta-item">
                 <span class="ac-meta-label">Meta</span>
-                <span class="ac-meta-value accent">R$&nbsp;{{ alert.meta | number:'1.0-0' }}</span>
+                <span class="ac-meta-value accent">R$&nbsp;{{ alert.meta | number:'1.0-0':'pt-BR' }}</span>
               </div>
               <div class="ac-meta-item">
                 <span class="ac-meta-label">Ida</span>
@@ -133,7 +136,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
         <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="modal-title">
 
           <div class="modal-head">
-            <h2 id="modal-title">Novo alerta</h2>
+            <h2 id="modal-title">{{ editingId ? 'Editar alerta' : 'Novo alerta' }}</h2>
             <button class="btn-icon" (click)="closeModal()" aria-label="Fechar">✕</button>
           </div>
 
@@ -206,7 +209,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
               <button type="button" class="btn-ghost" (click)="closeModal()">Cancelar</button>
               <button type="submit" class="btn-primary modal-save" [disabled]="saving">
                 <span *ngIf="saving" class="spinner"></span>
-                <span *ngIf="!saving">Salvar alerta</span>
+                <span *ngIf="!saving">{{ editingId ? 'Salvar alterações' : 'Salvar alerta' }}</span>
               </button>
             </div>
           </form>
@@ -267,14 +270,15 @@ export class DashboardComponent implements OnInit {
   saving     = false;
   formError  = '';
   userEmail  = '';
+  editingId: string | null = null;
 
   form: Partial<Alert> = this.emptyForm();
 
   get activeCount() { return this.alerts.filter(a => a.ativo).length; }
 
   constructor(
-    private supabase: SupabaseService,
-    private router: Router
+      private supabase: SupabaseService,
+      private router: Router
   ) {}
 
   async ngOnInit() {
@@ -291,12 +295,30 @@ export class DashboardComponent implements OnInit {
   }
 
   openModal() {
+    this.editingId = null;
     this.form      = this.emptyForm();
     this.formError = '';
     this.showModal = true;
   }
 
-  closeModal() { this.showModal = false; }
+  openEditModal(alert: Alert) {
+    this.editingId = alert.id!;
+    this.form = {
+      origem:         alert.origem,
+      destino:        alert.destino,
+      data_ida:       alert.data_ida,
+      data_volta:     alert.data_volta ?? '',
+      meta:           alert.meta,
+      horario_minimo: alert.horario_minimo ?? '',
+      so_direto:      alert.so_direto,
+      whatsapp:       alert.whatsapp,
+      ativo:          alert.ativo
+    };
+    this.formError = '';
+    this.showModal = true;
+  }
+
+  closeModal() { this.showModal = false; this.editingId = null; }
 
   onOverlayClick(e: Event) {
     if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
@@ -308,7 +330,7 @@ export class DashboardComponent implements OnInit {
     this.saving    = true;
     this.formError = '';
 
-    const payload: AlertCreate = {
+    const payload = {
       origem:          this.form.origem!,
       destino:         this.form.destino!,
       data_ida:        this.form.data_ida!,
@@ -320,7 +342,13 @@ export class DashboardComponent implements OnInit {
       ativo:           true
     };
 
-    const { error } = await this.supabase.createAlert(payload);
+    let error;
+    if (this.editingId) {
+      ({ error } = await this.supabase.updateAlert(this.editingId, payload));
+    } else {
+      ({ error } = await this.supabase.createAlert(payload as AlertCreate));
+    }
+
     if (error) {
       this.formError = 'Erro ao salvar alerta. Tente novamente.';
     } else {
