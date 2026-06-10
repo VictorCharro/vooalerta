@@ -189,12 +189,20 @@ async function processarAlerta(alerta, voosCache) {
   const horario = melhorVoo.horario_partida ?? '--:--';
   const companhia = melhorVoo.companhia ?? 'Companhia não informada';
 
+  const googleFlightsUrl = (() => {
+    const base = 'https://www.google.com/travel/flights?hl=pt-BR&q=';
+    const query = `voos de ${alerta.origem} para ${alerta.destino} em ${alerta.data_ida}`;
+    return base + encodeURIComponent(query);
+  })();
+
   const mensagem = [
     `✈ ${alerta.origem} → ${alerta.destino} por R$ ${precoAtual}!`,
     ``,
     `Voo das ${horario} · ${companhia} · ${tipo}`,
     ``,
-    `Sua meta era R$ ${alerta.meta}. Corre comprar! 🎉`
+    `Sua meta era R$ ${alerta.meta}. Corre comprar! 🎉`,
+    ``,
+    `🔗 ${googleFlightsUrl}`
   ].join('\n');
 
   console.log(`    📱 Enviando WhatsApp para ${alerta.whatsapp}...`);
