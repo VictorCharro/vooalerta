@@ -105,11 +105,11 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
               </div>
               <div class="ac-meta-item">
                 <span class="ac-meta-label">Ida</span>
-                <span class="ac-meta-value">{{ alert.data_ida | date:'dd/MM/yy' }}</span>
+                <span class="ac-meta-value">{{ alert.data_ida | date:'dd/MM/yyyy' }}</span>
               </div>
               <div class="ac-meta-item" *ngIf="alert.data_volta">
                 <span class="ac-meta-label">Volta</span>
-                <span class="ac-meta-value">{{ alert.data_volta | date:'dd/MM/yy' }}</span>
+                <span class="ac-meta-value">{{ alert.data_volta | date:'dd/MM/yyyy' }}</span>
               </div>
               <div class="ac-meta-item" *ngIf="alert.horario_minimo">
                 <span class="ac-meta-label">A partir de</span>
@@ -300,6 +300,7 @@ export class DashboardComponent implements OnInit {
   profileSuccess      = false;
   profileForm         = { whatsapp: '', callmebot_key: '' };
   missingCallmebotKey = false;
+  profileWhatsapp     = '';
 
   form: Partial<Alert> = this.emptyForm();
   readonly today = new Date().toISOString().split('T')[0];
@@ -317,6 +318,7 @@ export class DashboardComponent implements OnInit {
     await this.loadAlerts();
     const { data: profile } = await this.supabase.getProfile();
     this.missingCallmebotKey = !profile?.callmebot_key;
+    this.profileWhatsapp     = this.stripPrefix(profile?.whatsapp ?? '');
   }
 
   async loadAlerts() {
@@ -329,6 +331,7 @@ export class DashboardComponent implements OnInit {
   openModal() {
     this.editingId = null;
     this.form      = this.emptyForm();
+    this.form.whatsapp = this.profileWhatsapp;
     this.formError = '';
     this.showModal = true;
   }
@@ -341,7 +344,7 @@ export class DashboardComponent implements OnInit {
       data_ida:       alert.data_ida,
       data_volta:     alert.data_volta ?? '',
       meta:           alert.meta,
-      horario_minimo: alert.horario_minimo ?? '',
+      horario_minimo: alert.horario_minimo ?? '00:00',
       so_direto:      alert.so_direto,
       whatsapp:       this.stripPrefix(alert.whatsapp),
       ativo:          alert.ativo
@@ -380,7 +383,7 @@ export class DashboardComponent implements OnInit {
       data_ida:        this.form.data_ida!,
       data_volta:      this.form.data_volta || null,
       meta:            Number(this.form.meta),
-      horario_minimo:  this.form.horario_minimo || null,
+      horario_minimo:  (this.form.horario_minimo && this.form.horario_minimo !== '00:00') ? this.form.horario_minimo : null,
       so_direto:       this.form.so_direto ?? false,
       whatsapp:        '55' + this.form.whatsapp!,
       ativo:           true
@@ -482,7 +485,7 @@ export class DashboardComponent implements OnInit {
       data_ida:       '',
       data_volta:     '',
       meta:           undefined,
-      horario_minimo: '',
+      horario_minimo: '00:00',
       so_direto:      false,
       whatsapp:       '',
       ativo:          true
