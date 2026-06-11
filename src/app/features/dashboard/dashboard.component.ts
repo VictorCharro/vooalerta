@@ -9,25 +9,40 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
   selector: 'app-dashboard',
   standalone: true,
   imports: [CommonModule, FormsModule],
+  styleUrls: ['./dashboard.component.css'],
   template: `
     <div class="layout">
 
-      <!-- ── Navbar ── -->
-      <nav class="navbar">
-        <div class="nav-brand">
-          <div class="nav-brand-icon">✈</div>
-          <span class="nav-brand-name">VooAlerta</span>
+      <!-- ── Sidebar ── -->
+      <aside class="sidebar">
+        <div class="sidebar-top">
+          <div class="brand">
+            <div class="brand-icon">✈</div>
+            <span class="brand-name">VooAlerta</span>
+          </div>
+          <nav class="sidebar-nav">
+            <button class="nav-item active">
+              <span class="nav-icon">◫</span> Dashboard
+            </button>
+            <button class="nav-item" (click)="openProfileModal()">
+              <span class="nav-icon">◯</span> Perfil
+            </button>
+          </nav>
         </div>
-        <div class="nav-right">
-          <button class="btn-ghost nav-email" (click)="openProfileModal()">{{ userEmail }}</button>
-          <button class="btn-ghost nav-logout" (click)="logout()">Sair</button>
+        <div class="sidebar-bottom">
+          <button class="theme-btn" (click)="toggleTheme()" [title]="isDark ? 'Modo claro' : 'Modo escuro'">
+            {{ isDark ? '☀' : '☾' }} {{ isDark ? 'Modo claro' : 'Modo escuro' }}
+          </button>
+          <div class="sidebar-user">
+            <span class="user-email">{{ userEmail }}</span>
+            <button class="btn-ghost sidebar-logout" (click)="logout()">Sair</button>
+          </div>
         </div>
-      </nav>
+      </aside>
 
       <!-- ── Main ── -->
       <main class="main">
 
-        <!-- Header -->
         <div class="page-header fade-up">
           <div>
             <h1>Meus alertas</h1>
@@ -45,7 +60,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
         </div>
 
         <!-- Stats -->
-        <div class="stats-grid fade-up" style="animation-delay:.04s" *ngIf="alerts.length > 0">
+        <div class="stats-grid fade-up" *ngIf="alerts.length > 0">
           <div class="stat-card">
             <span class="stat-label">Total</span>
             <span class="stat-value">{{ alerts.length }}</span>
@@ -70,9 +85,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
           <div class="empty-icon">✈</div>
           <h3>Nenhum alerta ainda</h3>
           <p>Crie seu primeiro alerta e receba no WhatsApp quando o preço cair.</p>
-          <button class="btn-primary" (click)="openModal()" style="margin-top: 20px">
-            Criar primeiro alerta
-          </button>
+          <button class="btn-primary" (click)="openModal()" style="margin-top:20px">Criar primeiro alerta</button>
         </div>
 
         <!-- Alert cards -->
@@ -83,52 +96,65 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
             [style.animation-delay]="(i * 0.04) + 's'"
             [class.card-inactive]="!alert.ativo"
           >
-            <div class="ac-top">
-              <div class="ac-route">
-                <span class="ac-iata">{{ alert.origem }}</span>
-                <span class="ac-arrow">→</span>
-                <span class="ac-iata">{{ alert.destino }}</span>
+            <!-- Card header -->
+            <div class="card-header">
+              <div class="card-route">
+                <span class="iata">{{ alert.origem }}</span>
+                <span class="route-arrow">→</span>
+                <span class="iata">{{ alert.destino }}</span>
               </div>
-              <div style="display:flex;align-items:center;gap:8px">
+              <div class="card-status">
                 <span class="badge" [class.badge-green]="alert.ativo" [class.badge-dim]="!alert.ativo">
-                  <span class="dot"></span>
-                  {{ alert.ativo ? 'Ativo' : 'Pausado' }}
+                  <span class="dot"></span>{{ alert.ativo ? 'Ativo' : 'Pausado' }}
                 </span>
-                <button class="btn-icon" (click)="openEditModal(alert)" title="Editar alerta" aria-label="Editar alerta">✏️</button>
-              </div>
-            </div>
-
-            <div class="ac-meta">
-              <div class="ac-meta-item">
-                <span class="ac-meta-label">Meta</span>
-                <span class="ac-meta-value accent">R$&nbsp;{{ alert.meta | number:'1.0-0' }}</span>
-              </div>
-              <div class="ac-meta-item">
-                <span class="ac-meta-label">Ida</span>
-                <span class="ac-meta-value">{{ alert.data_ida | date:'dd/MM/yyyy' }}</span>
-              </div>
-              <div class="ac-meta-item" *ngIf="alert.data_volta">
-                <span class="ac-meta-label">Volta</span>
-                <span class="ac-meta-value">{{ alert.data_volta | date:'dd/MM/yyyy' }}</span>
-              </div>
-              <div class="ac-meta-item" *ngIf="alert.horario_minimo">
-                <span class="ac-meta-label">A partir de</span>
-                <span class="ac-meta-value">{{ alert.horario_minimo }}</span>
-              </div>
-              <div class="ac-meta-item" *ngIf="alert.so_direto">
-                <span class="ac-meta-label">Tipo</span>
-                <span class="ac-meta-value">Só direto</span>
-              </div>
-            </div>
-
-            <div class="ac-footer">
-              <span class="ac-phone">📱 {{ alert.whatsapp }}</span>
-              <div class="ac-actions">
-                <label class="toggle" [title]="alert.ativo ? 'Pausar alerta' : 'Ativar alerta'">
+                <label class="toggle" [title]="alert.ativo ? 'Pausar' : 'Ativar'">
                   <input type="checkbox" [checked]="alert.ativo" (change)="toggleAlert(alert)" />
                   <span class="track"></span>
                   <span class="thumb"></span>
                 </label>
+              </div>
+            </div>
+
+            <!-- Prices -->
+            <div class="card-prices">
+              <div class="price-block">
+                <span class="price-label">Sua meta</span>
+                <span class="price-value">R$&nbsp;{{ alert.meta | number:'1.0-0' }}</span>
+              </div>
+              <div class="price-divider"></div>
+              <div class="price-block" *ngIf="getMinPrice(alert) !== null">
+                <span class="price-label">Menor preço</span>
+                <span class="price-value" [class.price-below]="getMinPrice(alert)! <= alert.meta" [class.price-above]="getMinPrice(alert)! > alert.meta">
+                  R$&nbsp;{{ getMinPrice(alert) | number:'1.0-0' }}
+                </span>
+                <span class="price-diff" [class.diff-green]="getMinPrice(alert)! <= alert.meta" [class.diff-red]="getMinPrice(alert)! > alert.meta">
+                  {{ getMinPrice(alert)! <= alert.meta ? '↓' : '↑' }}
+                  R$&nbsp;{{ (alert.meta - getMinPrice(alert)!) | number:'1.0-0' }}
+                </span>
+              </div>
+              <div class="price-block" *ngIf="getMinPrice(alert) === null && !minPricesLoading">
+                <span class="price-label">Menor preço</span>
+                <span class="price-value muted">—</span>
+              </div>
+              <div class="price-block" *ngIf="minPricesLoading && getMinPrice(alert) === null">
+                <span class="price-label">Menor preço</span>
+                <span class="price-skeleton"></span>
+              </div>
+            </div>
+
+            <!-- Details -->
+            <div class="card-details">
+              <span class="detail-tag">📅 {{ alert.data_ida | date:'dd/MM/yyyy' }}</span>
+              <span class="detail-tag" *ngIf="alert.data_volta">↩ {{ alert.data_volta | date:'dd/MM/yyyy' }}</span>
+              <span class="detail-tag" *ngIf="alert.horario_minimo">🕐 A partir das {{ alert.horario_minimo }}</span>
+              <span class="badge badge-amber" *ngIf="alert.so_direto">Só direto</span>
+            </div>
+
+            <!-- Footer -->
+            <div class="card-footer">
+              <span class="card-phone">📱 {{ alert.whatsapp }}</span>
+              <div class="card-actions">
+                <button class="btn-icon" (click)="openEditModal(alert)" title="Editar" aria-label="Editar">✏️</button>
                 <button class="btn-danger" (click)="confirmDelete(alert)">Excluir</button>
               </div>
             </div>
@@ -140,22 +166,18 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
       <!-- ── Modal perfil ── -->
       <div class="modal-overlay" *ngIf="showProfileModal" (click)="onProfileOverlayClick($event)">
         <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
-
           <div class="modal-head">
             <h2 id="profile-modal-title">Meu perfil</h2>
             <button class="btn-icon" (click)="closeProfileModal()" aria-label="Fechar">✕</button>
           </div>
-
           <div *ngIf="profileLoading" class="center-state" style="padding:32px">
             <div class="spinner spinner-dark" style="width:24px;height:24px;border-width:3px"></div>
           </div>
-
           <form *ngIf="!profileLoading" (ngSubmit)="saveProfile()">
             <div class="form-group">
               <label>E-mail</label>
               <input [value]="userEmail" disabled style="opacity:.45;cursor:not-allowed" />
             </div>
-
             <div class="form-group" style="margin-top:14px">
               <label for="p-whatsapp">WhatsApp</label>
               <div class="phone-input">
@@ -165,7 +187,6 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
               </div>
               <span class="form-hint">DDD + número (ex: 11999999999)</span>
             </div>
-
             <div class="form-group" style="margin-top:14px">
               <label for="p-key">CallMeBot API Key</label>
               <input id="p-key" type="text" [(ngModel)]="profileForm.callmebot_key" name="callmebot_key"
@@ -175,10 +196,8 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
                 <strong>+34 644 60 49 16</strong> no WhatsApp — a key chega em segundos.
               </span>
             </div>
-
             <div *ngIf="profileError" class="error-box" style="margin-top:14px">{{ profileError }}</div>
             <div *ngIf="profileSuccess" class="success-box" style="margin-top:14px">Perfil salvo com sucesso!</div>
-
             <div class="modal-actions">
               <button type="button" class="btn-ghost" (click)="closeProfileModal()">Cancelar</button>
               <button type="submit" class="btn-primary modal-save" [disabled]="profileSaving">
@@ -187,19 +206,16 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
               </button>
             </div>
           </form>
-
         </div>
       </div>
 
-      <!-- ── Modal novo alerta ── -->
+      <!-- ── Modal novo/editar alerta ── -->
       <div class="modal-overlay" *ngIf="showModal" (click)="onOverlayClick($event)">
         <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-
           <div class="modal-head">
             <h2 id="modal-title">{{ editingId ? 'Editar alerta' : 'Novo alerta' }}</h2>
             <button class="btn-icon" (click)="closeModal()" aria-label="Fechar">✕</button>
           </div>
-
           <form (ngSubmit)="saveAlert()">
             <div class="form-row">
               <div class="form-group">
@@ -215,8 +231,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
                   (input)="form.destino = form.destino!.toUpperCase()" required />
               </div>
             </div>
-
-            <div class="form-row" style="margin-top: 14px">
+            <div class="form-row" style="margin-top:14px">
               <div class="form-group">
                 <label for="m-ida">Data de ida</label>
                 <input id="m-ida" type="date" [(ngModel)]="form.data_ida" name="data_ida" [min]="today" required />
@@ -226,11 +241,21 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
                   Data de volta
                   <span class="form-optional">(opcional)</span>
                 </label>
-                <input id="m-volta" type="date" [(ngModel)]="form.data_volta" name="data_volta" />
+                <input id="m-volta" type="date" [(ngModel)]="form.data_volta" name="data_volta"
+                  [min]="form.data_ida || today" [disabled]="!!form.so_ida" />
               </div>
             </div>
-
-            <div class="form-row" style="margin-top: 14px">
+            <div class="form-group" style="margin-top:14px">
+              <label class="toggle-label">
+                <label class="toggle" style="width:38px;height:22px">
+                  <input type="checkbox" [(ngModel)]="form.so_ida" name="so_ida" (change)="onSoIdaChange()" />
+                  <span class="track"></span>
+                  <span class="thumb"></span>
+                </label>
+                <span style="font-size:14px;color:var(--color-text)">Só ida</span>
+              </label>
+            </div>
+            <div class="form-row" style="margin-top:14px">
               <div class="form-group">
                 <label for="m-meta">Meta de preço (R$)</label>
                 <input id="m-meta" type="number" [(ngModel)]="form.meta" name="meta"
@@ -244,8 +269,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
                 <input id="m-horario" type="time" [(ngModel)]="form.horario_minimo" name="horario_minimo" />
               </div>
             </div>
-
-            <div class="form-group" style="margin-top: 14px">
+            <div class="form-group" style="margin-top:14px">
               <label for="m-whatsapp">WhatsApp para notificação</label>
               <div class="phone-input">
                 <span class="phone-prefix">55</span>
@@ -254,8 +278,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
               </div>
               <span class="form-hint">DDD + número (ex: 11999999999)</span>
             </div>
-
-            <div class="form-group" style="margin-top: 14px">
+            <div class="form-group" style="margin-top:14px">
               <label class="toggle-label">
                 <label class="toggle" style="width:38px;height:22px">
                   <input type="checkbox" [(ngModel)]="form.so_direto" name="so_direto" />
@@ -265,9 +288,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
                 <span style="font-size:14px;color:var(--color-text)">Somente voos diretos</span>
               </label>
             </div>
-
-            <div *ngIf="formError" class="error-box" style="margin-top: 14px">{{ formError }}</div>
-
+            <div *ngIf="formError" class="error-box" style="margin-top:14px">{{ formError }}</div>
             <div class="modal-actions">
               <button type="button" class="btn-ghost" (click)="closeModal()">Cancelar</button>
               <button type="submit" class="btn-primary modal-save" [disabled]="saving">
@@ -276,13 +297,11 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
               </button>
             </div>
           </form>
-
         </div>
       </div>
 
     </div>
-  `,
-  styleUrls: ['./dashboard.component.css']
+  `
 })
 export class DashboardComponent implements OnInit {
   alerts:    Alert[] = [];
@@ -302,7 +321,12 @@ export class DashboardComponent implements OnInit {
   missingCallmebotKey = false;
   profileWhatsapp     = '';
 
-  form: Partial<Alert> = this.emptyForm();
+  minPrices:        Record<string, number> = {};
+  minPricesLoading  = false;
+
+  isDark = true;
+
+  form: Partial<Alert & { so_ida: boolean }> = this.emptyForm();
   readonly today = new Date().toISOString().split('T')[0];
 
   get activeCount() { return this.alerts.filter(a => a.ativo).length; }
@@ -313,6 +337,7 @@ export class DashboardComponent implements OnInit {
   ) {}
 
   async ngOnInit() {
+    this.isDark = (localStorage.getItem('theme') ?? 'dark') === 'dark';
     const user = await this.supabase.getUser();
     this.userEmail = user?.email ?? '';
     await this.loadAlerts();
@@ -326,14 +351,44 @@ export class DashboardComponent implements OnInit {
     const { data } = await this.supabase.getAlerts();
     this.alerts  = (data as Alert[]) ?? [];
     this.loading = false;
+    this.loadMinPrices();
+  }
+
+  async loadMinPrices() {
+    if (!this.alerts.length) return;
+    this.minPricesLoading = true;
+    const prices: Record<string, number> = {};
+    await Promise.all(
+      this.alerts.map(async (alert) => {
+        const key = `${alert.origem}-${alert.destino}-${alert.data_ida}`;
+        if (prices[key] === undefined) {
+          const price = await this.supabase.getMinPriceForRoute(alert.origem, alert.destino, alert.data_ida);
+          if (price !== null) prices[key] = price;
+        }
+      })
+    );
+    this.minPrices = prices;
+    this.minPricesLoading = false;
+  }
+
+  getMinPrice(alert: Alert): number | null {
+    const val = this.minPrices[`${alert.origem}-${alert.destino}-${alert.data_ida}`];
+    return val !== undefined ? val : null;
+  }
+
+  toggleTheme() {
+    this.isDark = !this.isDark;
+    const theme = this.isDark ? 'dark' : 'light';
+    localStorage.setItem('theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
   }
 
   openModal() {
-    this.editingId = null;
-    this.form      = this.emptyForm();
-    this.form.whatsapp = this.profileWhatsapp;
-    this.formError = '';
-    this.showModal = true;
+    this.editingId         = null;
+    this.form              = this.emptyForm();
+    this.form.whatsapp     = this.profileWhatsapp;
+    this.formError         = '';
+    this.showModal         = true;
   }
 
   openEditModal(alert: Alert) {
@@ -347,18 +402,21 @@ export class DashboardComponent implements OnInit {
       horario_minimo: alert.horario_minimo ?? '00:00',
       so_direto:      alert.so_direto,
       whatsapp:       this.stripPrefix(alert.whatsapp),
-      ativo:          alert.ativo
+      ativo:          alert.ativo,
+      so_ida:         !alert.data_volta
     };
     this.formError = '';
     this.showModal = true;
   }
 
+  onSoIdaChange() {
+    if (this.form.so_ida) this.form.data_volta = '';
+  }
+
   closeModal() { this.showModal = false; this.editingId = null; }
 
   onOverlayClick(e: Event) {
-    if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
-      this.closeModal();
-    }
+    if ((e.target as HTMLElement).classList.contains('modal-overlay')) this.closeModal();
   }
 
   async saveAlert() {
@@ -367,6 +425,12 @@ export class DashboardComponent implements OnInit {
 
     if (this.form.data_ida && this.form.data_ida < this.today) {
       this.formError = 'A data de ida não pode ser no passado.';
+      this.saving = false;
+      return;
+    }
+
+    if (this.form.data_volta && this.form.data_volta < this.form.data_ida!) {
+      this.formError = 'A data de volta não pode ser anterior à data de ida.';
       this.saving = false;
       return;
     }
@@ -381,7 +445,7 @@ export class DashboardComponent implements OnInit {
       origem:          this.form.origem!,
       destino:         this.form.destino!,
       data_ida:        this.form.data_ida!,
-      data_volta:      this.form.data_volta || null,
+      data_volta:      this.form.so_ida ? null : (this.form.data_volta || null),
       meta:            Number(this.form.meta),
       horario_minimo:  (this.form.horario_minimo && this.form.horario_minimo !== '00:00') ? this.form.horario_minimo : null,
       so_direto:       this.form.so_direto ?? false,
@@ -428,7 +492,6 @@ export class DashboardComponent implements OnInit {
     this.profileError     = '';
     this.profileSuccess   = false;
     this.profileLoading   = true;
-
     const { data } = await this.supabase.getProfile();
     this.profileForm = {
       whatsapp:      this.stripPrefix(data?.whatsapp ?? ''),
@@ -437,14 +500,10 @@ export class DashboardComponent implements OnInit {
     this.profileLoading = false;
   }
 
-  closeProfileModal() {
-    this.showProfileModal = false;
-  }
+  closeProfileModal() { this.showProfileModal = false; }
 
   onProfileOverlayClick(e: Event) {
-    if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
-      this.closeProfileModal();
-    }
+    if ((e.target as HTMLElement).classList.contains('modal-overlay')) this.closeProfileModal();
   }
 
   async saveProfile() {
@@ -459,8 +518,8 @@ export class DashboardComponent implements OnInit {
     }
 
     const { error } = await this.supabase.updateProfile({
-      whatsapp:      '55' + this.profileForm.whatsapp,
-      callmebot_key: this.profileForm.callmebot_key
+      whatsapp:      this.profileForm.whatsapp ? '55' + this.profileForm.whatsapp : undefined,
+      callmebot_key: this.profileForm.callmebot_key || undefined
     });
 
     if (error) {
@@ -470,6 +529,7 @@ export class DashboardComponent implements OnInit {
     } else {
       this.profileSuccess      = true;
       this.missingCallmebotKey = !this.profileForm.callmebot_key;
+      if (this.profileForm.whatsapp) this.profileWhatsapp = this.profileForm.whatsapp;
     }
     this.profileSaving = false;
   }
@@ -478,17 +538,11 @@ export class DashboardComponent implements OnInit {
     return phone.startsWith('55') ? phone.slice(2) : phone;
   }
 
-  private emptyForm(): Partial<Alert> {
+  private emptyForm(): Partial<Alert & { so_ida: boolean }> {
     return {
-      origem:         '',
-      destino:        '',
-      data_ida:       '',
-      data_volta:     '',
-      meta:           undefined,
-      horario_minimo: '00:00',
-      so_direto:      false,
-      whatsapp:       '',
-      ativo:          true
+      origem: '', destino: '', data_ida: '', data_volta: '',
+      meta: undefined, horario_minimo: '00:00',
+      so_direto: false, so_ida: false, whatsapp: '', ativo: true
     };
   }
 }

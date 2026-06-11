@@ -87,6 +87,20 @@ export class SupabaseService {
         .eq('id', session.user.id);
   }
 
+  async getMinPriceForRoute(origem: string, destino: string, dataIda: string): Promise<number | null> {
+    const { data } = await this.client
+        .from('price_cache')
+        .select('preco')
+        .eq('origem', origem)
+        .eq('destino', destino)
+        .eq('data_ida', dataIda)
+        .not('preco', 'is', null)
+        .order('preco', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+    return data?.preco ?? null;
+  }
+
   async getAlerts() {
     const { data: { session } } = await this.client.auth.getSession();
     if (!session) return { data: [], error: null };
