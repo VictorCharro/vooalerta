@@ -1,13 +1,12 @@
 // =============================================================
 // VooAlerta — Monitor de Passagens
 // Roda via GitHub Actions a cada hora
-// Primário: Playwright (raspa Google Flights, grátis)
-// Fallback: SerpAPI (quando Playwright for bloqueado)
+// Busca: SerpAPI (Google Flights)
 // =============================================================
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
-const SERPAPI_KEY  = process.env.SERPAPI_KEY; // opcional — usado só como fallback
+const SERPAPI_KEY  = process.env.SERPAPI_KEY;
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -42,131 +41,7 @@ function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-// ── Playwright (scraping Google Flights) ──────────────────────
-
-async function buscarPlaywright(origem, destino, dataIda, dataVolta) {
-  let browser;
-  try {
-    const { chromium } = await import('playwright');
-
-    browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-web-security',
-      ]
-    });
-
-    const context = await browser.newContext({
-      locale: 'pt-BR',
-      timezoneId: 'America/Sao_Paulo',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      viewport: { width: 1280, height: 900 }
-    });
-
-    // Remove sinais de automação
-    await context.addInitScript(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-    });
-
-    const page = await context.newPage();
-
-    const tt = dataVolta ? 'r' : 'o';
-    const url = `https://www.google.com/travel/flights?hl=pt-BR&curr=BRL&f=${origem}&t=${destino}&d=${dataIda}&tt=${tt}`;
-    console.log(`  🌐 Playwright: ${url}`);
-
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-    // Aguarda resultados aparecerem
-    try {
-      await page.waitForSelector('[data-resulttype="sl"]', { timeout: 15000 });
-    } catch {
-      // Tenta seletor alternativo
-      try {
-        await page.waitForSelector('.pIav2d, .yR1fYc', { timeout: 5000 });
-      } catch {
-        console.log('  ⚠️  Playwright: sem resultados (CAPTCHA ou bloqueio)');
-        return null;
-      }
-    }
-
-    // Pausa para carregar todos os voos
-    await sleep(2500);
-
-    const voos = await page.evaluate(() => {
-      const cards = Array.from(document.querySelectorAll('[data-resulttype="sl"]'));
-      if (cards.length === 0) return null;
-
-      return cards.map(card => {
-        const texto = card.innerText || '';
-
-        // Preço: procura padrão "R$ 1.234" ou "R$1234"
-        const precoMatch = texto.match(/R\$\s*([\d.,]+)/);
-        if (!precoMatch) return null;
-        const preco = parseInt(precoMatch[1].replace(/\./g, '').replace(',', ''));
-        if (!preco || preco < 50) return null;
-
-        // Horários: pega todos os HH:MM do card
-        const horarios = texto.match(/\b\d{1,2}:\d{2}\b/g) || [];
-
-        // Duração: "2 h 30 min" ou "2h30m"
-        const duracaoMatch = texto.match(/(\d+)\s*h(?:(?:r?s?)?\.?\s*(\d+)\s*m(?:in)?)?/i);
-        const duracao_min = duracaoMatch
-          ? parseInt(duracaoMatch[1]) * 60 + (parseInt(duracaoMatch[2]) || 0)
-          : null;
-
-        // Escalas
-        let escalas = 0;
-        const textoLower = texto.toLowerCase();
-        if (textoLower.includes('direto') || textoLower.includes('nonstop')) {
-          escalas = 0;
-        } else {
-          const paradaMatch = texto.match(/(\d+)\s*parada/i);
-          escalas = paradaMatch ? parseInt(paradaMatch[1]) : 1;
-        }
-
-        // Companhia: primeira linha que não é horário/preço/duração
-        const linhas = texto.split('\n').map(l => l.trim()).filter(Boolean);
-        const companhia = linhas.find(l =>
-          l.length > 2 &&
-          !l.match(/^R\$/) &&
-          !l.match(/^\d{1,2}:\d{2}/) &&
-          !l.match(/^\d+\s*h/) &&
-          !l.match(/parada/i) &&
-          !l.match(/direto/i)
-        ) || null;
-
-        return {
-          preco,
-          companhia,
-          horario_partida: horarios[0] || null,
-          horario_chegada: horarios[1] || null,
-          duracao_min,
-          escalas
-        };
-      }).filter(Boolean);
-    });
-
-    if (!voos || voos.length === 0) {
-      console.log('  ⚠️  Playwright: nenhum voo extraído');
-      return null;
-    }
-
-    console.log(`  🎭 Playwright: ${voos.length} voos encontrados`);
-    return voos;
-
-  } catch (err) {
-    console.log(`  ⚠️  Playwright erro: ${err.message}`);
-    return null;
-  } finally {
-    if (browser) await browser.close();
-  }
-}
-
-// ── SerpAPI (fallback) ────────────────────────────────────────
+// ── SerpAPI ───────────────────────────────────────────────────
 
 async function buscarSerpapi(origem, destino, dataIda, dataVolta) {
   const params = new URLSearchParams({
@@ -182,7 +57,7 @@ async function buscarSerpapi(origem, destino, dataIda, dataVolta) {
   if (dataVolta) params.set('return_date', dataVolta);
 
   const res = await fetch(`https://serpapi.com/search?${params}`);
-  if (!res.ok) throw new Error(`Serpapi erro: ${res.status}`);
+  if (!res.ok) throw new Error(`SerpAPI erro: ${res.status}`);
   const resultado = await res.json();
 
   const voos = [
@@ -209,7 +84,7 @@ async function buscarSerpapi(origem, destino, dataIda, dataVolta) {
 // ── Salva voos no cache ───────────────────────────────────────
 
 async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
-  // Limpa entradas antigas da mesma rota antes de inserir as novas
+  // Limpa entradas antigas da rota antes de inserir as novas
   const dataVoltaFilter = dataVolta
     ? `&data_volta=eq.${dataVolta}`
     : '&data_volta=is.null';
@@ -242,38 +117,29 @@ async function processarRota(rota) {
   const { origem, destino, data_ida, data_volta } = rota;
   console.log(`\n📍 Processando rota: ${origem} → ${destino} | ${data_ida}`);
 
-  // 1. Tenta Playwright primeiro (grátis, sem limite)
-  let voosNovos = await buscarPlaywright(origem, destino, data_ida, data_volta);
+  // Usa cache se tiver menos de 6h
+  const seisHorasAtras = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+  const cacheRecente = await supabase(
+    'GET',
+    `price_cache?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${data_ida}&atualizado_em=gte.${seisHorasAtras}&limit=1`
+  );
 
-  // 2. Playwright falhou → tenta SerpAPI se cache tiver > 2h
-  if (!voosNovos) {
-    const duasHorasAtras = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    const cacheRecente = await supabase(
-      'GET',
-      `price_cache?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${data_ida}&atualizado_em=gte.${duasHorasAtras}&limit=1`
-    );
-
-    if (cacheRecente.length > 0) {
-      console.log(`  ✅ Cache recente (< 2h) — usando dados existentes`);
-    } else if (SERPAPI_KEY) {
-      console.log(`  🔍 Fallback SerpAPI...`);
-      try {
-        voosNovos = await buscarSerpapi(origem, destino, data_ida, data_volta);
-        console.log(`  ✈ SerpAPI: ${voosNovos.length} voos encontrados`);
-      } catch (err) {
-        console.error(`  ❌ SerpAPI erro: ${err.message}`);
+  if (cacheRecente.length > 0) {
+    console.log(`  ✅ Cache recente (< 6h) — usando dados existentes`);
+  } else {
+    console.log(`  🔍 Buscando no SerpAPI...`);
+    try {
+      const voos = await buscarSerpapi(origem, destino, data_ida, data_volta);
+      console.log(`  ✈ ${voos.length} voos encontrados`);
+      if (voos.length > 0) {
+        await salvarCache(voos, origem, destino, data_ida, data_volta);
       }
-    } else {
-      console.log(`  ⚠️  Playwright bloqueado e sem SerpAPI key — pulando busca`);
+    } catch (err) {
+      console.error(`  ❌ SerpAPI erro: ${err.message}`);
     }
   }
 
-  // 3. Salva novos voos no cache
-  if (voosNovos && voosNovos.length > 0) {
-    await salvarCache(voosNovos, origem, destino, data_ida, data_volta);
-  }
-
-  // 4. Busca alertas e voos do cache para processar notificações
+  // Busca alertas e voos do cache para processar notificações
   const alertas = await supabase(
     'GET',
     `alerts_ativos?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${data_ida}`
@@ -288,10 +154,6 @@ async function processarRota(rota) {
   for (const alerta of alertas) {
     await processarAlerta(alerta, voosCache);
   }
-
-  // Pausa aleatória entre rotas para não parecer bot
-  const pausaMs = 4000 + Math.random() * 3000;
-  await sleep(pausaMs);
 }
 
 async function processarAlerta(alerta, voosCache) {
@@ -317,8 +179,8 @@ async function processarAlerta(alerta, voosCache) {
     return;
   }
 
-  const melhorVoo   = voosFiltrados[0];
-  const precoAtual  = melhorVoo.preco;
+  const melhorVoo  = voosFiltrados[0];
+  const precoAtual = melhorVoo.preco;
   console.log(`    💰 Menor preço: R$${precoAtual} (meta: R$${alerta.meta})`);
 
   if (precoAtual > alerta.meta) {
@@ -387,7 +249,8 @@ async function main() {
   }
 
   if (!SERPAPI_KEY) {
-    console.log('⚠️  SERPAPI_KEY não definida — SerpAPI desativado (só Playwright)');
+    console.error('❌ SERPAPI_KEY ausente');
+    process.exit(1);
   }
 
   const rotas = await supabase('GET', 'rotas_unicas');
@@ -400,6 +263,7 @@ async function main() {
 
   for (const rota of rotas) {
     await processarRota(rota);
+    await sleep(1000);
   }
 
   const hoje = new Date().toISOString().split('T')[0];
