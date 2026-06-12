@@ -117,8 +117,8 @@ async function processarRota(rota) {
   const { origem, destino, data_ida, data_volta } = rota;
   console.log(`\n📍 Processando rota: ${origem} → ${destino} | ${data_ida}`);
 
-  // Usa cache se tiver menos de 1h
-  const seisHorasAtras = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
+  // Usa cache se tiver menos de 3h30 (coletas a cada 4h)
+  const seisHorasAtras = new Date(Date.now() - 3.5 * 60 * 60 * 1000).toISOString();
   const cacheRecente = await supabase(
     'GET',
     `price_cache?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${data_ida}&atualizado_em=gte.${seisHorasAtras}&limit=1`
