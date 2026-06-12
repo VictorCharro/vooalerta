@@ -43,101 +43,268 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
       <!-- ── Main ── -->
       <main class="main">
 
-        <div class="page-header fade-up">
-          <div>
-            <h1>Meus alertas</h1>
-            <p class="page-sub" *ngIf="!loading">
-              {{ alerts.length }} rota{{ alerts.length !== 1 ? 's' : '' }} monitorada{{ alerts.length !== 1 ? 's' : '' }}
-            </p>
+        <!-- ══ LISTA ══ -->
+        <ng-container *ngIf="!selectedAlert">
+
+          <div class="page-header fade-up">
+            <div>
+              <h1>Meus alertas</h1>
+              <p class="page-sub" *ngIf="!loading">
+                {{ alerts.length }} rota{{ alerts.length !== 1 ? 's' : '' }} monitorada{{ alerts.length !== 1 ? 's' : '' }}
+              </p>
+            </div>
+            <button class="btn-primary" (click)="openModal()">+ Novo alerta</button>
           </div>
-          <button class="btn-primary" (click)="openModal()">+ Novo alerta</button>
-        </div>
 
-        <!-- Aviso callmebot_key ausente -->
-        <div class="warn-banner fade-up" *ngIf="missingCallmebotKey">
-          ⚠️ Você ainda não cadastrou sua <strong>CallMeBot API Key</strong>. As notificações não serão enviadas.
-          <button class="btn-ghost warn-action" (click)="openProfileModal()">Configurar agora</button>
-        </div>
+          <!-- Aviso callmebot_key ausente -->
+          <div class="warn-banner fade-up" *ngIf="missingCallmebotKey">
+            ⚠️ Você ainda não cadastrou sua <strong>CallMeBot API Key</strong>. As notificações não serão enviadas.
+            <button class="btn-ghost warn-action" (click)="openProfileModal()">Configurar agora</button>
+          </div>
 
-        <!-- Banners de alerta de preço -->
-        <div class="price-banner fade-up" *ngFor="let a of alertsBelowMeta">
-          🔔 Alerta! O voo <strong>{{ a.origem }} → {{ a.destino }}</strong> está abaixo da sua meta —
-          R$&nbsp;{{ getMinPrice(a) | number:'1.0-0' }}
-          (meta: R$&nbsp;{{ a.meta | number:'1.0-0' }})
-        </div>
+          <!-- Banners de alerta de preço -->
+          <div class="price-banner fade-up" *ngFor="let a of alertsBelowMeta">
+            🔔 Alerta! O voo <strong>{{ a.origem }} → {{ a.destino }}</strong> está abaixo da sua meta —
+            R$&nbsp;{{ getMinPrice(a) | number:'1.0-0' }}
+            (meta: R$&nbsp;{{ a.meta | number:'1.0-0' }})
+          </div>
 
-        <!-- Loading -->
-        <div class="center-state" *ngIf="loading">
-          <div class="spinner spinner-dark" style="width:28px;height:28px;border-width:3px"></div>
-        </div>
+          <!-- Loading -->
+          <div class="center-state" *ngIf="loading">
+            <div class="spinner spinner-dark" style="width:28px;height:28px;border-width:3px"></div>
+          </div>
 
-        <!-- Empty state -->
-        <div class="empty-state fade-up" *ngIf="!loading && alerts.length === 0">
-          <div class="empty-icon">✈</div>
-          <h3>Nenhum alerta ainda</h3>
-          <p>Crie seu primeiro alerta e receba no WhatsApp quando o preço cair.</p>
-          <button class="btn-primary" (click)="openModal()" style="margin-top:20px">Criar primeiro alerta</button>
-        </div>
+          <!-- Empty state -->
+          <div class="empty-state fade-up" *ngIf="!loading && alerts.length === 0">
+            <div class="empty-icon">✈</div>
+            <h3>Nenhum alerta ainda</h3>
+            <p>Crie seu primeiro alerta e receba no WhatsApp quando o preço cair.</p>
+            <button class="btn-primary" (click)="openModal()" style="margin-top:20px">Criar primeiro alerta</button>
+          </div>
 
-        <!-- Alert cards -->
-        <div class="alerts-list" *ngIf="!loading && alerts.length > 0">
-          <div
-            class="alert-card fade-up"
-            *ngFor="let alert of alerts; let i = index"
-            [style.animation-delay]="(i * 0.04) + 's'"
-            [class.card-inactive]="!alert.ativo"
-          >
-            <!-- Rota -->
-            <div class="card-route">
-              <div class="route-iata">
-                <span class="iata">{{ alert.origem }}</span>
-                <span class="route-sep">→</span>
-                <span class="iata">{{ alert.destino }}</span>
+          <!-- Alert cards -->
+          <div class="alerts-list" *ngIf="!loading && alerts.length > 0">
+            <div
+              class="alert-card fade-up"
+              *ngFor="let alert of alerts; let i = index"
+              [style.animation-delay]="(i * 0.04) + 's'"
+              [class.card-inactive]="!alert.ativo"
+            >
+              <div class="card-route">
+                <div class="route-iata">
+                  <span class="iata">{{ alert.origem }}</span>
+                  <span class="route-sep">→</span>
+                  <span class="iata">{{ alert.destino }}</span>
+                </div>
+                <div class="route-date">
+                  {{ alert.data_ida | date:'dd/MM/yyyy' }}
+                  <ng-container *ngIf="alert.data_volta"> → {{ alert.data_volta | date:'dd/MM/yyyy' }}</ng-container>
+                  <ng-container *ngIf="!alert.data_volta"> · Só ida</ng-container>
+                </div>
               </div>
-              <div class="route-date">
-                {{ alert.data_ida | date:'dd/MM/yyyy' }}
-                <ng-container *ngIf="alert.data_volta"> → {{ alert.data_volta | date:'dd/MM/yyyy' }}</ng-container>
-                <ng-container *ngIf="!alert.data_volta"> · Só ida</ng-container>
+
+              <div class="card-price-col">
+                <span class="card-meta-label">Meta: R$&nbsp;{{ alert.meta | number:'1.0-0' }}</span>
+                <ng-container *ngIf="minPricesLoading && getMinPrice(alert) === null">
+                  <span class="price-skeleton"></span>
+                </ng-container>
+                <ng-container *ngIf="!minPricesLoading || getMinPrice(alert) !== null">
+                  <span class="card-price-value"
+                    [class.price-below]="getMinPrice(alert) !== null && getMinPrice(alert)! <= alert.meta"
+                    [class.price-above]="getMinPrice(alert) !== null && getMinPrice(alert)! > alert.meta"
+                    [class.price-muted]="getMinPrice(alert) === null">
+                    <ng-container *ngIf="getMinPrice(alert) !== null">
+                      R$&nbsp;{{ getMinPrice(alert) | number:'1.0-0' }}
+                      {{ getMinPrice(alert)! <= alert.meta ? '↓' : '↑' }}
+                    </ng-container>
+                    <ng-container *ngIf="getMinPrice(alert) === null">—</ng-container>
+                  </span>
+                  <span class="card-price-diff"
+                    *ngIf="getMinPrice(alert) !== null"
+                    [class.diff-green]="getMinPrice(alert)! <= alert.meta"
+                    [class.diff-red]="getMinPrice(alert)! > alert.meta">
+                    {{ getMinPrice(alert)! <= alert.meta ? '-' : '+' }}
+                    R$&nbsp;{{ (alert.meta - getMinPrice(alert)!) | number:'1.0-0' }}
+                  </span>
+                </ng-container>
               </div>
-            </div>
 
-            <!-- Preço -->
-            <div class="card-price-col">
-              <span class="card-meta-label">Meta: R$&nbsp;{{ alert.meta | number:'1.0-0' }}</span>
-              <ng-container *ngIf="minPricesLoading && getMinPrice(alert) === null">
-                <span class="price-skeleton"></span>
-              </ng-container>
-              <ng-container *ngIf="!minPricesLoading || getMinPrice(alert) !== null">
-                <span class="card-price-value"
-                  [class.price-below]="getMinPrice(alert) !== null && getMinPrice(alert)! <= alert.meta"
-                  [class.price-above]="getMinPrice(alert) !== null && getMinPrice(alert)! > alert.meta"
-                  [class.price-muted]="getMinPrice(alert) === null">
-                  <ng-container *ngIf="getMinPrice(alert) !== null">
-                    R$&nbsp;{{ getMinPrice(alert) | number:'1.0-0' }}
-                    {{ getMinPrice(alert)! <= alert.meta ? '↓' : '↑' }}
-                  </ng-container>
-                  <ng-container *ngIf="getMinPrice(alert) === null">—</ng-container>
-                </span>
-                <span class="card-price-diff"
-                  *ngIf="getMinPrice(alert) !== null"
-                  [class.diff-green]="getMinPrice(alert)! <= alert.meta"
-                  [class.diff-red]="getMinPrice(alert)! > alert.meta">
-                  {{ getMinPrice(alert)! <= alert.meta ? '-' : '+' }}
-                  R$&nbsp;{{ (alert.meta - getMinPrice(alert)!) | number:'1.0-0' }}
-                </span>
-              </ng-container>
-            </div>
-
-            <!-- Controles -->
-            <div class="card-controls">
-              <label class="toggle" [title]="alert.ativo ? 'Pausar' : 'Ativar'">
-                <input type="checkbox" [checked]="alert.ativo" (change)="toggleAlert(alert)" />
-                <span class="track"></span>
-                <span class="thumb"></span>
-              </label>
-              <button class="chevron-btn" (click)="openEditModal(alert)" title="Ver detalhes">›</button>
+              <div class="card-controls">
+                <label class="toggle" [title]="alert.ativo ? 'Pausar' : 'Ativar'">
+                  <input type="checkbox" [checked]="alert.ativo" (change)="toggleAlert(alert)" />
+                  <span class="track"></span>
+                  <span class="thumb"></span>
+                </label>
+                <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">›</button>
+              </div>
             </div>
           </div>
+
+        </ng-container>
+
+        <!-- ══ DETALHE ══ -->
+        <div class="detail-view fade-up" *ngIf="selectedAlert">
+
+          <div class="detail-header">
+            <button class="back-btn" (click)="closeDetail()">← Voltar</button>
+            <h1 class="detail-title">
+              {{ selectedAlert.origem }}
+              <span class="detail-arrow">→</span>
+              {{ selectedAlert.destino }}
+            </h1>
+          </div>
+
+          <!-- Cards de estatística -->
+          <div class="stat-grid">
+            <div class="stat-card">
+              <span class="stat-label">Menor preço</span>
+              <span class="stat-value"
+                [class.stat-green]="getMinPrice(selectedAlert) !== null && getMinPrice(selectedAlert)! <= selectedAlert.meta"
+                [class.stat-red]="getMinPrice(selectedAlert) !== null && getMinPrice(selectedAlert)! > selectedAlert.meta">
+                <ng-container *ngIf="getMinPrice(selectedAlert) !== null">
+                  R$&nbsp;{{ getMinPrice(selectedAlert) | number:'1.0-0' }}
+                </ng-container>
+                <ng-container *ngIf="getMinPrice(selectedAlert) === null && minPricesLoading">
+                  <span class="price-skeleton" style="width:80px;height:28px;display:inline-block"></span>
+                </ng-container>
+                <ng-container *ngIf="getMinPrice(selectedAlert) === null && !minPricesLoading">—</ng-container>
+              </span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Preço atual</span>
+              <span class="stat-value"
+                [class.stat-green]="getMinPrice(selectedAlert) !== null && getMinPrice(selectedAlert)! <= selectedAlert.meta"
+                [class.stat-red]="getMinPrice(selectedAlert) !== null && getMinPrice(selectedAlert)! > selectedAlert.meta">
+                <ng-container *ngIf="getMinPrice(selectedAlert) !== null">
+                  R$&nbsp;{{ getMinPrice(selectedAlert) | number:'1.0-0' }}
+                </ng-container>
+                <ng-container *ngIf="getMinPrice(selectedAlert) === null">—</ng-container>
+              </span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Sua meta</span>
+              <span class="stat-value">R$&nbsp;{{ selectedAlert.meta | number:'1.0-0' }}</span>
+            </div>
+          </div>
+
+          <!-- Formulário de edição -->
+          <form (ngSubmit)="saveAlert()">
+
+            <div class="info-section">
+              <h3 class="section-title">Detalhes da rota</h3>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="d-origem">Origem</label>
+                  <input id="d-origem" [(ngModel)]="form.origem" name="d_origem"
+                    placeholder="GRU" maxlength="3"
+                    (input)="form.origem = form.origem!.toUpperCase()" required />
+                </div>
+                <div class="form-group">
+                  <label for="d-destino">Destino</label>
+                  <input id="d-destino" [(ngModel)]="form.destino" name="d_destino"
+                    placeholder="LIS" maxlength="3"
+                    (input)="form.destino = form.destino!.toUpperCase()" required />
+                </div>
+              </div>
+              <div class="form-row" style="margin-top:14px">
+                <div class="form-group">
+                  <label for="d-ida">Data de ida</label>
+                  <input id="d-ida" type="date" [(ngModel)]="form.data_ida" name="d_data_ida" [min]="today" required />
+                </div>
+                <div class="form-group">
+                  <label for="d-volta">Data de volta <span class="form-optional">(opcional)</span></label>
+                  <input id="d-volta" type="date" [(ngModel)]="form.data_volta" name="d_data_volta"
+                    [min]="form.data_ida || today" [disabled]="!!form.so_ida" />
+                </div>
+              </div>
+              <div class="form-group" style="margin-top:14px">
+                <label class="toggle-label">
+                  <label class="toggle" style="width:38px;height:22px">
+                    <input type="checkbox" [(ngModel)]="form.so_ida" name="d_so_ida" (change)="onSoIdaChange()" />
+                    <span class="track"></span>
+                    <span class="thumb"></span>
+                  </label>
+                  <span style="font-size:14px;color:var(--color-text)">Só ida</span>
+                </label>
+              </div>
+              <div class="form-row" style="margin-top:14px">
+                <div class="form-group">
+                  <label for="d-meta">Meta de preço (R$)</label>
+                  <input id="d-meta" type="number" [(ngModel)]="form.meta" name="d_meta"
+                    placeholder="3000" min="1" required />
+                </div>
+                <div class="form-group">
+                  <label for="d-horario">Horário a partir de <span class="form-optional">(opcional)</span></label>
+                  <input id="d-horario" type="time" [(ngModel)]="form.horario_minimo" name="d_horario" />
+                </div>
+              </div>
+              <div class="form-group" style="margin-top:14px">
+                <label for="d-whatsapp">WhatsApp para notificação</label>
+                <div class="phone-input">
+                  <span class="phone-prefix">55</span>
+                  <input id="d-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="d_whatsapp"
+                    placeholder="11999999999" maxlength="11" required />
+                </div>
+                <span class="form-hint">DDD + número (ex: 11999999999)</span>
+              </div>
+            </div>
+
+            <!-- Informações do voo -->
+            <div class="info-section">
+              <h3 class="section-title">Informações do voo</h3>
+              <div class="info-row">
+                <span class="info-label">Companhia</span>
+                <span class="info-value">Qualquer</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Classe</span>
+                <span class="info-value">Econômica</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Escalas</span>
+                <span class="info-value">{{ form.so_direto ? 'Só direto' : 'Qualquer' }}</span>
+              </div>
+              <div class="info-row" style="border-bottom:none;padding-bottom:0">
+                <label class="toggle-label" style="width:100%">
+                  <label class="toggle" style="width:38px;height:22px">
+                    <input type="checkbox" [(ngModel)]="form.so_direto" name="d_so_direto" />
+                    <span class="track"></span>
+                    <span class="thumb"></span>
+                  </label>
+                  <span style="font-size:14px;color:var(--color-text)">Somente voos diretos</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Configurações -->
+            <div class="info-section">
+              <h3 class="section-title">Configurações</h3>
+              <div class="info-row" style="border-bottom:none;padding-bottom:0">
+                <div>
+                  <span class="info-label" style="font-size:14px;color:var(--color-text)">Ativar notificações</span>
+                  <p class="form-hint" style="margin:2px 0 0">
+                    Receba uma mensagem no WhatsApp quando o preço cair abaixo da meta.
+                  </p>
+                </div>
+                <label class="toggle" style="flex-shrink:0">
+                  <input type="checkbox" [(ngModel)]="form.ativo" name="d_ativo" (change)="toggleDetailAlert()" />
+                  <span class="track"></span>
+                  <span class="thumb"></span>
+                </label>
+              </div>
+            </div>
+
+            <div *ngIf="formError" class="error-box" style="margin-top:14px">{{ formError }}</div>
+
+            <div class="detail-actions">
+              <button type="button" class="btn-danger" (click)="confirmDeleteDetail()">Excluir alerta</button>
+              <button type="submit" class="btn-primary" [disabled]="saving">
+                <span *ngIf="saving" class="spinner"></span>
+                <span *ngIf="!saving">Salvar alterações</span>
+              </button>
+            </div>
+
+          </form>
         </div>
 
       </main>
@@ -188,11 +355,11 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
         </div>
       </div>
 
-      <!-- ── Modal novo/editar alerta ── -->
+      <!-- ── Modal novo alerta ── -->
       <div class="modal-overlay" *ngIf="showModal" (click)="onOverlayClick($event)">
         <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="modal-title">
           <div class="modal-head">
-            <h2 id="modal-title">{{ editingId ? 'Editar alerta' : 'Novo alerta' }}</h2>
+            <h2 id="modal-title">Novo alerta</h2>
             <button class="btn-icon" (click)="closeModal()" aria-label="Fechar">✕</button>
           </div>
           <form (ngSubmit)="saveAlert()">
@@ -217,8 +384,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
               </div>
               <div class="form-group">
                 <label for="m-volta">
-                  Data de volta
-                  <span class="form-optional">(opcional)</span>
+                  Data de volta <span class="form-optional">(opcional)</span>
                 </label>
                 <input id="m-volta" type="date" [(ngModel)]="form.data_volta" name="data_volta"
                   [min]="form.data_ida || today" [disabled]="!!form.so_ida" />
@@ -242,8 +408,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
               </div>
               <div class="form-group">
                 <label for="m-horario">
-                  Horário a partir de
-                  <span class="form-optional">(opcional)</span>
+                  Horário a partir de <span class="form-optional">(opcional)</span>
                 </label>
                 <input id="m-horario" type="time" [(ngModel)]="form.horario_minimo" name="horario_minimo" />
               </div>
@@ -272,7 +437,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
               <button type="button" class="btn-ghost" (click)="closeModal()">Cancelar</button>
               <button type="submit" class="btn-primary modal-save" [disabled]="saving">
                 <span *ngIf="saving" class="spinner"></span>
-                <span *ngIf="!saving">{{ editingId ? 'Salvar alterações' : 'Salvar alerta' }}</span>
+                <span *ngIf="!saving">Salvar alerta</span>
               </button>
             </div>
           </form>
@@ -290,6 +455,8 @@ export class DashboardComponent implements OnInit {
   formError  = '';
   userEmail  = '';
   editingId: string | null = null;
+
+  selectedAlert: Alert | null = null;
 
   showProfileModal    = false;
   profileLoading      = false;
@@ -377,7 +544,8 @@ export class DashboardComponent implements OnInit {
     this.showModal         = true;
   }
 
-  openEditModal(alert: Alert) {
+  openDetail(alert: Alert) {
+    this.selectedAlert = alert;
     this.editingId = alert.id!;
     this.form = {
       origem:         alert.origem,
@@ -392,7 +560,19 @@ export class DashboardComponent implements OnInit {
       so_ida:         !alert.data_volta
     };
     this.formError = '';
-    this.showModal = true;
+  }
+
+  closeDetail() {
+    this.selectedAlert = null;
+    this.editingId = null;
+  }
+
+  async toggleDetailAlert() {
+    if (!this.editingId) return;
+    await this.supabase.updateAlert(this.editingId, { ativo: this.form.ativo! });
+    if (this.selectedAlert) this.selectedAlert.ativo = this.form.ativo!;
+    const a = this.alerts.find(x => x.id === this.editingId);
+    if (a) a.ativo = this.form.ativo!;
   }
 
   onSoIdaChange() {
@@ -436,7 +616,7 @@ export class DashboardComponent implements OnInit {
       horario_minimo:  (this.form.horario_minimo && this.form.horario_minimo !== '00:00') ? this.form.horario_minimo : null,
       so_direto:       this.form.so_direto ?? false,
       whatsapp:        '55' + this.form.whatsapp!,
-      ativo:           true
+      ativo:           this.editingId ? (this.form.ativo ?? true) : true
     };
 
     let error;
@@ -451,7 +631,11 @@ export class DashboardComponent implements OnInit {
         ? 'Sua sessão expirou. Faça login novamente.'
         : 'Erro ao salvar alerta. Tente novamente.';
     } else {
-      this.closeModal();
+      if (this.selectedAlert) {
+        this.closeDetail();
+      } else {
+        this.closeModal();
+      }
       await this.loadAlerts();
     }
     this.saving = false;
@@ -462,10 +646,12 @@ export class DashboardComponent implements OnInit {
     alert.ativo = !alert.ativo;
   }
 
-  async confirmDelete(alert: Alert) {
-    if (!confirm(`Excluir alerta ${alert.origem} → ${alert.destino}?`)) return;
-    await this.supabase.deleteAlert(alert.id!);
-    this.alerts = this.alerts.filter(a => a.id !== alert.id);
+  async confirmDeleteDetail() {
+    if (!this.selectedAlert) return;
+    if (!confirm(`Excluir alerta ${this.selectedAlert.origem} → ${this.selectedAlert.destino}?`)) return;
+    await this.supabase.deleteAlert(this.editingId!);
+    this.alerts = this.alerts.filter(a => a.id !== this.editingId);
+    this.closeDetail();
   }
 
   async logout() {
