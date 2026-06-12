@@ -59,20 +59,11 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
           <button class="btn-ghost warn-action" (click)="openProfileModal()">Configurar agora</button>
         </div>
 
-        <!-- Stats -->
-        <div class="stats-grid fade-up" *ngIf="alerts.length > 0">
-          <div class="stat-card">
-            <span class="stat-label">Total</span>
-            <span class="stat-value">{{ alerts.length }}</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Ativos</span>
-            <span class="stat-value green">{{ activeCount }}</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Pausados</span>
-            <span class="stat-value muted">{{ alerts.length - activeCount }}</span>
-          </div>
+        <!-- Banners de alerta de preço -->
+        <div class="price-banner fade-up" *ngFor="let a of alertsBelowMeta">
+          🔔 Alerta! O voo <strong>{{ a.origem }} → {{ a.destino }}</strong> está abaixo da sua meta —
+          R$&nbsp;{{ getMinPrice(a) | number:'1.0-0' }}
+          (meta: R$&nbsp;{{ a.meta | number:'1.0-0' }})
         </div>
 
         <!-- Loading -->
@@ -96,67 +87,55 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
             [style.animation-delay]="(i * 0.04) + 's'"
             [class.card-inactive]="!alert.ativo"
           >
-            <!-- Card header -->
-            <div class="card-header">
-              <div class="card-route">
+            <!-- Rota -->
+            <div class="card-route">
+              <div class="route-iata">
                 <span class="iata">{{ alert.origem }}</span>
-                <span class="route-arrow">→</span>
+                <span class="route-sep">→</span>
                 <span class="iata">{{ alert.destino }}</span>
               </div>
-              <div class="card-status">
-                <span class="badge" [class.badge-green]="alert.ativo" [class.badge-dim]="!alert.ativo">
-                  <span class="dot"></span>{{ alert.ativo ? 'Ativo' : 'Pausado' }}
-                </span>
-                <label class="toggle" [title]="alert.ativo ? 'Pausar' : 'Ativar'">
-                  <input type="checkbox" [checked]="alert.ativo" (change)="toggleAlert(alert)" />
-                  <span class="track"></span>
-                  <span class="thumb"></span>
-                </label>
+              <div class="route-date">
+                {{ alert.data_ida | date:'dd/MM/yyyy' }}
+                <ng-container *ngIf="alert.data_volta"> → {{ alert.data_volta | date:'dd/MM/yyyy' }}</ng-container>
+                <ng-container *ngIf="!alert.data_volta"> · Só ida</ng-container>
               </div>
             </div>
 
-            <!-- Prices -->
-            <div class="card-prices">
-              <div class="price-block">
-                <span class="price-label">Sua meta</span>
-                <span class="price-value">R$&nbsp;{{ alert.meta | number:'1.0-0' }}</span>
-              </div>
-              <div class="price-divider"></div>
-              <div class="price-block" *ngIf="getMinPrice(alert) !== null">
-                <span class="price-label">Menor preço</span>
-                <span class="price-value" [class.price-below]="getMinPrice(alert)! <= alert.meta" [class.price-above]="getMinPrice(alert)! > alert.meta">
-                  R$&nbsp;{{ getMinPrice(alert) | number:'1.0-0' }}
+            <!-- Preço -->
+            <div class="card-price-col">
+              <span class="card-meta-label">Meta: R$&nbsp;{{ alert.meta | number:'1.0-0' }}</span>
+              <ng-container *ngIf="minPricesLoading && getMinPrice(alert) === null">
+                <span class="price-skeleton"></span>
+              </ng-container>
+              <ng-container *ngIf="!minPricesLoading || getMinPrice(alert) !== null">
+                <span class="card-price-value"
+                  [class.price-below]="getMinPrice(alert) !== null && getMinPrice(alert)! <= alert.meta"
+                  [class.price-above]="getMinPrice(alert) !== null && getMinPrice(alert)! > alert.meta"
+                  [class.price-muted]="getMinPrice(alert) === null">
+                  <ng-container *ngIf="getMinPrice(alert) !== null">
+                    R$&nbsp;{{ getMinPrice(alert) | number:'1.0-0' }}
+                    {{ getMinPrice(alert)! <= alert.meta ? '↓' : '↑' }}
+                  </ng-container>
+                  <ng-container *ngIf="getMinPrice(alert) === null">—</ng-container>
                 </span>
-                <span class="price-diff" [class.diff-green]="getMinPrice(alert)! <= alert.meta" [class.diff-red]="getMinPrice(alert)! > alert.meta">
-                  {{ getMinPrice(alert)! <= alert.meta ? '↓' : '↑' }}
+                <span class="card-price-diff"
+                  *ngIf="getMinPrice(alert) !== null"
+                  [class.diff-green]="getMinPrice(alert)! <= alert.meta"
+                  [class.diff-red]="getMinPrice(alert)! > alert.meta">
+                  {{ getMinPrice(alert)! <= alert.meta ? '-' : '+' }}
                   R$&nbsp;{{ (alert.meta - getMinPrice(alert)!) | number:'1.0-0' }}
                 </span>
-              </div>
-              <div class="price-block" *ngIf="getMinPrice(alert) === null && !minPricesLoading">
-                <span class="price-label">Menor preço</span>
-                <span class="price-value muted">—</span>
-              </div>
-              <div class="price-block" *ngIf="minPricesLoading && getMinPrice(alert) === null">
-                <span class="price-label">Menor preço</span>
-                <span class="price-skeleton"></span>
-              </div>
+              </ng-container>
             </div>
 
-            <!-- Details -->
-            <div class="card-details">
-              <span class="detail-tag">📅 {{ alert.data_ida | date:'dd/MM/yyyy' }}</span>
-              <span class="detail-tag" *ngIf="alert.data_volta">↩ {{ alert.data_volta | date:'dd/MM/yyyy' }}</span>
-              <span class="detail-tag" *ngIf="alert.horario_minimo">🕐 A partir das {{ alert.horario_minimo }}</span>
-              <span class="badge badge-amber" *ngIf="alert.so_direto">Só direto</span>
-            </div>
-
-            <!-- Footer -->
-            <div class="card-footer">
-              <span class="card-phone">📱 {{ alert.whatsapp }}</span>
-              <div class="card-actions">
-                <button class="btn-icon" (click)="openEditModal(alert)" title="Editar" aria-label="Editar">✏️</button>
-                <button class="btn-danger" (click)="confirmDelete(alert)">Excluir</button>
-              </div>
+            <!-- Controles -->
+            <div class="card-controls">
+              <label class="toggle" [title]="alert.ativo ? 'Pausar' : 'Ativar'">
+                <input type="checkbox" [checked]="alert.ativo" (change)="toggleAlert(alert)" />
+                <span class="track"></span>
+                <span class="thumb"></span>
+              </label>
+              <button class="chevron-btn" (click)="openEditModal(alert)" title="Ver detalhes">›</button>
             </div>
           </div>
         </div>
@@ -330,6 +309,13 @@ export class DashboardComponent implements OnInit {
   readonly today = new Date().toISOString().split('T')[0];
 
   get activeCount() { return this.alerts.filter(a => a.ativo).length; }
+
+  get alertsBelowMeta(): Alert[] {
+    return this.alerts.filter(a => {
+      const p = this.getMinPrice(a);
+      return p !== null && p <= a.meta;
+    });
+  }
 
   constructor(
       private supabase: SupabaseService,

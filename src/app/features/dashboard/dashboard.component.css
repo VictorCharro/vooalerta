@@ -3,29 +3,21 @@
 
 /* ── Sidebar ─────────────────────────────────────────────── */
 .sidebar {
-  width: 220px;
-  flex-shrink: 0;
+  width: 220px; flex-shrink: 0;
   background: var(--color-bg-2);
   border-right: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  display: flex; flex-direction: column; justify-content: space-between;
   padding: 24px 16px;
-  position: sticky;
-  top: 0;
-  height: 100vh;
+  position: sticky; top: 0; height: 100vh;
 }
-
 .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; }
 .brand-icon { width: 34px; height: 34px; background: var(--color-accent-dim); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 17px; }
 .brand-name { font-family: var(--font-display); font-weight: 800; font-size: 15px; }
-
 .sidebar-nav { display: flex; flex-direction: column; gap: 4px; }
 .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm); font-size: 14px; color: var(--color-text-muted); background: transparent; border: none; width: 100%; text-align: left; cursor: pointer; transition: background var(--transition), color var(--transition); }
 .nav-item:hover { background: var(--color-bg-3); color: var(--color-text); }
 .nav-item.active { background: var(--color-accent-dim); color: var(--color-accent); font-weight: 500; }
 .nav-icon { font-size: 16px; width: 18px; text-align: center; }
-
 .sidebar-bottom { display: flex; flex-direction: column; gap: 12px; }
 .theme-btn { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: var(--radius-sm); font-size: 13px; color: var(--color-text-muted); background: transparent; border: 1px solid var(--color-border); width: 100%; cursor: pointer; transition: all var(--transition); }
 .theme-btn:hover { border-color: var(--color-border-hover); color: var(--color-text); }
@@ -39,62 +31,55 @@
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 16px; }
 h1 { font-size: 26px; margin-bottom: 4px; }
 .page-sub { color: var(--color-text-muted); font-size: 13px; }
-
-.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
 .center-state { display: flex; justify-content: center; padding: 60px; }
 
+/* ── Banners ─────────────────────────────────────────────── */
+.warn-banner { display: flex; align-items: center; gap: 12px; background: var(--color-amber-dim); color: var(--color-amber); border: 1px solid rgba(245,166,35,0.2); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; margin-bottom: 12px; flex-wrap: wrap; }
+.warn-action { font-size: 12px; color: var(--color-amber); border: 1px solid rgba(245,166,35,0.3); padding: 4px 10px; margin-left: auto; }
+.warn-action:hover { background: rgba(245,166,35,0.1); }
+.price-banner { display: flex; align-items: center; gap: 8px; background: var(--color-green-dim); color: var(--color-green); border: 1px solid rgba(45,212,160,0.2); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; margin-bottom: 12px; }
+
+/* ── Empty state ─────────────────────────────────────────── */
 .empty-state { text-align: center; padding: 60px 24px; }
 .empty-icon { font-size: 42px; opacity: 0.15; margin-bottom: 16px; }
 .empty-state h3 { font-size: 18px; margin-bottom: 8px; }
 .empty-state p { color: var(--color-text-muted); font-size: 14px; }
 
-/* ── Warn banner ─────────────────────────────────────────── */
-.warn-banner { display: flex; align-items: center; gap: 12px; background: var(--color-amber-dim); color: var(--color-amber); border: 1px solid rgba(245,166,35,0.2); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; margin-bottom: 20px; flex-wrap: wrap; }
-.warn-action { font-size: 12px; color: var(--color-amber); border: 1px solid rgba(245,166,35,0.3); padding: 4px 10px; margin-left: auto; }
-.warn-action:hover { background: rgba(245,166,35,0.1); }
-
-/* ── Alert cards ─────────────────────────────────────────── */
-.alerts-list { display: grid; gap: 14px; }
+/* ── Alert cards (Figma layout) ──────────────────────────── */
+.alerts-list { display: grid; gap: 12px; }
 
 .alert-card {
+  display: flex; align-items: center; gap: 20px;
+  padding: 18px 22px;
   background: var(--color-bg-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 20px 22px;
   transition: border-color var(--transition), opacity var(--transition);
 }
 .alert-card:hover { border-color: var(--color-border-hover); }
-.alert-card.card-inactive { opacity: 0.45; }
+.alert-card.card-inactive { opacity: 0.5; }
 
-.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-.card-route { display: flex; align-items: center; gap: 10px; }
+.card-route { flex: 1; min-width: 0; }
+.route-iata { display: flex; align-items: center; gap: 8px; }
 .iata { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: 0.02em; }
-.route-arrow { color: var(--color-text-dim); font-size: 16px; }
-.card-status { display: flex; align-items: center; gap: 10px; }
+.route-sep { color: var(--color-text-dim); font-size: 16px; }
+.route-date { font-size: 12px; color: var(--color-text-muted); margin-top: 3px; }
 
-/* ── Prices ──────────────────────────────────────────────── */
-.card-prices { display: flex; align-items: center; gap: 0; background: var(--color-bg-3); border-radius: var(--radius-sm); padding: 14px 18px; margin-bottom: 16px; }
-.price-block { display: flex; flex-direction: column; gap: 3px; flex: 1; }
-.price-divider { width: 1px; background: var(--color-border); align-self: stretch; margin: 0 20px; flex-shrink: 0; }
-.price-label { font-size: 10px; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.price-value { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
-.price-value.price-below { color: var(--color-green); }
-.price-value.price-above { color: var(--color-red); }
-.price-value.muted { color: var(--color-text-dim); font-size: 16px; }
-.price-diff { font-size: 12px; font-weight: 500; }
+.card-price-col { text-align: right; min-width: 110px; flex-shrink: 0; }
+.card-meta-label { display: block; font-size: 11px; color: var(--color-text-muted); margin-bottom: 3px; }
+.card-price-value { display: block; font-family: var(--font-display); font-size: 20px; font-weight: 700; line-height: 1.2; }
+.card-price-diff { display: block; font-size: 12px; font-weight: 500; margin-top: 2px; }
+.price-below { color: var(--color-green); }
+.price-above { color: var(--color-red); }
+.price-muted { color: var(--color-text-dim); }
 .diff-green { color: var(--color-green); }
 .diff-red { color: var(--color-red); }
-.price-skeleton { height: 20px; width: 80px; background: var(--color-border); border-radius: 4px; animation: pulse 1.4s ease infinite; }
+.price-skeleton { display: block; height: 20px; width: 80px; background: var(--color-border); border-radius: 4px; animation: pulse 1.4s ease infinite; margin-left: auto; }
 @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }
 
-/* ── Details ─────────────────────────────────────────────── */
-.card-details { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-.detail-tag { font-size: 12px; color: var(--color-text-muted); background: var(--color-bg-3); border: 1px solid var(--color-border); border-radius: 20px; padding: 3px 10px; }
-
-/* ── Footer ──────────────────────────────────────────────── */
-.card-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--color-border); padding-top: 14px; gap: 12px; }
-.card-phone { font-size: 12px; color: var(--color-text-muted); }
-.card-actions { display: flex; align-items: center; gap: 10px; }
+.card-controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.chevron-btn { background: var(--color-bg-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--color-text-muted); cursor: pointer; transition: all var(--transition); line-height: 1; }
+.chevron-btn:hover { border-color: var(--color-accent); color: var(--color-accent); background: var(--color-accent-dim); }
 
 /* ── Modal ───────────────────────────────────────────────── */
 .modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.72); display: flex; align-items: center; justify-content: center; padding: 24px; }
@@ -121,4 +106,8 @@ h1 { font-size: 26px; margin-bottom: 4px; }
   .user-email { display: none; }
   .layout { flex-direction: column; }
   .main { padding: 20px 16px; }
+  .alert-card { gap: 12px; padding: 16px; }
+  .iata { font-size: 18px; }
+  .card-price-col { min-width: 90px; }
+  .card-price-value { font-size: 17px; }
 }
