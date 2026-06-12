@@ -101,6 +101,16 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
                   <ng-container *ngIf="alert.data_volta"> → {{ alert.data_volta | date:'dd/MM/yyyy' }}</ng-container>
                   <ng-container *ngIf="!alert.data_volta"> · Só ida</ng-container>
                 </div>
+                <div class="route-countdown"
+                  [class.countdown-green]="daysUntil(alert.data_ida) > 30"
+                  [class.countdown-yellow]="daysUntil(alert.data_ida) >= 7 && daysUntil(alert.data_ida) <= 30"
+                  [class.countdown-red]="daysUntil(alert.data_ida) > 0 && daysUntil(alert.data_ida) < 7"
+                  [class.countdown-muted]="daysUntil(alert.data_ida) <= 0">
+                  <ng-container *ngIf="daysUntil(alert.data_ida) > 0">
+                    Faltam {{ daysUntil(alert.data_ida) }} dia{{ daysUntil(alert.data_ida) !== 1 ? 's' : '' }}
+                  </ng-container>
+                  <ng-container *ngIf="daysUntil(alert.data_ida) <= 0">Viagem realizada</ng-container>
+                </div>
               </div>
 
               <div class="card-price-col">
@@ -553,6 +563,12 @@ export class DashboardComponent implements OnInit {
   }
 
   absDiff(a: number, b: number): number { return Math.abs(a - b); }
+
+  daysUntil(date: string): number {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const target = new Date(date + 'T00:00:00');
+    return Math.round((target.getTime() - today.getTime()) / 86400000);
+  }
 
   getMinPrice(alert: Alert): number | null {
     const val = this.minPrices[`${alert.origem}-${alert.destino}-${alert.data_ida}`];

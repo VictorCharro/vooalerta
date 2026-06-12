@@ -46,6 +46,13 @@
 }
 .chip-remove:hover { opacity: 1; }
 
+/* ── Countdown ───────────────────────────────────────────── */
+.route-countdown { font-size: 11px; font-weight: 500; margin-top: 3px; }
+.countdown-green  { color: var(--color-green); }
+.countdown-yellow { color: #f59e0b; }
+.countdown-red    { color: var(--color-red); }
+.countdown-muted  { color: var(--color-text-muted); }
+
 /* ── Main ────────────────────────────────────────────────── */
 .main { flex: 1; max-width: 860px; padding: 36px 32px; min-width: 0; }
 
