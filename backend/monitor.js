@@ -209,6 +209,15 @@ async function buscarSerpapi(origem, destino, dataIda, dataVolta) {
 // ── Salva voos no cache ───────────────────────────────────────
 
 async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
+  // Limpa entradas antigas da mesma rota antes de inserir as novas
+  const dataVoltaFilter = dataVolta
+    ? `&data_volta=eq.${dataVolta}`
+    : '&data_volta=is.null';
+  await supabase(
+    'DELETE',
+    `price_cache?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${dataIda}${dataVoltaFilter}`
+  );
+
   const agora = new Date().toISOString();
   for (const v of voos) {
     await supabase('POST', 'price_cache', {
