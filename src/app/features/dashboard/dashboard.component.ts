@@ -187,114 +187,121 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
             </div>
           </div>
 
-          <!-- Formulário de edição -->
+          <!-- Formulário de edição (grid 2 colunas) -->
           <form (ngSubmit)="saveAlert()">
 
-            <div class="info-section">
-              <h3 class="section-title">Detalhes da rota</h3>
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="d-origem">Origem</label>
-                  <input id="d-origem" [(ngModel)]="form.origem" name="d_origem"
-                    placeholder="GRU" maxlength="3"
-                    (input)="form.origem = form.origem!.toUpperCase()" required />
+            <div class="detail-grid">
+
+              <!-- Coluna esquerda: campos da rota -->
+              <div class="info-section">
+                <h3 class="section-title">Detalhes da rota</h3>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="d-origem">Origem</label>
+                    <input id="d-origem" [(ngModel)]="form.origem" name="d_origem"
+                      placeholder="GRU" maxlength="3"
+                      (input)="form.origem = form.origem!.toUpperCase()" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="d-destino">Destino</label>
+                    <input id="d-destino" [(ngModel)]="form.destino" name="d_destino"
+                      placeholder="LIS" maxlength="3"
+                      (input)="form.destino = form.destino!.toUpperCase()" required />
+                  </div>
                 </div>
-                <div class="form-group">
-                  <label for="d-destino">Destino</label>
-                  <input id="d-destino" [(ngModel)]="form.destino" name="d_destino"
-                    placeholder="LIS" maxlength="3"
-                    (input)="form.destino = form.destino!.toUpperCase()" required />
+                <div class="form-row" style="margin-top:14px">
+                  <div class="form-group">
+                    <label for="d-ida">Data de ida</label>
+                    <input id="d-ida" type="date" [(ngModel)]="form.data_ida" name="d_data_ida" [min]="today" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="d-volta">Data de volta <span class="form-optional">(opcional)</span></label>
+                    <input id="d-volta" type="date" [(ngModel)]="form.data_volta" name="d_data_volta"
+                      [min]="form.data_ida || today" [disabled]="!!form.so_ida" />
+                  </div>
                 </div>
-              </div>
-              <div class="form-row" style="margin-top:14px">
-                <div class="form-group">
-                  <label for="d-ida">Data de ida</label>
-                  <input id="d-ida" type="date" [(ngModel)]="form.data_ida" name="d_data_ida" [min]="today" required />
-                </div>
-                <div class="form-group">
-                  <label for="d-volta">Data de volta <span class="form-optional">(opcional)</span></label>
-                  <input id="d-volta" type="date" [(ngModel)]="form.data_volta" name="d_data_volta"
-                    [min]="form.data_ida || today" [disabled]="!!form.so_ida" />
-                </div>
-              </div>
-              <div class="form-group" style="margin-top:14px">
-                <label class="toggle-label">
-                  <label class="toggle" style="width:38px;height:22px">
-                    <input type="checkbox" [(ngModel)]="form.so_ida" name="d_so_ida" (change)="onSoIdaChange()" />
-                    <span class="track"></span>
-                    <span class="thumb"></span>
+                <div class="form-group" style="margin-top:14px">
+                  <label class="toggle-label">
+                    <label class="toggle" style="width:38px;height:22px">
+                      <input type="checkbox" [(ngModel)]="form.so_ida" name="d_so_ida" (change)="onSoIdaChange()" />
+                      <span class="track"></span>
+                      <span class="thumb"></span>
+                    </label>
+                    <span style="font-size:14px;color:var(--color-text)">Só ida</span>
                   </label>
-                  <span style="font-size:14px;color:var(--color-text)">Só ida</span>
-                </label>
+                </div>
+                <div class="form-row" style="margin-top:14px">
+                  <div class="form-group">
+                    <label for="d-meta">Meta de preço (R$)</label>
+                    <input id="d-meta" type="number" [(ngModel)]="form.meta" name="d_meta"
+                      placeholder="3000" min="1" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="d-horario">Horário a partir de <span class="form-optional">(opcional)</span></label>
+                    <input id="d-horario" type="time" [(ngModel)]="form.horario_minimo" name="d_horario" />
+                  </div>
+                </div>
+                <div class="form-group" style="margin-top:14px">
+                  <label for="d-whatsapp">WhatsApp para notificação</label>
+                  <div class="phone-input">
+                    <span class="phone-prefix">55</span>
+                    <input id="d-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="d_whatsapp"
+                      placeholder="11999999999" maxlength="11" required />
+                  </div>
+                  <span class="form-hint">DDD + número (ex: 11999999999)</span>
+                </div>
               </div>
-              <div class="form-row" style="margin-top:14px">
-                <div class="form-group">
-                  <label for="d-meta">Meta de preço (R$)</label>
-                  <input id="d-meta" type="number" [(ngModel)]="form.meta" name="d_meta"
-                    placeholder="3000" min="1" required />
+
+              <!-- Coluna direita: info do voo + configurações -->
+              <div class="detail-right">
+
+                <div class="info-section">
+                  <h3 class="section-title">Informações do voo</h3>
+                  <div class="info-row">
+                    <span class="info-label">Companhia</span>
+                    <span class="info-value">Qualquer</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Classe</span>
+                    <span class="info-value">Econômica</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Escalas</span>
+                    <span class="info-value">{{ form.so_direto ? 'Só direto' : 'Qualquer' }}</span>
+                  </div>
+                  <div class="info-row" style="border-bottom:none;padding-bottom:0">
+                    <label class="toggle-label" style="width:100%">
+                      <label class="toggle" style="width:38px;height:22px">
+                        <input type="checkbox" [(ngModel)]="form.so_direto" name="d_so_direto" />
+                        <span class="track"></span>
+                        <span class="thumb"></span>
+                      </label>
+                      <span style="font-size:14px;color:var(--color-text)">Somente voos diretos</span>
+                    </label>
+                  </div>
                 </div>
-                <div class="form-group">
-                  <label for="d-horario">Horário a partir de <span class="form-optional">(opcional)</span></label>
-                  <input id="d-horario" type="time" [(ngModel)]="form.horario_minimo" name="d_horario" />
+
+                <div class="info-section">
+                  <h3 class="section-title">Configurações</h3>
+                  <div class="info-row" style="border-bottom:none;padding-bottom:0">
+                    <div>
+                      <span class="info-label" style="font-size:14px;color:var(--color-text)">Ativar notificações</span>
+                      <p class="form-hint" style="margin:2px 0 0">
+                        Receba uma mensagem no WhatsApp quando o preço cair abaixo da meta.
+                      </p>
+                    </div>
+                    <label class="toggle" style="flex-shrink:0">
+                      <input type="checkbox" [(ngModel)]="form.ativo" name="d_ativo" (change)="toggleDetailAlert()" />
+                      <span class="track"></span>
+                      <span class="thumb"></span>
+                    </label>
+                  </div>
                 </div>
-              </div>
-              <div class="form-group" style="margin-top:14px">
-                <label for="d-whatsapp">WhatsApp para notificação</label>
-                <div class="phone-input">
-                  <span class="phone-prefix">55</span>
-                  <input id="d-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="d_whatsapp"
-                    placeholder="11999999999" maxlength="11" required />
-                </div>
-                <span class="form-hint">DDD + número (ex: 11999999999)</span>
+
               </div>
             </div>
 
-            <!-- Informações do voo -->
-            <div class="info-section">
-              <h3 class="section-title">Informações do voo</h3>
-              <div class="info-row">
-                <span class="info-label">Companhia</span>
-                <span class="info-value">Qualquer</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Classe</span>
-                <span class="info-value">Econômica</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Escalas</span>
-                <span class="info-value">{{ form.so_direto ? 'Só direto' : 'Qualquer' }}</span>
-              </div>
-              <div class="info-row" style="border-bottom:none;padding-bottom:0">
-                <label class="toggle-label" style="width:100%">
-                  <label class="toggle" style="width:38px;height:22px">
-                    <input type="checkbox" [(ngModel)]="form.so_direto" name="d_so_direto" />
-                    <span class="track"></span>
-                    <span class="thumb"></span>
-                  </label>
-                  <span style="font-size:14px;color:var(--color-text)">Somente voos diretos</span>
-                </label>
-              </div>
-            </div>
-
-            <!-- Configurações -->
-            <div class="info-section">
-              <h3 class="section-title">Configurações</h3>
-              <div class="info-row" style="border-bottom:none;padding-bottom:0">
-                <div>
-                  <span class="info-label" style="font-size:14px;color:var(--color-text)">Ativar notificações</span>
-                  <p class="form-hint" style="margin:2px 0 0">
-                    Receba uma mensagem no WhatsApp quando o preço cair abaixo da meta.
-                  </p>
-                </div>
-                <label class="toggle" style="flex-shrink:0">
-                  <input type="checkbox" [(ngModel)]="form.ativo" name="d_ativo" (change)="toggleDetailAlert()" />
-                  <span class="track"></span>
-                  <span class="thumb"></span>
-                </label>
-              </div>
-            </div>
-
-            <div *ngIf="formError" class="error-box" style="margin-top:14px">{{ formError }}</div>
+            <div *ngIf="formError" class="error-box" style="margin-top:4px">{{ formError }}</div>
 
             <div class="detail-actions">
               <button type="button" class="btn-danger" (click)="confirmDeleteDetail()">Excluir alerta</button>
