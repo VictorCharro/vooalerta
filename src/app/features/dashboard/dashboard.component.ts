@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -372,10 +372,22 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
           <form (ngSubmit)="saveAlert()">
             <div class="form-row">
               <div class="form-group">
-                <label for="m-origem">Origem</label>
-                <input id="m-origem" [(ngModel)]="form.origem" name="origem"
-                  placeholder="GRU" maxlength="3"
-                  (input)="form.origem = form.origem!.toUpperCase()" required />
+                <label>Origem</label>
+                <div class="chips-input" (click)="focusOrigenInput()">
+                  <span class="chip" *ngFor="let o of origens">
+                    {{ o }}
+                    <button type="button" class="chip-remove" (click)="removeOrigen(o)">×</button>
+                  </span>
+                  <input #origenInputEl
+                    [(ngModel)]="origenInput" name="origen_input"
+                    placeholder="{{ origens.length === 0 ? 'GRU' : '+' }}"
+                    maxlength="3" style="border:none;outline:none;background:transparent;width:48px;font-size:14px;padding:2px 4px"
+                    (input)="origenInput = origenInput.toUpperCase()"
+                    (keydown.enter)="$event.preventDefault(); addOrigen()"
+                    (keydown.tab)="$event.preventDefault(); addOrigen()"
+                    (blur)="addOrigen()" />
+                </div>
+                <span class="form-hint">Digite e pressione Enter para adicionar mais</span>
               </div>
               <div class="form-group">
                 <label for="m-destino">Destino</label>
@@ -444,7 +456,9 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
               <button type="button" class="btn-ghost" (click)="closeModal()">Cancelar</button>
               <button type="submit" class="btn-primary modal-save" [disabled]="saving">
                 <span *ngIf="saving" class="spinner"></span>
-                <span *ngIf="!saving">Salvar alerta</span>
+                <span *ngIf="!saving">
+                  Salvar{{ origens.length > 1 ? ' ' + origens.length + ' alertas' : ' alerta' }}
+                </span>
               </button>
             </div>
           </form>
@@ -478,6 +492,10 @@ export class DashboardComponent implements OnInit {
   minPricesLoading  = false;
 
   isDark = true;
+
+  origens: string[] = [];
+  origenInput = '';
+  @ViewChild('origenInputEl') origenInputEl?: ElementRef<HTMLInputElement>;
 
   form: Partial<Alert & { so_ida: boolean }> = this.emptyForm();
   readonly today = new Date().toISOString().split('T')[0];
@@ -549,11 +567,29 @@ export class DashboardComponent implements OnInit {
   }
 
   openModal() {
-    this.editingId         = null;
-    this.form              = this.emptyForm();
-    this.form.whatsapp     = this.profileWhatsapp;
-    this.formError         = '';
-    this.showModal         = true;
+    this.editingId     = null;
+    this.form          = this.emptyForm();
+    this.form.whatsapp = this.profileWhatsapp;
+    this.formError     = '';
+    this.origens       = [];
+    this.origenInput   = '';
+    this.showModal     = true;
+  }
+
+  addOrigen() {
+    const v = this.origenInput.trim().toUpperCase();
+    if (v.length === 3 && !this.origens.includes(v)) {
+      this.origens.push(v);
+    }
+    this.origenInput = '';
+  }
+
+  removeOrigen(o: string) {
+    this.origens = this.origens.filter(x => x !== o);
+  }
+
+  focusOrigenInput() {
+    this.origenInputEl?.nativeElement.focus();
   }
 
   openDetail(alert: Alert) {
@@ -619,8 +655,15 @@ export class DashboardComponent implements OnInit {
       return;
     }
 
-    const payload = {
-      origem:          this.form.origem!,
+    // Garante que há pelo menos uma origem no modal de novo alerta
+    if (!this.editingId) this.addOrigen();
+    if (!this.editingId && this.origens.length === 0) {
+      this.formError = 'Adicione pelo menos uma origem.';
+      this.saving = false;
+      return;
+    }
+
+    const basePayload = {
       destino:         this.form.destino!,
       data_ida:        this.form.data_ida!,
       data_volta:      this.form.so_ida ? null : (this.form.data_volta || null),
@@ -633,9 +676,12 @@ export class DashboardComponent implements OnInit {
 
     let error;
     if (this.editingId) {
-      ({ error } = await this.supabase.updateAlert(this.editingId, payload));
+      ({ error } = await this.supabase.updateAlert(this.editingId, { ...basePayload, origem: this.form.origem! }));
     } else {
-      ({ error } = await this.supabase.createAlert(payload as AlertCreate));
+      for (const origem of this.origens) {
+        const result = await this.supabase.createAlert({ ...basePayload, origem } as AlertCreate);
+        if (result.error) { error = result.error; break; }
+      }
     }
 
     if (error) {

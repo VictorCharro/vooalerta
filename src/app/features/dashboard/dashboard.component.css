@@ -25,6 +25,27 @@
 .user-email { font-size: 11px; color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-logout { padding: 5px 10px; font-size: 12px; flex-shrink: 0; }
 
+/* ── Chips de origem ─────────────────────────────────────── */
+.chips-input {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  min-height: 42px; padding: 6px 10px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  background: var(--color-bg-2); cursor: text;
+  transition: border-color var(--transition);
+}
+.chips-input:focus-within { border-color: var(--color-accent); }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px 3px 10px;
+  background: var(--color-accent-dim); color: var(--color-accent);
+  border-radius: 20px; font-size: 13px; font-weight: 600; font-family: var(--font-display);
+}
+.chip-remove {
+  background: none; border: none; cursor: pointer; padding: 0; line-height: 1;
+  font-size: 15px; color: var(--color-accent); opacity: .7;
+}
+.chip-remove:hover { opacity: 1; }
+
 /* ── Main ────────────────────────────────────────────────── */
 .main { flex: 1; max-width: 860px; padding: 36px 32px; min-width: 0; }
 
