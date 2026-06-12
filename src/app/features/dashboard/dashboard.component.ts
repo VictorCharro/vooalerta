@@ -522,7 +522,10 @@ export class DashboardComponent implements OnInit {
       this.alerts.map(async (alert) => {
         const key = `${alert.origem}-${alert.destino}-${alert.data_ida}`;
         if (prices[key] === undefined) {
-          const price = await this.supabase.getMinPriceForRoute(alert.origem, alert.destino, alert.data_ida);
+          const price = await this.supabase.getMinPriceForRoute(
+            alert.origem, alert.destino, alert.data_ida,
+            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+          );
           if (price !== null) prices[key] = price;
         }
       })

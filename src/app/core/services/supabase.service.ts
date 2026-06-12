@@ -87,17 +87,32 @@ export class SupabaseService {
         .eq('id', session.user.id);
   }
 
-  async getMinPriceForRoute(origem: string, destino: string, dataIda: string): Promise<number | null> {
-    const { data } = await this.client
+  async getMinPriceForRoute(
+    origem: string,
+    destino: string,
+    dataIda: string,
+    options: { horarioMinimo?: string | null; soDireto?: boolean } = {}
+  ): Promise<number | null> {
+    let query = this.client
         .from('price_cache')
         .select('preco')
         .eq('origem', origem)
         .eq('destino', destino)
         .eq('data_ida', dataIda)
-        .not('preco', 'is', null)
+        .not('preco', 'is', null);
+
+    if (options.horarioMinimo && options.horarioMinimo !== '00:00') {
+      query = query.gte('horario_partida', options.horarioMinimo);
+    }
+    if (options.soDireto) {
+      query = query.eq('escalas', 0);
+    }
+
+    const { data } = await query
         .order('preco', { ascending: true })
         .limit(1)
         .maybeSingle();
+
     return data?.preco ?? null;
   }
 
