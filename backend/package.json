@@ -1,0 +1,9 @@
+{
+  "name": "vooalerta-backend",
+  "version": "1.0.0",
+  "description": "Monitor de passagens — VooAlerta",
+  "scripts": { "start": "node monitor.js" },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}
