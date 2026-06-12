@@ -124,7 +124,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
                     [class.diff-green]="getMinPrice(alert)! <= alert.meta"
                     [class.diff-red]="getMinPrice(alert)! > alert.meta">
                     {{ getMinPrice(alert)! <= alert.meta ? '-' : '+' }}
-                    R$&nbsp;{{ (alert.meta - getMinPrice(alert)!) | number:'1.0-0' }}
+                    R$&nbsp;{{ absDiff(alert.meta, getMinPrice(alert)!) | number:'1.0-0' }}
                   </span>
                 </ng-container>
               </div>
@@ -533,6 +533,8 @@ export class DashboardComponent implements OnInit {
     this.minPrices = prices;
     this.minPricesLoading = false;
   }
+
+  absDiff(a: number, b: number): number { return Math.abs(a - b); }
 
   getMinPrice(alert: Alert): number | null {
     const val = this.minPrices[`${alert.origem}-${alert.destino}-${alert.data_ida}`];
