@@ -148,4 +148,11 @@ export class SupabaseService {
         .delete()
         .eq('id', id);
   }
+
+  subscribePriceCache(callback: () => void) {
+    return this.client
+      .channel('price-cache-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'price_cache' }, callback)
+      .subscribe();
+  }
 }

@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -42,6 +42,11 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
 
       <!-- ── Main ── -->
       <main class="main">
+
+        <!-- ── Toasts ── -->
+        <div class="toast-container">
+          <div class="toast fade-up" *ngFor="let t of toasts">{{ t }}</div>
+        </div>
 
         <!-- ══ LISTA ══ -->
         <ng-container *ngIf="!selectedAlert">
@@ -478,7 +483,7 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
     </div>
   `
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   alerts:    Alert[] = [];
   loading    = true;
   showModal  = false;
@@ -500,6 +505,8 @@ export class DashboardComponent implements OnInit {
 
   minPrices:        Record<string, number> = {};
   minPricesLoading  = false;
+  toasts:           string[] = [];
+  private realtimeChannel: any;
 
   isDark = true;
 
@@ -532,6 +539,28 @@ export class DashboardComponent implements OnInit {
     const { data: profile } = await this.supabase.getProfile();
     this.missingCallmebotKey = !profile?.callmebot_key;
     this.profileWhatsapp     = this.stripPrefix(profile?.whatsapp ?? '');
+
+    this.realtimeChannel = this.supabase.subscribePriceCache(async () => {
+      const prevPrices = { ...this.minPrices };
+      await this.loadMinPrices();
+      for (const alert of this.alerts) {
+        const key = `${alert.origem}-${alert.destino}-${alert.data_ida}`;
+        const prev = prevPrices[key];
+        const curr = this.minPrices[key];
+        if (curr !== undefined && curr <= alert.meta && (prev === undefined || prev > alert.meta)) {
+          this.showToast(`✈ ${alert.origem} → ${alert.destino} abaixo da meta! R$ ${curr}`);
+        }
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    this.realtimeChannel?.unsubscribe();
+  }
+
+  showToast(msg: string) {
+    this.toasts.push(msg);
+    setTimeout(() => this.toasts.shift(), 5000);
   }
 
   async loadAlerts() {
