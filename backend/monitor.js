@@ -239,6 +239,10 @@ async function processarAlerta(alerta, voosCache) {
 
 // ── Entry point ───────────────────────────────────────────────
 
+// Cron dispara às 12,16,20,0 UTC = 9h,13h,17h,21h BRT
+const CRON_HOURS_UTC = [12, 16, 20, 0];
+const MONTHLY_BUDGET = 250;
+
 async function main() {
   console.log('🚀 VooAlerta — Iniciando monitoramento');
   console.log(`📅 ${new Date().toISOString()}`);
@@ -258,6 +262,23 @@ async function main() {
 
   if (rotas.length === 0) {
     console.log('Nenhum alerta ativo. Encerrando.');
+    return;
+  }
+
+  // Calcula quantas execuções por dia cabem no orçamento mensal
+  const runsPerDay = Math.min(
+    CRON_HOURS_UTC.length,
+    Math.floor(MONTHLY_BUDGET / rotas.length / 30)
+  ) || 1;
+
+  const allowedHours = CRON_HOURS_UTC.slice(0, runsPerDay);
+  const currentHourUTC = new Date().getUTCHours();
+
+  console.log(`💰 Orçamento: ${MONTHLY_BUDGET} buscas/mês | ${rotas.length} rota(s) → ${runsPerDay} coleta(s)/dia`);
+  console.log(`🕐 Horários permitidos (UTC): ${allowedHours.join('h, ')}h`);
+
+  if (!allowedHours.includes(currentHourUTC)) {
+    console.log(`⏭  Hora atual (${currentHourUTC}h UTC) fora do orçamento — encerrando`);
     return;
   }
 
