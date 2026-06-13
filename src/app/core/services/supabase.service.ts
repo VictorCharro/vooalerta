@@ -150,11 +150,7 @@ export class SupabaseService {
   }
 
   async getAlertById(id: string) {
-    return this.client
-        .from('alerts')
-        .select('origem, destino, data_ida, data_volta, meta, horario_minimo, so_direto')
-        .eq('id', id)
-        .maybeSingle();
+    return this.client.rpc('get_shared_alert', { alert_id: id });
   }
 
   subscribePriceCache(callback: () => void) {
