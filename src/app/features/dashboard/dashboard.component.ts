@@ -575,7 +575,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   constructor(
       private supabase: SupabaseService,
-      private router: Router
+      public router: Router
   ) {}
 
   async ngOnInit() {
