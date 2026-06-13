@@ -161,9 +161,15 @@ interface BusAlert {
                   <span class="track"></span>
                   <span class="thumb"></span>
                 </label>
-                <button class="share-btn" (click)="refreshPrice(alert)" [title]="refreshing[alert.id] ? 'Atualizando...' : 'Atualizar preço'">
+                <button class="share-btn"
+                  (click)="refreshPrice(alert)"
+                  [title]="getRefreshTitle(alert)"
+                  [class.btn-cooldown]="getCooldownSeconds(alert) > 0 && !refreshing[alert.id]">
                   <span *ngIf="refreshing[alert.id]" class="spinner" style="width:14px;height:14px;border-width:2px"></span>
-                  <span *ngIf="!refreshing[alert.id]">↻</span>
+                  <ng-container *ngIf="!refreshing[alert.id]">
+                    <span *ngIf="getCooldownSeconds(alert) === 0">↻</span>
+                    <span *ngIf="getCooldownSeconds(alert) > 0" class="cooldown-label">{{ formatCooldown(alert) }}</span>
+                  </ng-container>
                 </button>
                 <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">›</button>
               </div>
@@ -433,6 +439,9 @@ export class OnibusComponent implements OnInit, OnDestroy {
   selectedAlert: BusAlert | null = null;
   private profileWhatsapp = '';
   private realtimeChannel: any;
+  private cooldownTick: any;
+  private cooldownNow = Date.now();
+  private readonly COOLDOWN_MS = 10 * 60 * 1000;
 
   form       = this.emptyForm();
   detailForm = this.emptyDetailForm();
@@ -457,9 +466,14 @@ export class OnibusComponent implements OnInit, OnDestroy {
     this.realtimeChannel = this.supabase.subscribeBusPriceCache(async () => {
       await this.loadCachedPrices();
     });
+    // tick a cada segundo para atualizar o countdown
+    this.cooldownTick = setInterval(() => { this.cooldownNow = Date.now(); }, 1000);
   }
 
-  ngOnDestroy() { this.realtimeChannel?.unsubscribe(); }
+  ngOnDestroy() {
+    this.realtimeChannel?.unsubscribe();
+    clearInterval(this.cooldownTick);
+  }
 
   async loadAlerts() {
     this.loading = true;
@@ -487,16 +501,39 @@ export class OnibusComponent implements OnInit, OnDestroy {
   }
 
   async refreshPrice(alert: BusAlert) {
-    if (this.refreshing[alert.id]) return;
+    if (this.refreshing[alert.id] || this.getCooldownSeconds(alert) > 0) return;
     this.refreshing = { ...this.refreshing, [alert.id]: true };
-    const p = await this.supabase.getBusCachedPrice(alert.origem_slug, alert.destino_slug, alert.data_ida);
+    const key = `bus_refresh_${alert.origem_slug}_${alert.destino_slug}_${alert.data_ida}`;
+    const p = await this.supabase.scrapeBuserPrice(alert.origem_slug, alert.destino_slug, alert.data_ida, alert.data_volta);
+    localStorage.setItem(key, String(Date.now()));
     if (p !== null) {
       this.cachedPrices = { ...this.cachedPrices, [this.priceKey(alert)]: p };
       this.showToast(`Preço atualizado: R$ ${p}`);
     } else {
-      this.showToast('Ainda sem preço no cache. O monitor atualiza a cada hora.');
+      this.showToast('Rota não encontrada ou sem passagens disponíveis.');
     }
     this.refreshing = { ...this.refreshing, [alert.id]: false };
+  }
+
+  getCooldownSeconds(alert: BusAlert): number {
+    const key = `bus_refresh_${alert.origem_slug}_${alert.destino_slug}_${alert.data_ida}`;
+    const last = Number(localStorage.getItem(key) ?? 0);
+    const remaining = this.COOLDOWN_MS - (this.cooldownNow - last);
+    return remaining > 0 ? Math.ceil(remaining / 1000) : 0;
+  }
+
+  formatCooldown(alert: BusAlert): string {
+    const secs = this.getCooldownSeconds(alert);
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  getRefreshTitle(alert: BusAlert): string {
+    if (this.refreshing[alert.id]) return 'Atualizando...';
+    const secs = this.getCooldownSeconds(alert);
+    if (secs > 0) return `Disponível em ${this.formatCooldown(alert)}`;
+    return 'Atualizar preço agora';
   }
 
   priceKey(a: BusAlert) { return `${a.origem_slug}-${a.destino_slug}-${a.data_ida}`; }

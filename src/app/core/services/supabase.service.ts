@@ -209,6 +209,14 @@ export class SupabaseService {
     return data?.preco ?? null;
   }
 
+  async scrapeBuserPrice(origemSlug: string, destinoSlug: string, dataIda: string, dataVolta?: string | null): Promise<number | null> {
+    const { data, error } = await this.client.functions.invoke('scrape-buser', {
+      body: { origem_slug: origemSlug, destino_slug: destinoSlug, data_ida: dataIda, data_volta: dataVolta ?? null }
+    });
+    if (error || data?.error) return null;
+    return data?.preco ?? null;
+  }
+
   subscribeBusPriceCache(callback: () => void) {
     return this.client
       .channel('bus-price-cache-changes')
