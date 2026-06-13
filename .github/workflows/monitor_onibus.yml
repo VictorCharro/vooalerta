@@ -1,0 +1,26 @@
+name: VooAlerta — Monitoramento de Ônibus
+
+on:
+  schedule:
+    - cron: '30 12,16,20,0 * * *'  # 9h30, 13h30, 17h30, 21h30 BRT (offset do voo)
+  workflow_dispatch:
+
+jobs:
+  monitor-onibus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repositório
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Rodar monitoramento de ônibus
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node backend/monitor_onibus.js
