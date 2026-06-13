@@ -557,6 +557,10 @@ export class OnibusComponent implements OnInit, OnDestroy {
     return url;
   }
 
+  toTitleCase(text: string): string {
+    return text.trim().replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  }
+
   toSlug(text: string): string {
     return text
       .toLowerCase()
@@ -599,9 +603,9 @@ export class OnibusComponent implements OnInit, OnDestroy {
     }
 
     const { error } = await this.supabase.createBusAlert({
-      origem:       this.form.origem,
+      origem:       this.toTitleCase(this.form.origem),
       origem_slug:  this.toSlug(this.form.origem) + '-' + this.form.origem_uf.toLowerCase(),
-      destino:      this.form.destino,
+      destino:      this.toTitleCase(this.form.destino),
       destino_slug: this.toSlug(this.form.destino) + '-' + this.form.destino_uf.toLowerCase(),
       data_ida:     this.form.data_ida,
       data_volta:   this.form.data_volta || null,
@@ -674,9 +678,9 @@ export class OnibusComponent implements OnInit, OnDestroy {
     }
 
     const { error } = await this.supabase.updateBusAlert(this.selectedAlert!.id, {
-      origem:       this.detailForm.origem,
+      origem:       this.toTitleCase(this.detailForm.origem),
       origem_slug:  this.toSlug(this.detailForm.origem) + '-' + this.detailForm.origem_uf.toLowerCase(),
-      destino:      this.detailForm.destino,
+      destino:      this.toTitleCase(this.detailForm.destino),
       destino_slug: this.toSlug(this.detailForm.destino) + '-' + this.detailForm.destino_uf.toLowerCase(),
       data_ida:     this.detailForm.data_ida,
       data_volta:   this.detailForm.data_volta || null,
