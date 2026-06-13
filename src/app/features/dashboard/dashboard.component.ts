@@ -424,7 +424,6 @@ import { TimePickerComponent } from '@shared/components/time-picker/time-picker.
                     style="flex:1;min-width:120px">
                   </app-airport-search>
                 </div>
-                <span class="form-hint">Selecione um ou mais aeroportos de origem</span>
               </div>
               <div class="form-group">
                 <label>Destino</label>
