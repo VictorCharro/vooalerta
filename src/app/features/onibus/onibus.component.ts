@@ -185,7 +185,8 @@ interface BusAlert {
               </div>
               <div class="form-group" style="max-width:80px">
                 <label>UF</label>
-                <input [(ngModel)]="form.origem_uf" name="origem_uf" placeholder="SP" maxlength="2" required />
+                <input class="uf-input" [(ngModel)]="form.origem_uf" name="origem_uf" placeholder="SP" maxlength="2" required
+                  (input)="form.origem_uf = form.origem_uf.toUpperCase()" />
               </div>
             </div>
 
@@ -196,7 +197,8 @@ interface BusAlert {
               </div>
               <div class="form-group" style="max-width:80px">
                 <label>UF</label>
-                <input [(ngModel)]="form.destino_uf" name="destino_uf" placeholder="SP" maxlength="2" required />
+                <input class="uf-input" [(ngModel)]="form.destino_uf" name="destino_uf" placeholder="SP" maxlength="2" required
+                  (input)="form.destino_uf = form.destino_uf.toUpperCase()" />
               </div>
             </div>
 
