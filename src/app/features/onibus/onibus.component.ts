@@ -65,106 +65,268 @@ interface BusAlert {
           <div class="toast fade-up" *ngFor="let t of toasts">{{ t }}</div>
         </div>
 
-        <!-- Banners abaixo da meta -->
-        <div class="price-banner fade-up" *ngFor="let a of alertsBelowMeta">
-          Onibus <strong>{{ a.origem }} → {{ a.destino }}</strong> abaixo da meta —
-          R$&nbsp;{{ getCachedPrice(a) | number:'1.0-0' }}
-          (meta: R$&nbsp;{{ a.meta | number:'1.0-0' }})
-        </div>
+        <!-- ══ LISTA ══ -->
+        <ng-container *ngIf="!selectedAlert">
 
-        <div class="page-header fade-up">
-          <div>
-            <h1>Ônibus</h1>
-            <p class="page-sub" *ngIf="!loading">
-              {{ alerts.length }} rota{{ alerts.length !== 1 ? 's' : '' }} monitorada{{ alerts.length !== 1 ? 's' : '' }}
-            </p>
+          <!-- Banners abaixo da meta -->
+          <div class="price-banner fade-up" *ngFor="let a of alertsBelowMeta">
+            Ônibus <strong>{{ a.origem }} → {{ a.destino }}</strong> abaixo da meta —
+            R$&nbsp;{{ getCachedPrice(a) | number:'1.0-0' }}
+            (meta: R$&nbsp;{{ a.meta | number:'1.0-0' }})
           </div>
-          <button class="btn-primary" (click)="openModal()">+ Novo alerta</button>
-        </div>
 
-        <!-- Loading -->
-        <div class="center-state" *ngIf="loading">
-          <div class="spinner spinner-dark" style="width:28px;height:28px;border-width:3px"></div>
-        </div>
-
-        <!-- Empty state -->
-        <div class="empty-state fade-up" *ngIf="!loading && alerts.length === 0">
-          <div class="empty-icon">—</div>
-          <h3>Nenhum alerta de ônibus</h3>
-          <p>Crie um alerta e receba no WhatsApp quando a passagem cair.</p>
-          <button class="btn-primary" (click)="openModal()" style="margin-top:20px">Criar primeiro alerta</button>
-        </div>
-
-        <!-- Cards de alertas -->
-        <div class="alerts-list" *ngIf="!loading && alerts.length > 0">
-          <div
-            class="alert-card fade-up"
-            *ngFor="let alert of alerts; let i = index"
-            [style.animation-delay]="(i * 0.04) + 's'"
-            [class.card-inactive]="!alert.ativo"
-          >
-            <div class="card-route">
-              <div class="route-iata">
-                <span class="city-name">{{ alert.origem }}</span>
-                <span class="route-sep">→</span>
-                <span class="city-name">{{ alert.destino }}</span>
-              </div>
-              <div class="route-date">
-                {{ alert.data_ida | date:'dd/MM/yyyy' }}
-                <ng-container *ngIf="alert.data_volta"> → {{ alert.data_volta | date:'dd/MM/yyyy' }}</ng-container>
-                <ng-container *ngIf="!alert.data_volta"> · Só ida</ng-container>
-              </div>
-              <div class="route-countdown"
-                [class.countdown-green]="daysUntil(alert.data_ida) > 30"
-                [class.countdown-yellow]="daysUntil(alert.data_ida) >= 7 && daysUntil(alert.data_ida) <= 30"
-                [class.countdown-red]="daysUntil(alert.data_ida) > 0 && daysUntil(alert.data_ida) < 7"
-                [class.countdown-muted]="daysUntil(alert.data_ida) <= 0">
-                <ng-container *ngIf="daysUntil(alert.data_ida) > 0">
-                  Faltam {{ daysUntil(alert.data_ida) }} dia{{ daysUntil(alert.data_ida) !== 1 ? 's' : '' }}
-                </ng-container>
-                <ng-container *ngIf="daysUntil(alert.data_ida) <= 0">Viagem realizada</ng-container>
-              </div>
+          <div class="page-header fade-up">
+            <div>
+              <h1>Ônibus</h1>
+              <p class="page-sub" *ngIf="!loading">
+                {{ alerts.length }} rota{{ alerts.length !== 1 ? 's' : '' }} monitorada{{ alerts.length !== 1 ? 's' : '' }}
+              </p>
             </div>
+            <button class="btn-primary" (click)="openModal()">+ Novo alerta</button>
+          </div>
 
-            <div class="card-price-col">
-              <span class="card-meta-label">Meta: R$&nbsp;{{ alert.meta | number:'1.0-0' }}</span>
-              <ng-container *ngIf="pricesLoading && getCachedPrice(alert) === null">
-                <span class="price-skeleton"></span>
-              </ng-container>
-              <ng-container *ngIf="!pricesLoading || getCachedPrice(alert) !== null">
-                <span class="card-price-value"
-                  [class.price-below]="getCachedPrice(alert) !== null && getCachedPrice(alert)! <= alert.meta"
-                  [class.price-above]="getCachedPrice(alert) !== null && getCachedPrice(alert)! > alert.meta"
-                  [class.price-muted]="getCachedPrice(alert) === null">
-                  <ng-container *ngIf="getCachedPrice(alert) !== null">
-                    R$&nbsp;{{ getCachedPrice(alert) | number:'1.0-0' }}
-                    {{ getCachedPrice(alert)! <= alert.meta ? '↓' : '↑' }}
+          <!-- Loading -->
+          <div class="center-state" *ngIf="loading">
+            <div class="spinner spinner-dark" style="width:28px;height:28px;border-width:3px"></div>
+          </div>
+
+          <!-- Empty state -->
+          <div class="empty-state fade-up" *ngIf="!loading && alerts.length === 0">
+            <div class="empty-icon">—</div>
+            <h3>Nenhum alerta de ônibus</h3>
+            <p>Crie um alerta e receba no WhatsApp quando a passagem cair.</p>
+            <button class="btn-primary" (click)="openModal()" style="margin-top:20px">Criar primeiro alerta</button>
+          </div>
+
+          <!-- Cards de alertas -->
+          <div class="alerts-list" *ngIf="!loading && alerts.length > 0">
+            <div
+              class="alert-card fade-up"
+              *ngFor="let alert of alerts; let i = index"
+              [style.animation-delay]="(i * 0.04) + 's'"
+              [class.card-inactive]="!alert.ativo"
+            >
+              <div class="card-route">
+                <div class="route-iata">
+                  <span class="city-name">{{ alert.origem }}</span>
+                  <span class="route-sep">→</span>
+                  <span class="city-name">{{ alert.destino }}</span>
+                </div>
+                <div class="route-date">
+                  {{ alert.data_ida | date:'dd/MM/yyyy' }}
+                  <ng-container *ngIf="alert.data_volta"> → {{ alert.data_volta | date:'dd/MM/yyyy' }}</ng-container>
+                  <ng-container *ngIf="!alert.data_volta"> · Só ida</ng-container>
+                </div>
+                <div class="route-countdown"
+                  [class.countdown-green]="daysUntil(alert.data_ida) > 30"
+                  [class.countdown-yellow]="daysUntil(alert.data_ida) >= 7 && daysUntil(alert.data_ida) <= 30"
+                  [class.countdown-red]="daysUntil(alert.data_ida) > 0 && daysUntil(alert.data_ida) < 7"
+                  [class.countdown-muted]="daysUntil(alert.data_ida) <= 0">
+                  <ng-container *ngIf="daysUntil(alert.data_ida) > 0">
+                    Faltam {{ daysUntil(alert.data_ida) }} dia{{ daysUntil(alert.data_ida) !== 1 ? 's' : '' }}
                   </ng-container>
-                  <ng-container *ngIf="getCachedPrice(alert) === null">—</ng-container>
-                </span>
-                <span class="card-price-diff"
-                  *ngIf="getCachedPrice(alert) !== null"
-                  [class.diff-green]="getCachedPrice(alert)! <= alert.meta"
-                  [class.diff-red]="getCachedPrice(alert)! > alert.meta">
-                  {{ getCachedPrice(alert)! <= alert.meta ? '-' : '+' }}
-                  R$&nbsp;{{ absDiff(alert.meta, getCachedPrice(alert)!) | number:'1.0-0' }}
-                </span>
-              </ng-container>
-            </div>
+                  <ng-container *ngIf="daysUntil(alert.data_ida) <= 0">Viagem realizada</ng-container>
+                </div>
+              </div>
 
-            <div class="card-controls">
-              <label class="toggle" [title]="alert.ativo ? 'Pausar' : 'Ativar'">
-                <input type="checkbox" [checked]="alert.ativo" (change)="toggleAlert(alert)" />
-                <span class="track"></span>
-                <span class="thumb"></span>
-              </label>
-              <a class="open-btn"
-                [href]="buildBuserUrl(alert)"
-                target="_blank" rel="noopener"
-                title="Abrir no Buser">↗</a>
-              <button class="chevron-btn" (click)="confirmDelete(alert)" title="Excluir">✕</button>
+              <div class="card-price-col">
+                <span class="card-meta-label">Meta: R$&nbsp;{{ alert.meta | number:'1.0-0' }}</span>
+                <ng-container *ngIf="pricesLoading && getCachedPrice(alert) === null">
+                  <span class="price-skeleton"></span>
+                </ng-container>
+                <ng-container *ngIf="!pricesLoading || getCachedPrice(alert) !== null">
+                  <span class="card-price-value"
+                    [class.price-below]="getCachedPrice(alert) !== null && getCachedPrice(alert)! <= alert.meta"
+                    [class.price-above]="getCachedPrice(alert) !== null && getCachedPrice(alert)! > alert.meta"
+                    [class.price-muted]="getCachedPrice(alert) === null">
+                    <ng-container *ngIf="getCachedPrice(alert) !== null">
+                      R$&nbsp;{{ getCachedPrice(alert) | number:'1.0-0' }}
+                      {{ getCachedPrice(alert)! <= alert.meta ? '↓' : '↑' }}
+                    </ng-container>
+                    <ng-container *ngIf="getCachedPrice(alert) === null">—</ng-container>
+                  </span>
+                  <span class="card-price-diff"
+                    *ngIf="getCachedPrice(alert) !== null"
+                    [class.diff-green]="getCachedPrice(alert)! <= alert.meta"
+                    [class.diff-red]="getCachedPrice(alert)! > alert.meta">
+                    {{ getCachedPrice(alert)! <= alert.meta ? '-' : '+' }}
+                    R$&nbsp;{{ absDiff(alert.meta, getCachedPrice(alert)!) | number:'1.0-0' }}
+                  </span>
+                </ng-container>
+              </div>
+
+              <div class="card-controls">
+                <label class="toggle" [title]="alert.ativo ? 'Pausar' : 'Ativar'">
+                  <input type="checkbox" [checked]="alert.ativo" (change)="toggleAlert(alert)" />
+                  <span class="track"></span>
+                  <span class="thumb"></span>
+                </label>
+                <button class="share-btn" (click)="refreshPrice(alert)" [title]="refreshing[alert.id] ? 'Atualizando...' : 'Atualizar preço'">
+                  <span *ngIf="refreshing[alert.id]" class="spinner" style="width:14px;height:14px;border-width:2px"></span>
+                  <span *ngIf="!refreshing[alert.id]">↻</span>
+                </button>
+                <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">›</button>
+              </div>
             </div>
           </div>
+
+        </ng-container>
+
+        <!-- ══ DETALHE ══ -->
+        <div class="detail-view fade-up" *ngIf="selectedAlert">
+
+          <div class="detail-header">
+            <button class="back-btn" (click)="closeDetail()">← Voltar</button>
+            <h1 class="detail-title">
+              {{ selectedAlert.origem }}
+              <span class="detail-arrow">→</span>
+              {{ selectedAlert.destino }}
+            </h1>
+          </div>
+
+          <!-- Stat cards -->
+          <div class="stat-grid">
+            <div class="stat-card">
+              <span class="stat-label">Menor preço</span>
+              <span class="stat-value"
+                [class.stat-green]="getCachedPrice(selectedAlert) !== null && getCachedPrice(selectedAlert)! <= selectedAlert.meta"
+                [class.stat-red]="getCachedPrice(selectedAlert) !== null && getCachedPrice(selectedAlert)! > selectedAlert.meta">
+                <ng-container *ngIf="getCachedPrice(selectedAlert) !== null">R$&nbsp;{{ getCachedPrice(selectedAlert) | number:'1.0-0' }}</ng-container>
+                <ng-container *ngIf="getCachedPrice(selectedAlert) === null">—</ng-container>
+              </span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Preço atual</span>
+              <span class="stat-value"
+                [class.stat-green]="getCachedPrice(selectedAlert) !== null && getCachedPrice(selectedAlert)! <= selectedAlert.meta"
+                [class.stat-red]="getCachedPrice(selectedAlert) !== null && getCachedPrice(selectedAlert)! > selectedAlert.meta">
+                <ng-container *ngIf="getCachedPrice(selectedAlert) !== null">R$&nbsp;{{ getCachedPrice(selectedAlert) | number:'1.0-0' }}</ng-container>
+                <ng-container *ngIf="getCachedPrice(selectedAlert) === null">—</ng-container>
+              </span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Sua meta</span>
+              <span class="stat-value">R$&nbsp;{{ selectedAlert.meta | number:'1.0-0' }}</span>
+            </div>
+          </div>
+
+          <!-- Formulário de edição -->
+          <form (ngSubmit)="saveDetail()">
+            <div class="detail-grid">
+
+              <!-- Esquerda: campos da rota -->
+              <div class="info-section">
+                <h3 class="section-title">Detalhes da rota</h3>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Cidade de origem</label>
+                    <input [(ngModel)]="detailForm.origem" name="d_origem" placeholder="Ex: Franca" required />
+                  </div>
+                  <div class="form-group" style="max-width:80px">
+                    <label>UF</label>
+                    <input class="uf-input" [(ngModel)]="detailForm.origem_uf" name="d_origem_uf" maxlength="2" required
+                      (input)="detailForm.origem_uf = detailForm.origem_uf.toUpperCase()" />
+                  </div>
+                </div>
+
+                <div class="form-row" style="margin-top:14px">
+                  <div class="form-group">
+                    <label>Cidade de destino</label>
+                    <input [(ngModel)]="detailForm.destino" name="d_destino" placeholder="Ex: São Paulo" required />
+                  </div>
+                  <div class="form-group" style="max-width:80px">
+                    <label>UF</label>
+                    <input class="uf-input" [(ngModel)]="detailForm.destino_uf" name="d_destino_uf" maxlength="2" required
+                      (input)="detailForm.destino_uf = detailForm.destino_uf.toUpperCase()" />
+                  </div>
+                </div>
+
+                <div class="form-row" style="margin-top:14px">
+                  <div class="form-group">
+                    <label>Data de ida</label>
+                    <app-date-picker
+                      [value]="detailForm.data_ida"
+                      [min]="today"
+                      placeholder="Selecionar data"
+                      (valueChange)="detailForm.data_ida = $event">
+                    </app-date-picker>
+                  </div>
+                  <div class="form-group">
+                    <label>Data de volta <span class="form-optional">(opcional)</span></label>
+                    <app-date-picker
+                      [value]="detailForm.data_volta"
+                      [min]="detailForm.data_ida || today"
+                      placeholder="Selecionar data"
+                      (valueChange)="detailForm.data_volta = $event">
+                    </app-date-picker>
+                  </div>
+                </div>
+
+                <div class="form-row" style="margin-top:14px">
+                  <div class="form-group">
+                    <label for="d-meta">Meta de preço (R$)</label>
+                    <input id="d-meta" type="number" [(ngModel)]="detailForm.meta" name="d_meta" placeholder="150" min="1" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="d-whatsapp">WhatsApp para notificação</label>
+                    <div class="phone-input">
+                      <span class="phone-prefix">55</span>
+                      <input id="d-whatsapp" type="tel" [(ngModel)]="detailForm.whatsapp" name="d_whatsapp"
+                        placeholder="11999999999" maxlength="11" required />
+                    </div>
+                    <span class="form-hint">DDD + número (ex: 11999999999)</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Direita: info + configurações -->
+              <div class="detail-right">
+                <div class="info-section">
+                  <h3 class="section-title">Informações da passagem</h3>
+                  <div class="info-row">
+                    <span class="info-label">Operadora</span>
+                    <span class="info-value">Buser</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Tipo</span>
+                    <span class="info-value">Qualquer assento</span>
+                  </div>
+                  <div class="info-row" style="border-bottom:none;padding-bottom:0">
+                    <span class="info-label">Abrir no Buser</span>
+                    <a class="open-btn" [href]="buildBuserUrl(selectedAlert)" target="_blank" rel="noopener" title="Abrir no Buser">↗</a>
+                  </div>
+                </div>
+
+                <div class="info-section">
+                  <h3 class="section-title">Configurações</h3>
+                  <div class="info-row" style="border-bottom:none;padding-bottom:0">
+                    <div>
+                      <span class="info-label" style="font-size:14px;color:var(--color-text)">Ativar notificações</span>
+                      <p class="form-hint" style="margin:2px 0 0">
+                        Receba uma mensagem no WhatsApp quando o preço cair abaixo da meta.
+                      </p>
+                    </div>
+                    <label class="toggle" style="flex-shrink:0">
+                      <input type="checkbox" [(ngModel)]="detailForm.ativo" name="d_ativo" (change)="toggleDetailAlert()" />
+                      <span class="track"></span>
+                      <span class="thumb"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div *ngIf="formError" class="error-box" style="margin-top:4px">{{ formError }}</div>
+
+            <div class="detail-actions">
+              <button type="button" class="btn-danger" (click)="confirmDeleteDetail()">Excluir alerta</button>
+              <button type="submit" class="btn-primary" [disabled]="saving">
+                <span *ngIf="saving" class="spinner"></span>
+                <span *ngIf="!saving">Salvar alterações</span>
+              </button>
+            </div>
+          </form>
         </div>
 
       </main>
@@ -258,19 +420,22 @@ interface BusAlert {
 })
 export class OnibusComponent implements OnInit, OnDestroy {
   alerts: BusAlert[] = [];
-  loading    = true;
-  showModal  = false;
-  saving     = false;
-  formError  = '';
-  userEmail  = '';
-  isDark     = true;
-  toasts:    string[] = [];
+  loading      = true;
+  showModal    = false;
+  saving       = false;
+  formError    = '';
+  userEmail    = '';
+  isDark       = true;
+  toasts:      string[] = [];
   cachedPrices: Record<string, number> = {};
   pricesLoading = false;
+  refreshing:   Record<string, boolean> = {};
+  selectedAlert: BusAlert | null = null;
   private profileWhatsapp = '';
   private realtimeChannel: any;
 
-  form = this.emptyForm();
+  form       = this.emptyForm();
+  detailForm = this.emptyDetailForm();
   readonly today = new Date().toISOString().split('T')[0];
 
   get alertsBelowMeta(): BusAlert[] {
@@ -286,20 +451,15 @@ export class OnibusComponent implements OnInit, OnDestroy {
     this.isDark = (localStorage.getItem('theme') ?? 'dark') === 'dark';
     const user = await this.supabase.getUser();
     this.userEmail = user?.email ?? '';
-
     const { data: profile } = await this.supabase.getProfile();
     this.profileWhatsapp = this.stripPrefix(profile?.whatsapp ?? '');
-
     await this.loadAlerts();
-
     this.realtimeChannel = this.supabase.subscribeBusPriceCache(async () => {
       await this.loadCachedPrices();
     });
   }
 
-  ngOnDestroy() {
-    this.realtimeChannel?.unsubscribe();
-  }
+  ngOnDestroy() { this.realtimeChannel?.unsubscribe(); }
 
   async loadAlerts() {
     this.loading = true;
@@ -315,7 +475,7 @@ export class OnibusComponent implements OnInit, OnDestroy {
     const prices: Record<string, number> = {};
     await Promise.all(
       this.alerts.map(async (a) => {
-        const key = `${a.origem_slug}-${a.destino_slug}-${a.data_ida}`;
+        const key = this.priceKey(a);
         if (prices[key] === undefined) {
           const p = await this.supabase.getBusCachedPrice(a.origem_slug, a.destino_slug, a.data_ida);
           if (p !== null) prices[key] = p;
@@ -326,8 +486,23 @@ export class OnibusComponent implements OnInit, OnDestroy {
     this.pricesLoading = false;
   }
 
+  async refreshPrice(alert: BusAlert) {
+    if (this.refreshing[alert.id]) return;
+    this.refreshing = { ...this.refreshing, [alert.id]: true };
+    const p = await this.supabase.getBusCachedPrice(alert.origem_slug, alert.destino_slug, alert.data_ida);
+    if (p !== null) {
+      this.cachedPrices = { ...this.cachedPrices, [this.priceKey(alert)]: p };
+      this.showToast(`Preço atualizado: R$ ${p}`);
+    } else {
+      this.showToast('Ainda sem preço no cache. O monitor atualiza a cada hora.');
+    }
+    this.refreshing = { ...this.refreshing, [alert.id]: false };
+  }
+
+  priceKey(a: BusAlert) { return `${a.origem_slug}-${a.destino_slug}-${a.data_ida}`; }
+
   getCachedPrice(alert: BusAlert): number | null {
-    const val = this.cachedPrices[`${alert.origem_slug}-${alert.destino_slug}-${alert.data_ida}`];
+    const val = this.cachedPrices[this.priceKey(alert)];
     return val !== undefined ? val : null;
   }
 
@@ -354,6 +529,8 @@ export class OnibusComponent implements OnInit, OnDestroy {
       .replace(/[^a-z0-9-]/g, '');
   }
 
+  // ── Lista ──────────────────────────────────────────────────
+
   openModal() {
     this.form          = this.emptyForm();
     this.form.whatsapp = this.profileWhatsapp;
@@ -373,30 +550,22 @@ export class OnibusComponent implements OnInit, OnDestroy {
 
     if (!this.form.origem || !this.form.origem_uf || !this.form.destino || !this.form.destino_uf) {
       this.formError = 'Preencha cidade e UF de origem e destino.';
-      this.saving = false;
-      return;
+      this.saving = false; return;
     }
-
     if (!this.form.data_ida || this.form.data_ida < this.today) {
       this.formError = 'Data de ida inválida.';
-      this.saving = false;
-      return;
+      this.saving = false; return;
     }
-
     if ((this.form.whatsapp ?? '').replace(/\D/g, '').length !== 11) {
       this.formError = 'WhatsApp inválido. Digite DDD + número (11 dígitos).';
-      this.saving = false;
-      return;
+      this.saving = false; return;
     }
-
-    const origemSlug  = this.toSlug(this.form.origem) + '-' + this.form.origem_uf.toLowerCase();
-    const destinoSlug = this.toSlug(this.form.destino) + '-' + this.form.destino_uf.toLowerCase();
 
     const { error } = await this.supabase.createBusAlert({
       origem:       this.form.origem,
-      origem_slug:  origemSlug,
+      origem_slug:  this.toSlug(this.form.origem) + '-' + this.form.origem_uf.toLowerCase(),
       destino:      this.form.destino,
-      destino_slug: destinoSlug,
+      destino_slug: this.toSlug(this.form.destino) + '-' + this.form.destino_uf.toLowerCase(),
       data_ida:     this.form.data_ida,
       data_volta:   this.form.data_volta || null,
       meta:         Number(this.form.meta),
@@ -420,11 +589,84 @@ export class OnibusComponent implements OnInit, OnDestroy {
     alert.ativo = !alert.ativo;
   }
 
-  async confirmDelete(alert: BusAlert) {
-    if (!confirm(`Excluir alerta ${alert.origem} → ${alert.destino}?`)) return;
-    await this.supabase.deleteBusAlert(alert.id);
-    this.alerts = this.alerts.filter(a => a.id !== alert.id);
+  // ── Detail ─────────────────────────────────────────────────
+
+  openDetail(alert: BusAlert) {
+    this.selectedAlert = alert;
+    const ufFromSlug = (slug: string) => slug.split('-').pop()?.toUpperCase() ?? '';
+    const cityFromSlug = (slug: string) => {
+      const parts = slug.split('-');
+      parts.pop();
+      return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+    };
+    this.detailForm = {
+      origem:      alert.origem,
+      origem_uf:   ufFromSlug(alert.origem_slug),
+      destino:     alert.destino,
+      destino_uf:  ufFromSlug(alert.destino_slug),
+      data_ida:    alert.data_ida,
+      data_volta:  alert.data_volta ?? '',
+      meta:        alert.meta,
+      whatsapp:    this.stripPrefix(alert.whatsapp),
+      ativo:       alert.ativo
+    };
+    this.formError = '';
   }
+
+  closeDetail() { this.selectedAlert = null; }
+
+  async toggleDetailAlert() {
+    if (!this.selectedAlert) return;
+    await this.supabase.updateBusAlert(this.selectedAlert.id, { ativo: this.detailForm.ativo });
+    this.selectedAlert.ativo = this.detailForm.ativo;
+    const a = this.alerts.find(x => x.id === this.selectedAlert!.id);
+    if (a) a.ativo = this.detailForm.ativo;
+  }
+
+  async saveDetail() {
+    this.saving    = true;
+    this.formError = '';
+
+    if (!this.detailForm.origem || !this.detailForm.origem_uf || !this.detailForm.destino || !this.detailForm.destino_uf) {
+      this.formError = 'Preencha cidade e UF de origem e destino.';
+      this.saving = false; return;
+    }
+    if ((this.detailForm.whatsapp ?? '').replace(/\D/g, '').length !== 11) {
+      this.formError = 'WhatsApp inválido.';
+      this.saving = false; return;
+    }
+
+    const { error } = await this.supabase.updateBusAlert(this.selectedAlert!.id, {
+      origem:       this.detailForm.origem,
+      origem_slug:  this.toSlug(this.detailForm.origem) + '-' + this.detailForm.origem_uf.toLowerCase(),
+      destino:      this.detailForm.destino,
+      destino_slug: this.toSlug(this.detailForm.destino) + '-' + this.detailForm.destino_uf.toLowerCase(),
+      data_ida:     this.detailForm.data_ida,
+      data_volta:   this.detailForm.data_volta || null,
+      meta:         Number(this.detailForm.meta),
+      whatsapp:     '55' + this.detailForm.whatsapp
+    });
+
+    if (error) {
+      this.formError = this.supabase.isSessionError(error)
+        ? 'Sua sessão expirou.'
+        : 'Erro ao salvar. Tente novamente.';
+    } else {
+      this.closeDetail();
+      await this.loadAlerts();
+    }
+    this.saving = false;
+  }
+
+  async confirmDeleteDetail() {
+    if (!this.selectedAlert) return;
+    if (!confirm(`Excluir alerta ${this.selectedAlert.origem} → ${this.selectedAlert.destino}?`)) return;
+    await this.supabase.deleteBusAlert(this.selectedAlert.id);
+    this.alerts = this.alerts.filter(a => a.id !== this.selectedAlert!.id);
+    this.closeDetail();
+  }
+
+  // ── Util ───────────────────────────────────────────────────
 
   toggleTheme() {
     this.isDark = !this.isDark;
@@ -448,12 +690,10 @@ export class OnibusComponent implements OnInit, OnDestroy {
   }
 
   private emptyForm() {
-    return {
-      origem: '', origem_uf: '',
-      destino: '', destino_uf: '',
-      data_ida: '', data_volta: '',
-      meta: undefined as number | undefined,
-      whatsapp: ''
-    };
+    return { origem: '', origem_uf: '', destino: '', destino_uf: '', data_ida: '', data_volta: '', meta: undefined as number | undefined, whatsapp: '' };
+  }
+
+  private emptyDetailForm() {
+    return { origem: '', origem_uf: '', destino: '', destino_uf: '', data_ida: '', data_volta: '', meta: 0, whatsapp: '', ativo: true };
   }
 }
