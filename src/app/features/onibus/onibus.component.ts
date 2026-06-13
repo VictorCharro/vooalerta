@@ -615,13 +615,18 @@ export class OnibusComponent implements OnInit, OnDestroy {
     this.saving    = true;
     this.formError = '';
 
-    if (this.cityError['origem'] || this.cityError['destino']) {
-      this.formError = 'Corrija as cidades inválidas antes de salvar.';
-      this.saving = false; return;
-    }
-
     if (!this.form.origem || !this.form.origem_uf || !this.form.destino || !this.form.destino_uf) {
       this.formError = 'Preencha cidade e UF de origem e destino.';
+      this.saving = false; return;
+    }
+    if (this.form.origem_uf.length < 2 || this.form.destino_uf.length < 2) {
+      this.formError = 'UF deve ter 2 letras (ex: SP).';
+      this.saving = false; return;
+    }
+    // Valida as cidades no Buser antes de salvar
+    await Promise.all([this.validateCity('origem'), this.validateCity('destino')]);
+    if (this.cityError['origem'] || this.cityError['destino']) {
+      this.formError = 'Uma ou mais cidades não foram encontradas no Buser.';
       this.saving = false; return;
     }
     if (!this.form.data_ida || this.form.data_ida < this.today) {
