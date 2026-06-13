@@ -25,13 +25,13 @@ import { TimePickerComponent } from '@shared/components/time-picker/time-picker.
           </div>
           <nav class="sidebar-nav">
             <button class="nav-item active">
-              <span class="nav-icon">◫</span> Dashboard
-            </button>
-            <button class="nav-item" (click)="openProfileModal()">
-              <span class="nav-icon">◯</span> Perfil
+              <span class="nav-icon">◫</span> Voos
             </button>
             <button class="nav-item" (click)="router.navigate(['/onibus'])">
               <span class="nav-icon">⊟</span> Ônibus
+            </button>
+            <button class="nav-item" (click)="openProfileModal()">
+              <span class="nav-icon">◯</span> Perfil
             </button>
           </nav>
         </div>
