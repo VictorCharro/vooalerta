@@ -45,8 +45,7 @@ import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
 
           <!-- Aviso callmebot_key ausente -->
           <div class="warn-banner fade-up" *ngIf="missingCallmebotKey">
-            ⚠️ Você ainda não cadastrou sua <strong>CallMeBot API Key</strong>. As notificações não serão enviadas.
-            <button class="btn-ghost warn-action" (click)="openProfileModal()">Configurar agora</button>
+            ⚠️ Você ainda não cadastrou sua <strong>CallMeBot API Key</strong>. As notificações não serão enviadas. Acesse <strong>Perfil</strong> na sidebar para configurar.
           </div>
 
           <!-- Banners de alerta de preço -->
