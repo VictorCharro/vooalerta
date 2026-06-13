@@ -480,7 +480,7 @@ export class OnibusComponent implements OnInit, OnDestroy {
     const { data } = await this.supabase.getBusAlerts();
     this.alerts  = (data as BusAlert[]) ?? [];
     this.loading = false;
-    this.loadCachedPrices();
+    await this.loadCachedPrices();
   }
 
   async loadCachedPrices() {
