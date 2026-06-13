@@ -52,21 +52,25 @@ import { SupabaseService } from '@core/services/supabase.service';
         <form *ngIf="!profileLoading" (ngSubmit)="saveProfile()">
           <div class="form-group">
             <label>E-mail</label>
-            <input type="email" [value]="userEmail" disabled />
+            <input type="email" [value]="userEmail" disabled style="opacity:.45;cursor:not-allowed" />
           </div>
           <div class="form-group" style="margin-top:14px">
-            <label for="p-whatsapp">WhatsApp para notificações</label>
+            <label for="p-whatsapp">WhatsApp</label>
             <div class="phone-input">
               <span class="phone-prefix">55</span>
               <input id="p-whatsapp" type="tel" [(ngModel)]="profileForm.whatsapp" name="whatsapp"
                 placeholder="11999999999" maxlength="11" />
             </div>
+            <span class="form-hint">DDD + número (ex: 11999999999)</span>
           </div>
           <div class="form-group" style="margin-top:14px">
             <label for="p-key">CallMeBot API Key</label>
             <input id="p-key" type="text" [(ngModel)]="profileForm.callmebot_key" name="callmebot_key"
               placeholder="Ex: 123456" />
-            <span class="form-hint">Necessária para receber notificações no WhatsApp.</span>
+            <span class="form-hint">
+              Não tem? Envie <strong>I allow callmebot to send me messages</strong> para
+              <strong>+34 644 81 58 78</strong> no WhatsApp — a key chega em segundos.
+            </span>
           </div>
           <div *ngIf="profileError" class="error-box" style="margin-top:14px">{{ profileError }}</div>
           <div *ngIf="profileSuccess" class="success-box" style="margin-top:14px">Perfil salvo com sucesso!</div>
