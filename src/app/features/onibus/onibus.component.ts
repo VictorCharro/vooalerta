@@ -349,24 +349,32 @@ interface BusAlert {
             <div class="form-row" style="align-items:flex-start">
               <div class="form-group">
                 <label>Cidade de origem</label>
-                <input [(ngModel)]="form.origem" name="origem" placeholder="Ex: Franca" required />
+                <input [(ngModel)]="form.origem" name="origem" placeholder="Ex: Franca" required
+                  (blur)="validateCity('origem')" />
+                <span *ngIf="cityError.origem" class="city-error">{{ cityError.origem }}</span>
+                <span *ngIf="cityChecking.origem" class="form-hint">Verificando...</span>
               </div>
               <div class="form-group" style="max-width:80px">
                 <label>UF</label>
                 <input class="uf-input" [(ngModel)]="form.origem_uf" name="origem_uf" placeholder="SP" maxlength="2" required
-                  (input)="form.origem_uf = form.origem_uf.toUpperCase()" />
+                  (input)="form.origem_uf = form.origem_uf.toUpperCase()"
+                  (blur)="validateCity('origem')" />
               </div>
             </div>
 
             <div class="form-row" style="align-items:flex-start;margin-top:14px">
               <div class="form-group">
                 <label>Cidade de destino</label>
-                <input [(ngModel)]="form.destino" name="destino" placeholder="Ex: São Paulo" required />
+                <input [(ngModel)]="form.destino" name="destino" placeholder="Ex: São Paulo" required
+                  (blur)="validateCity('destino')" />
+                <span *ngIf="cityError.destino" class="city-error">{{ cityError.destino }}</span>
+                <span *ngIf="cityChecking.destino" class="form-hint">Verificando...</span>
               </div>
               <div class="form-group" style="max-width:80px">
                 <label>UF</label>
                 <input class="uf-input" [(ngModel)]="form.destino_uf" name="destino_uf" placeholder="SP" maxlength="2" required
-                  (input)="form.destino_uf = form.destino_uf.toUpperCase()" />
+                  (input)="form.destino_uf = form.destino_uf.toUpperCase()"
+                  (blur)="validateCity('destino')" />
               </div>
             </div>
 
@@ -442,6 +450,8 @@ export class OnibusComponent implements OnInit, OnDestroy {
   private cooldownTick: any;
   private cooldownNow = Date.now();
   private readonly COOLDOWN_MS = 10 * 60 * 1000;
+  cityError: Record<string, string> = {};
+  cityChecking: Record<string, boolean> = {};
 
   form       = this.emptyForm();
   detailForm = this.emptyDetailForm();
@@ -557,6 +567,20 @@ export class OnibusComponent implements OnInit, OnDestroy {
     return url;
   }
 
+  async validateCity(field: 'origem' | 'destino') {
+    const cidade = field === 'origem' ? this.form.origem : this.form.destino;
+    const uf = field === 'origem' ? this.form.origem_uf : this.form.destino_uf;
+    if (!cidade || !uf || uf.length < 2) return;
+    const slug = this.toSlug(cidade) + '-' + uf.toLowerCase();
+    this.cityChecking = { ...this.cityChecking, [field]: true };
+    this.cityError = { ...this.cityError, [field]: '' };
+    const valido = await this.supabase.validateBuserCity(slug);
+    this.cityChecking = { ...this.cityChecking, [field]: false };
+    if (!valido) {
+      this.cityError = { ...this.cityError, [field]: `"${cidade} - ${uf.toUpperCase()}" não encontrada no Buser.` };
+    }
+  }
+
   toTitleCase(text: string): string {
     return text.trim().replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
   }
@@ -576,6 +600,8 @@ export class OnibusComponent implements OnInit, OnDestroy {
     this.form          = this.emptyForm();
     this.form.whatsapp = this.profileWhatsapp;
     this.formError     = '';
+    this.cityError     = {};
+    this.cityChecking  = {};
     this.showModal     = true;
   }
 
@@ -588,6 +614,11 @@ export class OnibusComponent implements OnInit, OnDestroy {
   async saveAlert() {
     this.saving    = true;
     this.formError = '';
+
+    if (this.cityError['origem'] || this.cityError['destino']) {
+      this.formError = 'Corrija as cidades inválidas antes de salvar.';
+      this.saving = false; return;
+    }
 
     if (!this.form.origem || !this.form.origem_uf || !this.form.destino || !this.form.destino_uf) {
       this.formError = 'Preencha cidade e UF de origem e destino.';

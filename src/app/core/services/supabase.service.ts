@@ -209,6 +209,14 @@ export class SupabaseService {
     return data?.preco ?? null;
   }
 
+  async validateBuserCity(slug: string): Promise<boolean> {
+    const { data, error } = await this.client.functions.invoke('scrape-buser', {
+      body: { action: 'validate_city', slug }
+    });
+    if (error) return false;
+    return data?.valido === true;
+  }
+
   async scrapeBuserPrice(origemSlug: string, destinoSlug: string, dataIda: string, dataVolta?: string | null): Promise<number | null> {
     const { data, error } = await this.client.functions.invoke('scrape-buser', {
       body: { origem_slug: origemSlug, destino_slug: destinoSlug, data_ida: dataIda, data_volta: dataVolta ?? null }

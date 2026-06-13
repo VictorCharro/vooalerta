@@ -5,13 +5,39 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const NAO_DISPONIVEL = 'não temos essa rota disponível';
+
+async function fetchBuser(url: string): Promise<string | null> {
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'pt-BR,pt;q=0.9',
+    },
+  });
+  if (!res.ok) return null;
+  return res.text();
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { origem_slug, destino_slug, data_ida, data_volta } = await req.json();
+    const body = await req.json();
+    const { origem_slug, destino_slug, data_ida, data_volta, action } = body;
+
+    // ── Modo validação de cidade ──────────────────────────────
+    if (action === 'validate_city') {
+      const slug = body.slug as string;
+      if (!slug) {
+        return new Response(JSON.stringify({ error: 'slug é obrigatório' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const html = await fetchBuser(`https://www.buser.com.br/onibus/${slug}`);
+      const valido = html !== null && !html.toLowerCase().includes(NAO_DISPONIVEL);
+      return new Response(JSON.stringify({ valido }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     if (!origem_slug || !destino_slug || !data_ida) {
       return new Response(
@@ -24,22 +50,14 @@ Deno.serve(async (req) => {
     let url = `https://www.buser.com.br/onibus/${origem_slug}/${destino_slug}?ida=${data_ida}`;
     if (data_volta) url += `&volta=${data_volta}`;
 
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'pt-BR,pt;q=0.9',
-      },
-    });
+    const html = await fetchBuser(url);
 
-    if (!res.ok) {
+    if (html === null) {
       return new Response(
-        JSON.stringify({ error: `Buser retornou ${res.status}` }),
+        JSON.stringify({ error: 'Falha ao acessar o Buser' }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    const html = await res.text();
     const match = html.match(/<meta[^>]+property="product:price:amount"[^>]+content="([\d.]+)"/);
 
     if (!match) {
