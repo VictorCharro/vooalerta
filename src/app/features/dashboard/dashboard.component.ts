@@ -151,6 +151,7 @@ import { AirportSearchComponent } from '@shared/components/airport-search/airpor
                   <span class="track"></span>
                   <span class="thumb"></span>
                 </label>
+                <button class="share-btn" (click)="shareAlert(alert)" title="Compartilhar">⤴</button>
                 <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">›</button>
               </div>
             </div>
@@ -741,6 +742,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
       await this.loadAlerts();
     }
     this.saving = false;
+  }
+
+  async shareAlert(alert: Alert) {
+    const url = `${window.location.origin}/share/${alert.id}`;
+    await navigator.clipboard.writeText(url);
+    this.showToast(`🔗 Link copiado! ${alert.origem} → ${alert.destino}`);
   }
 
   async toggleAlert(alert: Alert) {

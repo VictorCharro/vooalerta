@@ -149,6 +149,14 @@ export class SupabaseService {
         .eq('id', id);
   }
 
+  async getAlertById(id: string) {
+    return this.client
+        .from('alerts')
+        .select('origem, destino, data_ida, data_volta, meta, horario_minimo, so_direto')
+        .eq('id', id)
+        .maybeSingle();
+  }
+
   subscribePriceCache(callback: () => void) {
     return this.client
       .channel('price-cache-changes')

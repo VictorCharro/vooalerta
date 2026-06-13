@@ -21,5 +21,10 @@ export const routes: Routes = [
     loadComponent: () =>
       import('@features/dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
+  {
+    path: 'share/:id',
+    loadComponent: () =>
+      import('@features/share/share.component').then(m => m.ShareComponent)
+  },
   { path: '**', redirectTo: 'dashboard' }
 ];
