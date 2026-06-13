@@ -389,7 +389,7 @@ import { TimePickerComponent } from '@shared/components/time-picker/time-picker.
             </div>
             <div *ngIf="profileError" class="error-box" style="margin-top:14px">{{ profileError }}</div>
             <div *ngIf="profileSuccess" class="success-box" style="margin-top:14px">Perfil salvo com sucesso!</div>
-            <div class="modal-actions">
+            <div class="modal-actions" style="justify-content: space-between">
               <a class="btn-whatsapp" *ngIf="!profileForm.callmebot_key"
                 href="https://wa.me/34644604916?text=I%20allow%20callmebot%20to%20send%20me%20messages"
                 target="_blank" rel="noopener">
