@@ -31,7 +31,7 @@ import { TimePickerComponent } from '@shared/components/time-picker/time-picker.
               <span class="nav-icon">◯</span> Perfil
             </button>
             <button class="nav-item" (click)="router.navigate(['/onibus'])">
-              <span class="nav-icon">🚌</span> Ônibus
+              <span class="nav-icon">⊟</span> Ônibus
             </button>
           </nav>
         </div>

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
+import { DatePickerComponent } from '@shared/components/date-picker/date-picker.component';
 
 interface BusAlert {
   id: string;
@@ -22,7 +23,7 @@ interface BusAlert {
 @Component({
   selector: 'app-onibus',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DatePickerComponent],
   styleUrls: ['./onibus.component.css'],
   template: `
     <div class="layout">
@@ -42,7 +43,7 @@ interface BusAlert {
               <span class="nav-icon">◯</span> Perfil
             </button>
             <button class="nav-item active">
-              <span class="nav-icon">🚌</span> Ônibus
+              <span class="nav-icon">⊟</span> Ônibus
             </button>
           </nav>
         </div>
@@ -66,7 +67,7 @@ interface BusAlert {
 
         <!-- Banners abaixo da meta -->
         <div class="price-banner fade-up" *ngFor="let a of alertsBelowMeta">
-          🔔 Ônibus <strong>{{ a.origem }} → {{ a.destino }}</strong> abaixo da meta —
+          Onibus <strong>{{ a.origem }} → {{ a.destino }}</strong> abaixo da meta —
           R$&nbsp;{{ getCachedPrice(a) | number:'1.0-0' }}
           (meta: R$&nbsp;{{ a.meta | number:'1.0-0' }})
         </div>
@@ -88,7 +89,7 @@ interface BusAlert {
 
         <!-- Empty state -->
         <div class="empty-state fade-up" *ngIf="!loading && alerts.length === 0">
-          <div class="empty-icon">🚌</div>
+          <div class="empty-icon">—</div>
           <h3>Nenhum alerta de ônibus</h3>
           <p>Crie um alerta e receba no WhatsApp quando a passagem cair.</p>
           <button class="btn-primary" (click)="openModal()" style="margin-top:20px">Criar primeiro alerta</button>
@@ -180,47 +181,44 @@ interface BusAlert {
             <div class="form-row" style="align-items:flex-start">
               <div class="form-group">
                 <label>Cidade de origem</label>
-                <input [(ngModel)]="form.origem" name="origem"
-                  placeholder="Ex: Franca" required
-                  (input)="form.origem_slug = toSlug(form.origem) + '-' + form.origem_uf" />
+                <input [(ngModel)]="form.origem" name="origem" placeholder="Ex: Franca" required />
               </div>
               <div class="form-group" style="max-width:80px">
                 <label>UF</label>
-                <input [(ngModel)]="form.origem_uf" name="origem_uf"
-                  placeholder="sp" maxlength="2" required
-                  (input)="form.origem_slug = toSlug(form.origem) + '-' + form.origem_uf.toLowerCase()" />
+                <input [(ngModel)]="form.origem_uf" name="origem_uf" placeholder="SP" maxlength="2" required />
               </div>
-            </div>
-            <div class="form-hint" style="margin-bottom:10px">
-              Slug: <code>{{ form.origem_slug || '—' }}</code>
             </div>
 
             <div class="form-row" style="align-items:flex-start;margin-top:14px">
               <div class="form-group">
                 <label>Cidade de destino</label>
-                <input [(ngModel)]="form.destino" name="destino"
-                  placeholder="Ex: São Paulo" required
-                  (input)="form.destino_slug = toSlug(form.destino) + '-' + form.destino_uf" />
+                <input [(ngModel)]="form.destino" name="destino" placeholder="Ex: São Paulo" required />
               </div>
               <div class="form-group" style="max-width:80px">
                 <label>UF</label>
-                <input [(ngModel)]="form.destino_uf" name="destino_uf"
-                  placeholder="sp" maxlength="2" required
-                  (input)="form.destino_slug = toSlug(form.destino) + '-' + form.destino_uf.toLowerCase()" />
+                <input [(ngModel)]="form.destino_uf" name="destino_uf" placeholder="SP" maxlength="2" required />
               </div>
-            </div>
-            <div class="form-hint" style="margin-bottom:10px">
-              Slug: <code>{{ form.destino_slug || '—' }}</code>
             </div>
 
             <div class="form-row" style="margin-top:14px">
               <div class="form-group">
                 <label>Data de ida</label>
-                <input type="date" [(ngModel)]="form.data_ida" name="data_ida" [min]="today" required />
+                <app-date-picker
+                  [value]="form.data_ida"
+                  [min]="today"
+                  placeholder="Selecionar data"
+                  (valueChange)="form.data_ida = $event">
+                </app-date-picker>
               </div>
               <div class="form-group">
                 <label>Data de volta <span class="form-optional">(opcional)</span></label>
-                <input type="date" [(ngModel)]="form.data_volta" name="data_volta" [min]="form.data_ida || today" />
+                <app-date-picker
+                  [value]="form.data_volta"
+                  [min]="form.data_ida || today"
+                  align="right"
+                  placeholder="Selecionar data"
+                  (valueChange)="form.data_volta = $event">
+                </app-date-picker>
               </div>
             </div>
 
@@ -237,6 +235,7 @@ interface BusAlert {
                   <input id="bus-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="whatsapp"
                     placeholder="11999999999" maxlength="11" required />
                 </div>
+                <span class="form-hint">DDD + número (ex: 11999999999)</span>
               </div>
             </div>
 
@@ -266,6 +265,7 @@ export class OnibusComponent implements OnInit, OnDestroy {
   toasts:    string[] = [];
   cachedPrices: Record<string, number> = {};
   pricesLoading = false;
+  private profileWhatsapp = '';
   private realtimeChannel: any;
 
   form = this.emptyForm();
@@ -284,6 +284,10 @@ export class OnibusComponent implements OnInit, OnDestroy {
     this.isDark = (localStorage.getItem('theme') ?? 'dark') === 'dark';
     const user = await this.supabase.getUser();
     this.userEmail = user?.email ?? '';
+
+    const { data: profile } = await this.supabase.getProfile();
+    this.profileWhatsapp = this.stripPrefix(profile?.whatsapp ?? '');
+
     await this.loadAlerts();
 
     this.realtimeChannel = this.supabase.subscribeBusPriceCache(async () => {
@@ -349,9 +353,10 @@ export class OnibusComponent implements OnInit, OnDestroy {
   }
 
   openModal() {
-    this.form      = this.emptyForm();
-    this.formError = '';
-    this.showModal = true;
+    this.form          = this.emptyForm();
+    this.form.whatsapp = this.profileWhatsapp;
+    this.formError     = '';
+    this.showModal     = true;
   }
 
   closeModal() { this.showModal = false; }
@@ -364,11 +369,8 @@ export class OnibusComponent implements OnInit, OnDestroy {
     this.saving    = true;
     this.formError = '';
 
-    const origemSlug  = this.toSlug(this.form.origem) + '-' + this.form.origem_uf.toLowerCase();
-    const destinoSlug = this.toSlug(this.form.destino) + '-' + this.form.destino_uf.toLowerCase();
-
     if (!this.form.origem || !this.form.origem_uf || !this.form.destino || !this.form.destino_uf) {
-      this.formError = 'Preencha origem, destino e os estados (UF).';
+      this.formError = 'Preencha cidade e UF de origem e destino.';
       this.saving = false;
       return;
     }
@@ -384,6 +386,9 @@ export class OnibusComponent implements OnInit, OnDestroy {
       this.saving = false;
       return;
     }
+
+    const origemSlug  = this.toSlug(this.form.origem) + '-' + this.form.origem_uf.toLowerCase();
+    const destinoSlug = this.toSlug(this.form.destino) + '-' + this.form.destino_uf.toLowerCase();
 
     const { error } = await this.supabase.createBusAlert({
       origem:       this.form.origem,
@@ -436,10 +441,14 @@ export class OnibusComponent implements OnInit, OnDestroy {
     setTimeout(() => this.toasts.shift(), 4000);
   }
 
+  private stripPrefix(phone: string): string {
+    return phone.startsWith('55') ? phone.slice(2) : phone;
+  }
+
   private emptyForm() {
     return {
-      origem: '', origem_uf: '', origem_slug: '',
-      destino: '', destino_uf: '', destino_slug: '',
+      origem: '', origem_uf: '',
+      destino: '', destino_uf: '',
       data_ida: '', data_volta: '',
       meta: undefined as number | undefined,
       whatsapp: ''
