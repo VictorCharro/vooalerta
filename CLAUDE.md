@@ -74,7 +74,7 @@ vooalerta/
 | Path | Componente | Guard |
 |---|---|---|
 | `/` | redireciona para `/dashboard` | — |
-| `/dashboard` | DashboardComponent | authGuard |
+| `/dashboard` | DashboardComponent (sidebar: "Voos") | authGuard |
 | `/onibus` | OnibusComponent | authGuard |
 | `/login` | LoginComponent | guestGuard |
 | `/register` | RegisterComponent | guestGuard |
@@ -122,6 +122,7 @@ vooalerta/
 - Extrai preço da meta tag `<meta property="product:price:amount" content="X">`
 - Cache: reutiliza dados com menos de 3h30 de idade
 - Sleep de 2s entre rotas para não sobrecarregar o Buser
+- Roda **a cada hora** (cron `30 * * * *`), sem custo de API
 
 ---
 
