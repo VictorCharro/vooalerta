@@ -202,6 +202,23 @@ interface BusAlert {
 
             <div class="form-row" style="margin-top:14px">
               <div class="form-group">
+                <label for="bus-meta">Meta de preço (R$)</label>
+                <input id="bus-meta" type="number" [(ngModel)]="form.meta" name="meta"
+                  placeholder="150" min="1" required />
+              </div>
+              <div class="form-group">
+                <label for="bus-whatsapp">WhatsApp para notificação</label>
+                <div class="phone-input">
+                  <span class="phone-prefix">55</span>
+                  <input id="bus-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="whatsapp"
+                    placeholder="11999999999" maxlength="11" required />
+                </div>
+                <span class="form-hint">DDD + número (ex: 11999999999)</span>
+              </div>
+            </div>
+
+            <div class="form-row" style="margin-top:14px">
+              <div class="form-group">
                 <label>Data de ida</label>
                 <app-date-picker
                   [value]="form.data_ida"
@@ -219,23 +236,6 @@ interface BusAlert {
                   placeholder="Selecionar data"
                   (valueChange)="form.data_volta = $event">
                 </app-date-picker>
-              </div>
-            </div>
-
-            <div class="form-row" style="margin-top:14px">
-              <div class="form-group">
-                <label for="bus-meta">Meta de preço (R$)</label>
-                <input id="bus-meta" type="number" [(ngModel)]="form.meta" name="meta"
-                  placeholder="150" min="1" required />
-              </div>
-              <div class="form-group">
-                <label for="bus-whatsapp">WhatsApp para notificação</label>
-                <div class="phone-input">
-                  <span class="phone-prefix">55</span>
-                  <input id="bus-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="whatsapp"
-                    placeholder="11999999999" maxlength="11" required />
-                </div>
-                <span class="form-hint">DDD + número (ex: 11999999999)</span>
               </div>
             </div>
 
