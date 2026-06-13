@@ -22,6 +22,12 @@ export const routes: Routes = [
       import('@features/dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
   {
+    path: 'onibus',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('@features/onibus/onibus.component').then(m => m.OnibusComponent)
+  },
+  {
     path: 'share/:id',
     loadComponent: () =>
       import('@features/share/share.component').then(m => m.ShareComponent)
