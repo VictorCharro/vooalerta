@@ -390,11 +390,18 @@ import { TimePickerComponent } from '@shared/components/time-picker/time-picker.
             <div *ngIf="profileError" class="error-box" style="margin-top:14px">{{ profileError }}</div>
             <div *ngIf="profileSuccess" class="success-box" style="margin-top:14px">Perfil salvo com sucesso!</div>
             <div class="modal-actions">
-              <button type="button" class="btn-ghost" (click)="closeProfileModal()">Cancelar</button>
-              <button type="submit" class="btn-primary modal-save" [disabled]="profileSaving">
-                <span *ngIf="profileSaving" class="spinner"></span>
-                <span *ngIf="!profileSaving">Salvar</span>
-              </button>
+              <a class="btn-whatsapp"
+                href="https://wa.me/5534644604916?text=I%20allow%20callmebot%20to%20send%20me%20messages"
+                target="_blank" rel="noopener">
+                📲 Ativar CallMeBot
+              </a>
+              <div style="display:flex;gap:8px">
+                <button type="button" class="btn-ghost" (click)="closeProfileModal()">Cancelar</button>
+                <button type="submit" class="btn-primary modal-save" [disabled]="profileSaving">
+                  <span *ngIf="profileSaving" class="spinner"></span>
+                  <span *ngIf="!profileSaving">Salvar</span>
+                </button>
+              </div>
             </div>
           </form>
         </div>
