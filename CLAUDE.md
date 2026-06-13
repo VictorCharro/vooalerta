@@ -124,6 +124,14 @@ vooalerta/
 - Sleep de 2s entre rotas para não sobrecarregar o Buser
 - Roda **a cada hora** (cron `30 * * * *`), sem custo de API
 
+### `supabase/functions/scrape-buser/` — Edge Function (on-demand)
+- Chamada pelo botão ↻ na página de Ônibus para atualizar o preço manualmente
+- Roda server-side (Deno) para evitar CORS ao buscar o Buser
+- Recebe `{ origem_slug, destino_slug, data_ida, data_volta }`, salva em `bus_price_cache`
+- Retorna `{ preco: number | null }`
+- Deploy: `supabase functions deploy scrape-buser`
+- **Cooldown:** 10 minutos por rota, rastreado em `localStorage` com chave `bus_refresh_{orig}_{dest}_{data}`; o botão exibe contagem regressiva "M:SS" enquanto não disponível
+
 ---
 
 ## Design system
