@@ -15,7 +15,7 @@ const DAYS   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
         <span class="dp-icon">📅</span>
       </button>
 
-      <div class="dp-popup" *ngIf="open">
+      <div class="dp-popup" *ngIf="open" [style.left]="align === 'left' ? '0' : 'auto'" [style.right]="align === 'right' ? '0' : 'auto'">
         <div class="dp-header">
           <button type="button" class="dp-nav" (click)="prevMonth()">‹</button>
           <span class="dp-month-label">{{ monthLabel }}</span>
@@ -54,7 +54,7 @@ const DAYS   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
     .dp-placeholder { color: var(--color-text-muted); }
     .dp-icon { font-size: 13px; opacity: .5; }
     .dp-popup {
-      position: absolute; top: calc(100% + 6px); right: 0; z-index: 300;
+      position: absolute; top: calc(100% + 6px); z-index: 300;
       background: var(--color-bg-2); border: 1px solid var(--color-border);
       border-radius: var(--radius-md); padding: 14px; min-width: 260px;
       box-shadow: 0 8px 24px rgba(0,0,0,.25);
@@ -88,6 +88,7 @@ export class DatePickerComponent implements OnChanges {
   @Input() min   = '';
   @Input() placeholder = 'Selecionar data';
   @Input() disabled = false;
+  @Input() align: 'left' | 'right' = 'left';
   @Output() valueChange = new EventEmitter<string>();
 
   open = false;

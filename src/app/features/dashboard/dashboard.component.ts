@@ -452,6 +452,7 @@ import { TimePickerComponent } from '@shared/components/time-picker/time-picker.
                   [value]="form.data_volta || ''"
                   [min]="form.data_ida || today"
                   [disabled]="!!form.so_ida"
+                  align="right"
                   placeholder="Selecionar data"
                   (valueChange)="form.data_volta = $event">
                 </app-date-picker>
