@@ -5,11 +5,13 @@ import { Router } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
 import { Alert, AlertCreate } from '@core/models/alert.model';
 import { AirportSearchComponent } from '@shared/components/airport-search/airport-search.component';
+import { DatePickerComponent } from '@shared/components/date-picker/date-picker.component';
+import { TimePickerComponent } from '@shared/components/time-picker/time-picker.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, AirportSearchComponent],
+  imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent],
   styleUrls: ['./dashboard.component.css'],
   template: `
     <div class="layout">
@@ -234,13 +236,23 @@ import { AirportSearchComponent } from '@shared/components/airport-search/airpor
                 </div>
                 <div class="form-row" style="margin-top:14px">
                   <div class="form-group">
-                    <label for="d-ida">Data de ida</label>
-                    <input id="d-ida" type="date" [(ngModel)]="form.data_ida" name="d_data_ida" [min]="today" required />
+                    <label>Data de ida</label>
+                    <app-date-picker
+                      [value]="form.data_ida || ''"
+                      [min]="today"
+                      placeholder="Selecionar data"
+                      (valueChange)="form.data_ida = $event">
+                    </app-date-picker>
                   </div>
                   <div class="form-group">
-                    <label for="d-volta">Data de volta <span class="form-optional">(opcional)</span></label>
-                    <input id="d-volta" type="date" [(ngModel)]="form.data_volta" name="d_data_volta"
-                      [min]="form.data_ida || today" [disabled]="!!form.so_ida" />
+                    <label>Data de volta <span class="form-optional">(opcional)</span></label>
+                    <app-date-picker
+                      [value]="form.data_volta || ''"
+                      [min]="form.data_ida || today"
+                      [disabled]="!!form.so_ida"
+                      placeholder="Selecionar data"
+                      (valueChange)="form.data_volta = $event">
+                    </app-date-picker>
                   </div>
                 </div>
                 <div class="form-group" style="margin-top:14px">
@@ -261,7 +273,10 @@ import { AirportSearchComponent } from '@shared/components/airport-search/airpor
                   </div>
                   <div class="form-group">
                     <label for="d-horario">Horário a partir de <span class="form-optional">(opcional)</span></label>
-                    <input id="d-horario" type="time" [(ngModel)]="form.horario_minimo" name="d_horario" />
+                    <app-time-picker name="d_horario"
+                      [value]="form.horario_minimo || '00:00'"
+                      (valueChange)="form.horario_minimo = $event">
+                    </app-time-picker>
                   </div>
                 </div>
                 <div class="form-group" style="margin-top:14px">
@@ -423,15 +438,23 @@ import { AirportSearchComponent } from '@shared/components/airport-search/airpor
             </div>
             <div class="form-row" style="margin-top:14px">
               <div class="form-group">
-                <label for="m-ida">Data de ida</label>
-                <input id="m-ida" type="date" [(ngModel)]="form.data_ida" name="data_ida" [min]="today" required />
+                <label>Data de ida</label>
+                <app-date-picker
+                  [value]="form.data_ida || ''"
+                  [min]="today"
+                  placeholder="Selecionar data"
+                  (valueChange)="form.data_ida = $event">
+                </app-date-picker>
               </div>
               <div class="form-group">
-                <label for="m-volta">
-                  Data de volta <span class="form-optional">(opcional)</span>
-                </label>
-                <input id="m-volta" type="date" [(ngModel)]="form.data_volta" name="data_volta"
-                  [min]="form.data_ida || today" [disabled]="!!form.so_ida" />
+                <label>Data de volta <span class="form-optional">(opcional)</span></label>
+                <app-date-picker
+                  [value]="form.data_volta || ''"
+                  [min]="form.data_ida || today"
+                  [disabled]="!!form.so_ida"
+                  placeholder="Selecionar data"
+                  (valueChange)="form.data_volta = $event">
+                </app-date-picker>
               </div>
             </div>
             <div class="form-group" style="margin-top:14px">
@@ -454,7 +477,10 @@ import { AirportSearchComponent } from '@shared/components/airport-search/airpor
                 <label for="m-horario">
                   Horário a partir de <span class="form-optional">(opcional)</span>
                 </label>
-                <input id="m-horario" type="time" [(ngModel)]="form.horario_minimo" name="horario_minimo" />
+                <app-time-picker name="horario_minimo"
+                  [value]="form.horario_minimo || '00:00'"
+                  (valueChange)="form.horario_minimo = $event">
+                </app-time-picker>
               </div>
             </div>
             <div class="form-group" style="margin-top:14px">
