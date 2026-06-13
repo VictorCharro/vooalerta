@@ -54,7 +54,7 @@ const DAYS   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
     .dp-placeholder { color: var(--color-text-muted); }
     .dp-icon { font-size: 13px; opacity: .5; }
     .dp-popup {
-      position: absolute; top: calc(100% + 6px); left: 0; z-index: 300;
+      position: absolute; top: calc(100% + 6px); right: 0; z-index: 300;
       background: var(--color-bg-2); border: 1px solid var(--color-border);
       border-radius: var(--radius-md); padding: 14px; min-width: 260px;
       box-shadow: 0 8px 24px rgba(0,0,0,.25);

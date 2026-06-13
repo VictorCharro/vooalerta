@@ -47,7 +47,7 @@ export class TimePickerComponent {
   minute = '00';
 
   readonly hours   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-  readonly minutes = ['00', '30'];
+  readonly minutes = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
 
   emit() { this.valueChange.emit(`${this.hour}:${this.minute}`); }
 }

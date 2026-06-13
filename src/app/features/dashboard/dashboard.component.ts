@@ -408,7 +408,7 @@ import { TimePickerComponent } from '@shared/components/time-picker/time-picker.
             <button class="btn-icon" (click)="closeModal()" aria-label="Fechar">✕</button>
           </div>
           <form (ngSubmit)="saveAlert()">
-            <div class="form-row">
+            <div class="form-row" style="align-items: flex-start">
               <div class="form-group">
                 <label>Origem</label>
                 <div class="chips-input">
