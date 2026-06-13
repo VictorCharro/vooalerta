@@ -384,14 +384,14 @@ import { TimePickerComponent } from '@shared/components/time-picker/time-picker.
                 placeholder="Ex: 123456" />
               <span class="form-hint">
                 Não tem? Envie <strong>I allow callmebot to send me messages</strong> para
-                <strong>+34 644 60 49 16</strong> no WhatsApp — a key chega em segundos.
+                <strong>+34 644 81 58 78</strong> no WhatsApp — a key chega em segundos.
               </span>
             </div>
             <div *ngIf="profileError" class="error-box" style="margin-top:14px">{{ profileError }}</div>
             <div *ngIf="profileSuccess" class="success-box" style="margin-top:14px">Perfil salvo com sucesso!</div>
             <div class="modal-actions" style="justify-content: space-between">
               <a class="btn-whatsapp" *ngIf="!profileForm.callmebot_key"
-                href="https://wa.me/34644604916?text=I%20allow%20callmebot%20to%20send%20me%20messages"
+                href="https://wa.me/34644815878?text=I%20allow%20callmebot%20to%20send%20me%20messages"
                 target="_blank" rel="noopener">
                 📲 Ativar CallMeBot
               </a>
