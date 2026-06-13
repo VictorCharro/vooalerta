@@ -159,4 +159,60 @@ export class SupabaseService {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'price_cache' }, callback)
       .subscribe();
   }
+
+  // ── Ônibus ────────────────────────────────────────────────────
+
+  async getBusAlerts() {
+    const { data: { session } } = await this.client.auth.getSession();
+    if (!session) return { data: [], error: null };
+
+    return this.client
+      .from('bus_alerts')
+      .select('*')
+      .order('criado_em', { ascending: false });
+  }
+
+  async createBusAlert(payload: {
+    origem: string; origem_slug: string;
+    destino: string; destino_slug: string;
+    data_ida: string; data_volta?: string | null;
+    meta: number; whatsapp: string;
+  }) {
+    const { data: { session } } = await this.client.auth.getSession();
+    if (!session) return { data: null, error: new Error('Não autenticado') };
+
+    return this.client
+      .from('bus_alerts')
+      .insert({ ...payload, user_id: session.user.id });
+  }
+
+  async updateBusAlert(id: string, changes: Record<string, unknown>) {
+    return this.client.from('bus_alerts').update(changes).eq('id', id);
+  }
+
+  async deleteBusAlert(id: string) {
+    return this.client.from('bus_alerts').delete().eq('id', id);
+  }
+
+  async getBusCachedPrice(origemSlug: string, destinoSlug: string, dataIda: string): Promise<number | null> {
+    const { data } = await this.client
+      .from('bus_price_cache')
+      .select('preco')
+      .eq('origem_slug', origemSlug)
+      .eq('destino_slug', destinoSlug)
+      .eq('data_ida', dataIda)
+      .not('preco', 'is', null)
+      .order('atualizado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    return data?.preco ?? null;
+  }
+
+  subscribeBusPriceCache(callback: () => void) {
+    return this.client
+      .channel('bus-price-cache-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bus_price_cache' }, callback)
+      .subscribe();
+  }
 }
