@@ -7,44 +7,20 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
 import { AirportSearchComponent } from '@shared/components/airport-search/airport-search.component';
 import { DatePickerComponent } from '@shared/components/date-picker/date-picker.component';
 import { TimePickerComponent } from '@shared/components/time-picker/time-picker.component';
+import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent],
+  imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent],
   styleUrls: ['./dashboard.component.css'],
   template: `
     <div class="layout">
 
-      <!-- ── Sidebar ── -->
-      <aside class="sidebar">
-        <div class="sidebar-top">
-          <div class="brand">
-            <div class="brand-icon">✈</div>
-            <span class="brand-name">VooAlerta</span>
-          </div>
-          <nav class="sidebar-nav">
-            <button class="nav-item active">
-              <span class="nav-icon">◫</span> Voos
-            </button>
-            <button class="nav-item" (click)="router.navigate(['/onibus'])">
-              <span class="nav-icon">⊟</span> Ônibus
-            </button>
-            <button class="nav-item" (click)="openProfileModal()">
-              <span class="nav-icon">◯</span> Perfil
-            </button>
-          </nav>
-        </div>
-        <div class="sidebar-bottom">
-          <button class="theme-btn" (click)="toggleTheme()" [title]="isDark ? 'Modo claro' : 'Modo escuro'">
-            {{ isDark ? '☀' : '☾' }} {{ isDark ? 'Modo claro' : 'Modo escuro' }}
-          </button>
-          <div class="sidebar-user">
-            <span class="user-email">{{ userEmail }}</span>
-            <button class="btn-ghost sidebar-logout" (click)="logout()">Sair</button>
-          </div>
-        </div>
-      </aside>
+      <app-sidebar active="voos" [userEmail]="userEmail" [isDark]="isDark"
+        (themeChange)="isDark = $event"
+        (profileSaved)="onProfileSaved($event)">
+      </app-sidebar>
 
       <!-- ── Main ── -->
       <main class="main">
@@ -357,60 +333,6 @@ import { TimePickerComponent } from '@shared/components/time-picker/time-picker.
 
       </main>
 
-      <!-- ── Modal perfil ── -->
-      <div class="modal-overlay" *ngIf="showProfileModal" (click)="onProfileOverlayClick($event)">
-        <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
-          <div class="modal-head">
-            <h2 id="profile-modal-title">Meu perfil</h2>
-            <button class="btn-icon" (click)="closeProfileModal()" aria-label="Fechar">✕</button>
-          </div>
-          <div *ngIf="profileLoading" class="center-state" style="padding:32px">
-            <div class="spinner spinner-dark" style="width:24px;height:24px;border-width:3px"></div>
-          </div>
-          <form *ngIf="!profileLoading" (ngSubmit)="saveProfile()">
-            <div class="form-group">
-              <label>E-mail</label>
-              <input [value]="userEmail" disabled style="opacity:.45;cursor:not-allowed" />
-            </div>
-            <div class="form-group" style="margin-top:14px">
-              <label for="p-whatsapp">WhatsApp</label>
-              <div class="phone-input">
-                <span class="phone-prefix">55</span>
-                <input id="p-whatsapp" type="tel" [(ngModel)]="profileForm.whatsapp" name="whatsapp"
-                  placeholder="11999999999" maxlength="11" />
-              </div>
-              <span class="form-hint">DDD + número (ex: 11999999999)</span>
-            </div>
-            <div class="form-group" style="margin-top:14px">
-              <label for="p-key">CallMeBot API Key</label>
-              <input id="p-key" type="text" [(ngModel)]="profileForm.callmebot_key" name="callmebot_key"
-                placeholder="Ex: 123456" />
-              <span class="form-hint">
-                Não tem? Envie <strong>I allow callmebot to send me messages</strong> para
-                <strong>+34 644 81 58 78</strong> no WhatsApp — a key chega em segundos.
-              </span>
-            </div>
-            <div *ngIf="profileError" class="error-box" style="margin-top:14px">{{ profileError }}</div>
-            <div *ngIf="profileSuccess" class="success-box" style="margin-top:14px">Perfil salvo com sucesso!</div>
-            <div class="modal-actions" style="justify-content: space-between">
-              <a class="btn-whatsapp" *ngIf="!profileForm.callmebot_key"
-                href="https://wa.me/34644815878?text=I%20allow%20callmebot%20to%20send%20me%20messages"
-                target="_blank" rel="noopener">
-                📲 Ativar CallMeBot
-              </a>
-              <span *ngIf="profileForm.callmebot_key"></span>
-              <div style="display:flex;gap:8px">
-                <button type="button" class="btn-ghost" (click)="closeProfileModal()">Cancelar</button>
-                <button type="submit" class="btn-primary modal-save" [disabled]="profileSaving">
-                  <span *ngIf="profileSaving" class="spinner"></span>
-                  <span *ngIf="!profileSaving">Salvar</span>
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      </div>
-
       <!-- ── Modal novo alerta ── -->
       <div class="modal-overlay" *ngIf="showModal" (click)="onOverlayClick($event)">
         <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -542,12 +464,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   selectedAlert: Alert | null = null;
 
-  showProfileModal    = false;
-  profileLoading      = false;
-  profileSaving       = false;
-  profileError        = '';
-  profileSuccess      = false;
-  profileForm         = { whatsapp: '', callmebot_key: '' };
   missingCallmebotKey = false;
   profileWhatsapp     = '';
 
@@ -651,11 +567,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return val !== undefined ? val : null;
   }
 
-  toggleTheme() {
-    this.isDark = !this.isDark;
-    const theme = this.isDark ? 'dark' : 'light';
-    localStorage.setItem('theme', theme);
-    document.documentElement.setAttribute('data-theme', theme);
+  onProfileSaved(event: { whatsapp: string }) {
+    if (event.whatsapp) this.profileWhatsapp = event.whatsapp;
   }
 
   openModal() {
@@ -799,58 +712,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     await this.supabase.deleteAlert(this.editingId!);
     this.alerts = this.alerts.filter(a => a.id !== this.editingId);
     this.closeDetail();
-  }
-
-  async logout() {
-    await this.supabase.signOut();
-    this.router.navigate(['/login']);
-  }
-
-  async openProfileModal() {
-    this.showProfileModal = true;
-    this.profileError     = '';
-    this.profileSuccess   = false;
-    this.profileLoading   = true;
-    const { data } = await this.supabase.getProfile();
-    this.profileForm = {
-      whatsapp:      this.stripPrefix(data?.whatsapp ?? ''),
-      callmebot_key: data?.callmebot_key ?? ''
-    };
-    this.profileLoading = false;
-  }
-
-  closeProfileModal() { this.showProfileModal = false; }
-
-  onProfileOverlayClick(e: Event) {
-    if ((e.target as HTMLElement).classList.contains('modal-overlay')) this.closeProfileModal();
-  }
-
-  async saveProfile() {
-    this.profileSaving  = true;
-    this.profileError   = '';
-    this.profileSuccess = false;
-
-    if (this.profileForm.whatsapp && this.profileForm.whatsapp.replace(/\D/g, '').length !== 11) {
-      this.profileError  = 'WhatsApp inválido. Digite DDD + número (11 dígitos, ex: 11999999999).';
-      this.profileSaving = false;
-      return;
-    }
-
-    const { error } = await this.supabase.updateProfile({
-      whatsapp:      this.profileForm.whatsapp ? '55' + this.profileForm.whatsapp : undefined,
-      callmebot_key: this.profileForm.callmebot_key || undefined
-    });
-
-    if (error) {
-      this.profileError = this.supabase.isSessionError(error)
-        ? 'Sua sessão expirou. Faça login novamente.'
-        : 'Erro ao salvar perfil. Tente novamente.';
-    } else {
-      this.profileSuccess      = true;
-      this.missingCallmebotKey = !this.profileForm.callmebot_key;
-      if (this.profileForm.whatsapp) this.profileWhatsapp = this.profileForm.whatsapp;
-    }
-    this.profileSaving = false;
   }
 
   private stripPrefix(phone: string): string {
