@@ -2,7 +2,7 @@ name: VooAlerta — Monitoramento de Ônibus
 
 on:
   schedule:
-    - cron: '30 12,16,20,0 * * *'  # 9h30, 13h30, 17h30, 21h30 BRT (offset do voo)
+    - cron: '30 * * * *'  # a cada hora, nos :30 (offset de 30min do monitor de voos)
   workflow_dispatch:
 
 jobs:
