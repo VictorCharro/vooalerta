@@ -1,14 +1,15 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
 import { Alert, AlertCreate } from '@core/models/alert.model';
+import { AirportSearchComponent } from '@shared/components/airport-search/airport-search.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AirportSearchComponent],
   styleUrls: ['./dashboard.component.css'],
   template: `
     <div class="layout">
@@ -212,16 +213,22 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
                 <h3 class="section-title">Detalhes da rota</h3>
                 <div class="form-row">
                   <div class="form-group">
-                    <label for="d-origem">Origem</label>
-                    <input id="d-origem" [(ngModel)]="form.origem" name="d_origem"
-                      placeholder="GRU" maxlength="3"
-                      (input)="form.origem = form.origem!.toUpperCase()" required />
+                    <label>Origem</label>
+                    <app-airport-search
+                      inputId="d-origem"
+                      placeholder="GRU — São Paulo"
+                      [value]="form.origem || ''"
+                      (selected)="form.origem = $event">
+                    </app-airport-search>
                   </div>
                   <div class="form-group">
-                    <label for="d-destino">Destino</label>
-                    <input id="d-destino" [(ngModel)]="form.destino" name="d_destino"
-                      placeholder="LIS" maxlength="3"
-                      (input)="form.destino = form.destino!.toUpperCase()" required />
+                    <label>Destino</label>
+                    <app-airport-search
+                      inputId="d-destino"
+                      placeholder="LIS — Lisboa"
+                      [value]="form.destino || ''"
+                      (selected)="form.destino = $event">
+                    </app-airport-search>
                   </div>
                 </div>
                 <div class="form-row" style="margin-top:14px">
@@ -388,27 +395,29 @@ import { Alert, AlertCreate } from '@core/models/alert.model';
             <div class="form-row">
               <div class="form-group">
                 <label>Origem</label>
-                <div class="chips-input" (click)="focusOrigenInput()">
+                <div class="chips-input">
                   <span class="chip" *ngFor="let o of origens">
                     {{ o }}
                     <button type="button" class="chip-remove" (click)="removeOrigen(o)">×</button>
                   </span>
-                  <input #origenInputEl
-                    [(ngModel)]="origenInput" name="origen_input"
-                    placeholder="{{ origens.length === 0 ? 'GRU' : '+' }}"
-                    maxlength="3" style="border:none;outline:none;background:transparent;width:48px;font-size:14px;padding:2px 4px"
-                    (input)="origenInput = origenInput.toUpperCase()"
-                    (keydown.enter)="$event.preventDefault(); addOrigen()"
-                    (keydown.tab)="$event.preventDefault(); addOrigen()"
-                    (blur)="addOrigen()" />
+                  <app-airport-search
+                    inputId="m-origem"
+                    [placeholder]="origens.length === 0 ? 'GRU — São Paulo' : '+ Adicionar'"
+                    value=""
+                    (selected)="addOrigenFromSearch($event)"
+                    style="flex:1;min-width:120px">
+                  </app-airport-search>
                 </div>
-                <span class="form-hint">Digite e pressione Enter para adicionar mais</span>
+                <span class="form-hint">Selecione um ou mais aeroportos de origem</span>
               </div>
               <div class="form-group">
-                <label for="m-destino">Destino</label>
-                <input id="m-destino" [(ngModel)]="form.destino" name="destino"
-                  placeholder="LIS" maxlength="3"
-                  (input)="form.destino = form.destino!.toUpperCase()" required />
+                <label>Destino</label>
+                <app-airport-search
+                  inputId="m-destino"
+                  placeholder="LIS — Lisboa"
+                  [value]="form.destino || ''"
+                  (selected)="form.destino = $event">
+                </app-airport-search>
               </div>
             </div>
             <div class="form-row" style="margin-top:14px">
@@ -512,7 +521,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   origens: string[] = [];
   origenInput = '';
-  @ViewChild('origenInputEl') origenInputEl?: ElementRef<HTMLInputElement>;
 
   form: Partial<Alert & { so_ida: boolean }> = this.emptyForm();
   readonly today = new Date().toISOString().split('T')[0];
@@ -621,20 +629,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.showModal     = true;
   }
 
-  addOrigen() {
-    const v = this.origenInput.trim().toUpperCase();
-    if (v.length === 3 && !this.origens.includes(v)) {
-      this.origens.push(v);
-    }
-    this.origenInput = '';
+  addOrigenFromSearch(iata: string) {
+    if (!this.origens.includes(iata)) this.origens.push(iata);
   }
 
   removeOrigen(o: string) {
     this.origens = this.origens.filter(x => x !== o);
-  }
-
-  focusOrigenInput() {
-    this.origenInputEl?.nativeElement.focus();
   }
 
   openDetail(alert: Alert) {
@@ -701,7 +701,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
 
     // Garante que há pelo menos uma origem no modal de novo alerta
-    if (!this.editingId) this.addOrigen();
     if (!this.editingId && this.origens.length === 0) {
       this.formError = 'Adicione pelo menos uma origem.';
       this.saving = false;
