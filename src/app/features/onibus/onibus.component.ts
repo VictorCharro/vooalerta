@@ -351,8 +351,8 @@ interface BusAlert {
                 <label>Cidade de origem</label>
                 <input [(ngModel)]="form.origem" name="origem" placeholder="Ex: Franca" required
                   (blur)="validateCity('origem')" />
-                <span *ngIf="cityError.origem" class="city-error">{{ cityError.origem }}</span>
-                <span *ngIf="cityChecking.origem" class="form-hint">Verificando...</span>
+                <span *ngIf="cityError['origem']" class="city-error">{{ cityError['origem'] }}</span>
+                <span *ngIf="cityChecking['origem']" class="form-hint">Verificando...</span>
               </div>
               <div class="form-group" style="max-width:80px">
                 <label>UF</label>
@@ -367,8 +367,8 @@ interface BusAlert {
                 <label>Cidade de destino</label>
                 <input [(ngModel)]="form.destino" name="destino" placeholder="Ex: São Paulo" required
                   (blur)="validateCity('destino')" />
-                <span *ngIf="cityError.destino" class="city-error">{{ cityError.destino }}</span>
-                <span *ngIf="cityChecking.destino" class="form-hint">Verificando...</span>
+                <span *ngIf="cityError['destino']" class="city-error">{{ cityError['destino'] }}</span>
+                <span *ngIf="cityChecking['destino']" class="form-hint">Verificando...</span>
               </div>
               <div class="form-group" style="max-width:80px">
                 <label>UF</label>
