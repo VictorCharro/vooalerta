@@ -251,7 +251,7 @@ interface BusAlert {
                     <input id="d-meta" type="number" [(ngModel)]="detailForm.meta" name="d_meta" placeholder="150" min="1" required />
                   </div>
                   <div class="form-group">
-                    <label for="d-whatsapp">WhatsApp para notificação</label>
+                    <label for="d-whatsapp">WhatsApp</label>
                     <div class="phone-input">
                       <span class="phone-prefix">55</span>
                       <input id="d-whatsapp" type="tel" [(ngModel)]="detailForm.whatsapp" name="d_whatsapp"
@@ -361,7 +361,7 @@ interface BusAlert {
                   placeholder="150" min="1" required />
               </div>
               <div class="form-group">
-                <label for="bus-whatsapp">WhatsApp para notificação</label>
+                <label for="bus-whatsapp">WhatsApp</label>
                 <div class="phone-input">
                   <span class="phone-prefix">55</span>
                   <input id="bus-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="whatsapp"
