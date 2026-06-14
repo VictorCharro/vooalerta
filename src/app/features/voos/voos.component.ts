@@ -10,10 +10,10 @@ import { TimePickerComponent } from '@shared/components/time-picker/time-picker.
 import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
 
 @Component({
-  selector: 'app-dashboard',
+  selector: 'app-voos',
   standalone: true,
   imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent],
-  styleUrls: ['./dashboard.component.css'],
+  styleUrls: ['./voos.component.css'],
   template: `
     <div class="layout">
 
@@ -452,7 +452,7 @@ import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
     </div>
   `
 })
-export class DashboardComponent implements OnInit, OnDestroy {
+export class VoosComponent implements OnInit, OnDestroy {
   alerts:    Alert[] = [];
   loading    = true;
   showModal  = false;

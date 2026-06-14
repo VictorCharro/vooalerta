@@ -18,7 +18,7 @@ export const guestGuard = async () => {
   const router   = inject(Router);
   const user     = await supabase.getUser();
   if (user) {
-    router.navigate(['/dashboard']);
+    router.navigate(['/voos']);
     return false;
   }
   return true;

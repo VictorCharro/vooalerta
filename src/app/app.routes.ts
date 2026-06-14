@@ -2,7 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from '@core/guards/auth.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+  { path: '', redirectTo: 'voos', pathMatch: 'full' },
   {
     path: 'login',
     canActivate: [guestGuard],
@@ -16,10 +16,15 @@ export const routes: Routes = [
       import('@features/auth/register/register.component').then(m => m.RegisterComponent)
   },
   {
-    path: 'dashboard',
+    path: 'voos',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('@features/dashboard/dashboard.component').then(m => m.DashboardComponent)
+      import('@features/voos/voos.component').then(m => m.VoosComponent)
+  },
+  {
+    path: 'dashboard',
+    redirectTo: 'voos',
+    pathMatch: 'full'
   },
   {
     path: 'onibus',
@@ -32,5 +37,5 @@ export const routes: Routes = [
     loadComponent: () =>
       import('@features/share/share.component').then(m => m.ShareComponent)
   },
-  { path: '**', redirectTo: 'dashboard' }
+  { path: '**', redirectTo: 'voos' }
 ];

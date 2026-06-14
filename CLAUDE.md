@@ -12,7 +12,7 @@ Aplicação de alertas de preço para **voos** e **ônibus (Buser)**. O usuário
 - **Backend:** Node.js scripts rodando via GitHub Actions (cron)
 - **Banco:** Supabase (Postgres + RLS + Realtime)
 - **Notificações:** CallMeBot (WhatsApp gratuito)
-- **Produção:** [vooalerta-seven.vercel.app](https://vooalerta-seven.vercel.app)
+- **Produção:** [viagemalerta.vercel.app](https://viagemalerta.vercel.app)
 
 ---
 
@@ -35,9 +35,9 @@ vooalerta/
 │       │   ├── auth/
 │       │   │   ├── login/
 │       │   │   └── register/
-│       │   ├── dashboard/
-│       │   │   ├── dashboard.component.ts # Página principal — alertas de VOO
-│       │   │   └── dashboard.component.css
+│       │   ├── voos/
+│       │   │   ├── voos.component.ts      # Página de alertas de VOO
+│       │   │   └── voos.component.css
 │       │   ├── onibus/
 │       │   │   ├── onibus.component.ts    # Página de alertas de ÔNIBUS
 │       │   │   └── onibus.component.css
@@ -47,7 +47,8 @@ vooalerta/
 │           ├── components/
 │           │   ├── airport-search/        # Autocomplete de aeroportos
 │           │   ├── date-picker/
-│           │   └── time-picker/
+│           │   ├── time-picker/
+│           │   └── sidebar/               # Sidebar + modal de perfil (compartilhado)
 │           └── data/airports.ts           # Lista de aeroportos (IATA)
 ├── styles/
 │   ├── theme.css       # Variáveis CSS (cores, espaçamentos, radius)
@@ -73,8 +74,9 @@ vooalerta/
 
 | Path | Componente | Guard |
 |---|---|---|
-| `/` | redireciona para `/dashboard` | — |
-| `/dashboard` | DashboardComponent (sidebar: "Voos") | authGuard |
+| `/` | redireciona para `/voos` | — |
+| `/voos` | VoosComponent | authGuard |
+| `/dashboard` | redireciona para `/voos` | — |
 | `/onibus` | OnibusComponent | authGuard |
 | `/login` | LoginComponent | guestGuard |
 | `/register` | RegisterComponent | guestGuard |
