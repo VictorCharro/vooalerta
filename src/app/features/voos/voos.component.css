@@ -27,12 +27,12 @@
 /* ── Share button ────────────────────────────────────────── */
 .share-btn {
   width: 36px; height: 36px; border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border); background: transparent;
+  border: 1px solid var(--color-border); background: var(--color-bg-3);
   color: var(--color-text-muted); font-size: 16px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: all var(--transition); flex-shrink: 0;
 }
-.share-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.share-btn:hover { border-color: var(--color-accent); color: var(--color-accent); background: var(--color-accent-dim); }
 
 /* ── Toasts ──────────────────────────────────────────────── */
 .toast-container { position: fixed; bottom: 28px; right: 28px; z-index: 999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
@@ -80,7 +80,7 @@ h1 { font-size: 26px; margin-bottom: 4px; }
 .price-skeleton { display: block; height: 20px; width: 80px; background: var(--color-border); border-radius: 4px; animation: pulse 1.4s ease infinite; margin-left: auto; }
 @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }
 .card-controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.chevron-btn { background: var(--color-bg-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--color-text-muted); cursor: pointer; transition: all var(--transition); line-height: 1; }
+.chevron-btn { background: var(--color-bg-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--color-text-muted); cursor: pointer; transition: all var(--transition); line-height: 1; }
 .chevron-btn:hover { border-color: var(--color-accent); color: var(--color-accent); background: var(--color-accent-dim); }
 
 /* ── Detail view ─────────────────────────────────────────── */
