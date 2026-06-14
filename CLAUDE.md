@@ -65,7 +65,8 @@ vooalerta/
     ├── 001_initial_schema.sql   # alerts, price_cache, notifications, views
     ├── 002_price_cache.sql      # função limpar_cache_antigo
     ├── 003_profiles_and_fix_view.sql  # profiles, trigger new user, fix alerts_ativos
-    └── 004_bus_alerts.sql       # bus_alerts, bus_price_cache, bus_notifications, views
+    ├── 004_bus_alerts.sql       # bus_alerts, bus_price_cache, bus_notifications, views
+    └── 005_grants_service_role.sql  # grants select/insert/update/delete para service_role em todas as tabelas e views
 ```
 
 ---
@@ -81,7 +82,7 @@ vooalerta/
 | `/login` | LoginComponent | guestGuard |
 | `/register` | RegisterComponent | guestGuard |
 | `/share/:id` | ShareComponent | — |
-| `/**` | redireciona para `/dashboard` | — |
+| `/**` | redireciona para `/voos` | — |
 
 ---
 
@@ -151,6 +152,8 @@ Todas as páginas usam variáveis CSS de `src/styles/theme.css`. As principais:
 Tema claro disponível via `html[data-theme="light"]`, toggled por `localStorage('theme')`.
 
 Classes globais reutilizáveis em `components.css`: `btn-primary`, `btn-ghost`, `btn-icon`, `spinner`, `error-box`, `success-box`, `form-hint`, `toggle` (switch).
+- O `.toggle` global (`components.css`) é a única definição — não duplicar em CSS de componente.
+- Botão `.open-btn` (link externo) presente nos cards de voos (Google Flights) e ônibus (Buser); também no detalhe de ambas as páginas.
 
 ---
 

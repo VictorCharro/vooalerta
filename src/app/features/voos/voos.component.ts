@@ -131,6 +131,9 @@ import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
                   <span class="track"></span>
                   <span class="thumb"></span>
                 </label>
+                <a [href]="buildGoogleFlightsUrl(alert)" target="_blank" class="open-btn" title="Abrir no Google Flights">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </a>
                 <button class="share-btn" (click)="shareAlert(alert)" title="Compartilhar">⤴</button>
                 <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">›</button>
               </div>
