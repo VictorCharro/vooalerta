@@ -67,7 +67,7 @@ import { SupabaseService } from '@core/services/supabase.service';
             <label for="p-key">CallMeBot API Key</label>
             <input id="p-key" type="text" [(ngModel)]="profileForm.callmebot_key" name="callmebot_key"
               placeholder="Ex: 123456" />
-            <span class="form-hint">
+            <span class="form-hint" *ngIf="!profileForm.callmebot_key">
               Não tem? Envie <strong>I allow callmebot to send me messages</strong> para
               <strong>+34 644 81 58 78</strong> no WhatsApp — a key chega em segundos.
             </span>
