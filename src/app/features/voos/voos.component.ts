@@ -285,7 +285,7 @@ import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
                     <span class="info-label">Escalas</span>
                     <span class="info-value">{{ form.so_direto ? 'Só direto' : 'Qualquer' }}</span>
                   </div>
-                  <div class="info-row" style="border-bottom:none;padding-bottom:0">
+                  <div class="info-row">
                     <label class="toggle-label" style="width:100%">
                       <label class="toggle" style="width:38px;height:22px">
                         <input type="checkbox" [(ngModel)]="form.so_direto" name="d_so_direto" />
@@ -294,6 +294,10 @@ import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
                       </label>
                       <span style="font-size:14px;color:var(--color-text)">Somente voos diretos</span>
                     </label>
+                  </div>
+                  <div class="info-row" style="border-bottom:none;padding-bottom:0">
+                    <span class="info-label">Abrir no Google Flights</span>
+                    <a class="open-btn" [href]="buildGoogleFlightsUrl(selectedAlert)" target="_blank" rel="noopener" title="Abrir no Google Flights">↗</a>
                   </div>
                 </div>
 
@@ -711,6 +715,12 @@ export class VoosComponent implements OnInit, OnDestroy {
     await this.supabase.deleteAlert(this.editingId!);
     this.alerts = this.alerts.filter(a => a.id !== this.editingId);
     this.closeDetail();
+  }
+
+  buildGoogleFlightsUrl(alert: Alert | null): string {
+    if (!alert) return 'https://www.google.com/travel/flights?hl=pt-BR';
+    const query = `voos de ${alert.origem} para ${alert.destino} em ${alert.data_ida}`;
+    return 'https://www.google.com/travel/flights?hl=pt-BR&q=' + encodeURIComponent(query);
   }
 
   private stripPrefix(phone: string): string {
