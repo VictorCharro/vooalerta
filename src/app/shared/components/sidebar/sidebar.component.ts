@@ -14,7 +14,7 @@ import { SupabaseService } from '@core/services/supabase.service';
       <div class="sidebar-top">
         <div class="brand">
           <div class="brand-icon">✈</div>
-          <span class="brand-name">VooAlerta</span>
+          <span class="brand-name">Viagem Alerta</span>
         </div>
         <nav class="sidebar-nav">
           <button class="nav-item" [class.active]="active === 'voos'" (click)="router.navigate(['/voos'])">
