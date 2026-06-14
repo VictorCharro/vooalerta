@@ -35,7 +35,7 @@ import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
 
           <div class="page-header fade-up">
             <div>
-              <h1>Meus alertas</h1>
+              <h1>Voos</h1>
               <p class="page-sub" *ngIf="!loading">
                 {{ alerts.length }} rota{{ alerts.length !== 1 ? 's' : '' }} monitorada{{ alerts.length !== 1 ? 's' : '' }}
               </p>
