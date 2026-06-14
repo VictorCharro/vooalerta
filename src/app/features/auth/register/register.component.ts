@@ -15,7 +15,7 @@ import { SupabaseService } from '@core/services/supabase.service';
 
         <div class="auth-brand">
           <div class="auth-brand-icon">✈</div>
-          <span class="auth-brand-name">VooAlerta</span>
+          <span class="auth-brand-name">Viagem Alerta</span>
         </div>
 
         <h1 class="auth-title">Criar conta</h1>
