@@ -143,7 +143,7 @@ interface BusAlert {
                   [class.btn-cooldown]="getCooldownSeconds(alert) > 0 && !refreshing[alert.id]">
                   <span *ngIf="refreshing[alert.id]" class="spinner" style="width:14px;height:14px;border-width:2px"></span>
                   <ng-container *ngIf="!refreshing[alert.id]">
-                    <span *ngIf="getCooldownSeconds(alert) === 0">↻</span>
+                    <svg *ngIf="getCooldownSeconds(alert) === 0" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                     <span *ngIf="getCooldownSeconds(alert) > 0" class="cooldown-label">{{ formatCooldown(alert) }}</span>
                   </ng-container>
                 </button>
