@@ -2,7 +2,7 @@ name: VooAlerta — Monitoramento de Passagens
 
 on:
   schedule:
-    - cron: '0 12,16,20,0 * * *'  # 9h, 13h, 17h, 21h horário de Brasília (UTC-3)
+    - cron: '0 15,0 * * *'  # 12h e 21h horário de Brasília (UTC-3)
   workflow_dispatch:
 
 jobs:

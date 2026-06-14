@@ -59,7 +59,7 @@ vooalerta/
 │   ├── monitor.js          # Monitor de VOOS — SerpAPI → Supabase → CallMeBot
 │   └── monitor_onibus.js   # Monitor de ÔNIBUS — scraping Buser → Supabase → CallMeBot
 ├── .github/workflows/
-│   ├── monitor.yml         # Cron voos: 9h, 13h, 17h, 21h BRT
+│   ├── monitor.yml         # Cron voos: 12h e 21h BRT
 │   └── monitor_onibus.yml  # Cron ônibus: 9h30, 13h30, 17h30, 21h30 BRT
 └── supabase/migrations/
     ├── 001_initial_schema.sql   # alerts, price_cache, notifications, views
