@@ -239,8 +239,8 @@ async function processarAlerta(alerta, voosCache) {
 
 // ── Entry point ───────────────────────────────────────────────
 
-// Cron dispara às 12,16,20,0 UTC = 9h,13h,17h,21h BRT
-const CRON_HOURS_UTC = [12, 16, 20, 0];
+// Cron dispara às 15,0 UTC = 12h,21h BRT
+const CRON_HOURS_UTC = [15, 0];
 const MONTHLY_BUDGET = 250;
 
 async function main() {
