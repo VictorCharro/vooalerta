@@ -116,8 +116,9 @@ vooalerta/
 
 ### `monitor.js` — Voos
 - Fonte: SerpAPI (Google Flights)
-- Controle de orçamento: limita coletas por dia baseado em `MONTHLY_BUDGET = 250`
-- Cache: reutiliza dados com menos de 3h30 de idade
+- Agendamento: controlado **só pelo cron** (`monitor.yml`, 12h e 21h BRT). O script coleta sempre que é executado — não há mais gate de orçamento interno.
+- `MONTHLY_BUDGET = 250` é apenas informativo: loga uso estimado e avisa se passar do orçamento.
+- Cache: reutiliza dados com menos de 3h30 de idade (evita duplicar em disparo manual logo após o cron)
 - Filtros por alerta: `horario_minimo`, `so_direto`
 
 ### `monitor_onibus.js` — Ônibus

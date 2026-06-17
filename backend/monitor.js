@@ -117,15 +117,16 @@ async function processarRota(rota) {
   const { origem, destino, data_ida, data_volta } = rota;
   console.log(`\n📍 Processando rota: ${origem} → ${destino} | ${data_ida}`);
 
-  // Usa cache se tiver menos de 3h30 (coletas a cada 4h)
-  const seisHorasAtras = new Date(Date.now() - 3.5 * 60 * 60 * 1000).toISOString();
+  // Usa cache se tiver menos de 3h30 — evita coletas duplicadas se o
+  // workflow for disparado manualmente logo após o cron.
+  const cacheLimite = new Date(Date.now() - 3.5 * 60 * 60 * 1000).toISOString();
   const cacheRecente = await supabase(
     'GET',
-    `price_cache?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${data_ida}&atualizado_em=gte.${seisHorasAtras}&limit=1`
+    `price_cache?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${data_ida}&atualizado_em=gte.${cacheLimite}&limit=1`
   );
 
   if (cacheRecente.length > 0) {
-    console.log(`  ✅ Cache recente (< 6h) — usando dados existentes`);
+    console.log(`  ✅ Cache recente (< 3h30) — usando dados existentes`);
   } else {
     console.log(`  🔍 Buscando no SerpAPI...`);
     try {
@@ -239,9 +240,11 @@ async function processarAlerta(alerta, voosCache) {
 
 // ── Entry point ───────────────────────────────────────────────
 
-// Cron dispara às 15,0 UTC = 12h,21h BRT
-const CRON_HOURS_UTC = [15, 0];
+// Cron dispara às 15,0 UTC = 12h,21h BRT (2 coletas/dia).
+// O agendamento é controlado pelo cron em .github/workflows/monitor.yml —
+// este script coleta sempre que é executado. MONTHLY_BUDGET é só informativo.
 const MONTHLY_BUDGET = 250;
+const RUNS_PER_DAY = 2;
 
 async function main() {
   console.log('🚀 VooAlerta — Iniciando monitoramento');
@@ -265,21 +268,11 @@ async function main() {
     return;
   }
 
-  // Calcula quantas execuções por dia cabem no orçamento mensal
-  const runsPerDay = Math.min(
-    CRON_HOURS_UTC.length,
-    Math.floor(MONTHLY_BUDGET / rotas.length / 30)
-  ) || 1;
-
-  const allowedHours = CRON_HOURS_UTC.slice(0, runsPerDay);
-  const currentHourUTC = new Date().getUTCHours();
-
-  console.log(`💰 Orçamento: ${MONTHLY_BUDGET} buscas/mês | ${rotas.length} rota(s) → ${runsPerDay} coleta(s)/dia`);
-  console.log(`🕐 Horários permitidos (UTC): ${allowedHours.join('h, ')}h`);
-
-  if (!allowedHours.includes(currentHourUTC)) {
-    console.log(`⏭  Hora atual (${currentHourUTC}h UTC) fora do orçamento — encerrando`);
-    return;
+  // Estimativa de uso mensal (informativo) — alerta se passar do orçamento
+  const usoMensalEstimado = rotas.length * RUNS_PER_DAY * 30;
+  console.log(`💰 Uso estimado: ${usoMensalEstimado} buscas/mês (${rotas.length} rotas × ${RUNS_PER_DAY}/dia × 30) | orçamento ${MONTHLY_BUDGET}`);
+  if (usoMensalEstimado > MONTHLY_BUDGET) {
+    console.log(`⚠️  Estimativa acima do orçamento do SerpAPI — considere reduzir rotas ou trocar de fonte.`);
   }
 
   for (const rota of rotas) {
