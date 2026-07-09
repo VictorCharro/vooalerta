@@ -1,4 +1,5 @@
 const DEFAULT_TIMEOUT_MS = 45000;
+const NAVIGATION_ATTEMPTS = Number(process.env.FLIGHT_NAVIGATION_ATTEMPTS || 2);
 const PRICE_SETTLE_MS = Number(process.env.FLIGHT_PRICE_SETTLE_MS || 10000);
 const IS_VERCEL = !!process.env.VERCEL;
 
@@ -194,6 +195,25 @@ async function collectFlightRows(page, origem, destino, link) {
 
 async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta) {
   const url = buildGoogleFlightsUrl(origem, destino, dataIda, dataVolta);
+  let lastError;
+
+  for (let attempt = 1; attempt <= NAVIGATION_ATTEMPTS; attempt++) {
+    try {
+      return await buscarGoogleFlightsPlaywrightOnce(url, origem, destino);
+    } catch (err) {
+      lastError = err;
+      console.warn(`Google Flights scrape attempt ${attempt}/${NAVIGATION_ATTEMPTS} failed: ${err.message}`);
+
+      if (attempt < NAVIGATION_ATTEMPTS) {
+        await sleep(1000 * attempt);
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+async function buscarGoogleFlightsPlaywrightOnce(url, origem, destino) {
   const browser = await launchBrowser();
 
   try {
@@ -214,7 +234,7 @@ async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta
       });
     }
 
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: IS_VERCEL ? 30000 : DEFAULT_TIMEOUT_MS });
     if (!IS_VERCEL) {
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     }
@@ -223,7 +243,7 @@ async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta
 
     return await collectFlightRows(page, origem, destino, url);
   } finally {
-    await browser.close();
+    await browser.close().catch(() => {});
   }
 }
 
@@ -238,7 +258,8 @@ async function launchBrowser() {
         ...chromium.args,
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--single-process'
+        '--disable-setuid-sandbox',
+        '--no-sandbox'
       ],
       executablePath: await chromium.executablePath(),
       headless: chromium.headless,

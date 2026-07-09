@@ -49,10 +49,15 @@ async function handler(req, res) {
     });
   } catch (err) {
     console.error('scrape-flight failed', err);
+    const message = err.message || String(err);
+    const userMessage = /Target page, context or browser has been closed|page\.goto/i.test(message)
+      ? 'Google Flights fechou a pagina durante a coleta. Tente novamente em alguns segundos.'
+      : message;
+
     res.status(200).json({
       preco: null,
       quantidade: 0,
-      error: err.message || String(err),
+      error: userMessage,
       error_stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }

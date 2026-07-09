@@ -91,6 +91,7 @@ Nao usar mais `SERPAPI_KEY`.
 - Instala Chromium no GitHub Actions com `npx playwright install --with-deps chromium`
 - Seleciona a aba "Menores precos" no Google Flights antes de coletar
 - Espera os precos do Google Flights assentarem antes de coletar; padrao `FLIGHT_PRICE_SETTLE_MS=10000`
+- Reabre o Chromium e tenta novamente se o Google fechar a pagina durante a navegacao; padrao `FLIGHT_NAVIGATION_ATTEMPTS=2`
 - Reutiliza cache com menos de 3h30
 - Processa notificacoes pelo cache em `price_cache`
 - Mantem filtros por alerta: `horario_minimo` e `so_direto`

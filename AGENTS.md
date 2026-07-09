@@ -126,6 +126,7 @@ vooalerta/
 - Não usa mais `SERPAPI_KEY`.
 - Seleciona a aba "Menores preços" no Google Flights antes de coletar.
 - Aguarda os preços do Google Flights assentarem antes de coletar; padrão `FLIGHT_PRICE_SETTLE_MS=10000`.
+- Reabre o Chromium e tenta novamente se o Google fechar a página durante a navegação; padrão `FLIGHT_NAVIGATION_ATTEMPTS=2`.
 - Cache: reutiliza dados com menos de 3h30 de idade (evita duplicar em disparo manual logo após o cron)
 - Filtros por alerta: `horario_minimo`, `so_direto`
 
