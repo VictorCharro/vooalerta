@@ -2,9 +2,9 @@ const DEFAULT_TIMEOUT_MS = 45000;
 
 function getSupabaseConfig() {
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
   if (!url || !key) {
-    throw new Error('SUPABASE_URL e SUPABASE_SERVICE_KEY/SUPABASE_SERVICE_ROLE_KEY sao obrigatorios');
+    throw new Error('SUPABASE_URL e SUPABASE_SERVICE_KEY/SUPABASE_SERVICE_ROLE_KEY ou SUPABASE_KEY sao obrigatorios');
   }
   return { url, key };
 }

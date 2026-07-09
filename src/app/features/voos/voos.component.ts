@@ -592,18 +592,20 @@ export class VoosComponent implements OnInit, OnDestroy {
     if (!alert.id || this.isRefreshing(alert) || this.getCooldownSeconds(alert) > 0) return;
 
     this.refreshing = { ...this.refreshing, [alert.id]: true };
-    const key = this.refreshKey(alert);
-    const price = await this.supabase.scrapeFlightPrice(alert.origem, alert.destino, alert.data_ida, alert.data_volta);
-    localStorage.setItem(key, String(Date.now()));
+    try {
+      const key = this.refreshKey(alert);
+      const result = await this.supabase.scrapeFlightPrice(alert.origem, alert.destino, alert.data_ida, alert.data_volta);
 
-    if (price !== null) {
-      this.minPrices = { ...this.minPrices, [`${alert.origem}-${alert.destino}-${alert.data_ida}`]: price };
-      this.showToast(`Preço atualizado: R$ ${price}`);
-    } else {
-      this.showToast('Não foi possível atualizar o preço agora.');
+      if (result.preco !== null) {
+        localStorage.setItem(key, String(Date.now()));
+        this.minPrices = { ...this.minPrices, [`${alert.origem}-${alert.destino}-${alert.data_ida}`]: result.preco };
+        this.showToast(result.warning ? `Preco atualizado: R$ ${result.preco}. ${result.warning}` : `Preco atualizado: R$ ${result.preco}`);
+      } else {
+        this.showToast(result.error ? `Nao foi possivel atualizar: ${result.error}` : 'Nao encontramos precos para esta rota agora.');
+      }
+    } finally {
+      this.refreshing = { ...this.refreshing, [alert.id]: false };
     }
-
-    this.refreshing = { ...this.refreshing, [alert.id]: false };
   }
 
   isRefreshing(alert: Alert): boolean {

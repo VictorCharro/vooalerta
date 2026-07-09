@@ -116,27 +116,43 @@ export class SupabaseService {
     return data?.preco ?? null;
   }
 
-  async scrapeFlightPrice(origem: string, destino: string, dataIda: string, dataVolta?: string | null): Promise<number | null> {
+  async scrapeFlightPrice(origem: string, destino: string, dataIda: string, dataVolta?: string | null): Promise<{ preco: number | null; error?: string; warning?: string }> {
     const { data: { session } } = await this.client.auth.getSession();
-    if (!session) return null;
+    if (!session) return { preco: null, error: 'Sessão expirada. Faça login novamente.' };
 
-    const res = await fetch('/api/scrape-flight', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`
-      },
-      body: JSON.stringify({
-        origem,
-        destino,
-        data_ida: dataIda,
-        data_volta: dataVolta ?? null
-      })
-    });
+    try {
+      const res = await fetch('/api/scrape-flight', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          origem,
+          destino,
+          data_ida: dataIda,
+          data_volta: dataVolta ?? null
+        })
+      });
 
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.preco ?? null;
+      const contentType = res.headers.get('content-type') ?? '';
+      const data = contentType.includes('application/json') ? await res.json() : null;
+
+      if (!contentType.includes('application/json')) {
+        return { preco: null, error: 'A API /api/scrape-flight não retornou JSON. Em desenvolvimento local, rode pela Vercel ou configure um proxy para a API.' };
+      }
+
+      if (!res.ok) {
+        return { preco: null, error: data?.error ?? `Erro ${res.status} ao chamar /api/scrape-flight` };
+      }
+
+      return {
+        preco: data?.preco ?? null,
+        warning: data?.warning ?? undefined
+      };
+    } catch (err) {
+      return { preco: null, error: (err as Error).message };
+    }
   }
 
   async getAlerts() {

@@ -2,7 +2,12 @@ if (process.env.VERCEL && !process.env.PLAYWRIGHT_BROWSERS_PATH) {
   process.env.PLAYWRIGHT_BROWSERS_PATH = '0';
 }
 
-const { refreshFlightPrice, verifyUserToken } = require('../backend/flight_scraper');
+const {
+  buildGoogleFlightsUrl,
+  buscarGoogleFlightsPlaywright,
+  salvarCache,
+  verifyUserToken
+} = require('../backend/flight_scraper');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -28,8 +33,30 @@ module.exports = async function handler(req, res) {
     }
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    const result = await refreshFlightPrice(body);
-    res.status(200).json(result);
+    const { origem, destino, data_ida, data_volta } = body;
+
+    if (!origem || !destino || !data_ida) {
+      res.status(400).json({ error: 'origem, destino e data_ida sao obrigatorios' });
+      return;
+    }
+
+    const voos = await buscarGoogleFlightsPlaywright(origem, destino, data_ida, data_volta);
+    let warning = null;
+
+    if (voos.length > 0) {
+      try {
+        await salvarCache(voos, origem, destino, data_ida, data_volta);
+      } catch (err) {
+        warning = `Preco coletado, mas nao foi salvo no cache: ${err.message || String(err)}`;
+      }
+    }
+
+    res.status(200).json({
+      preco: voos[0]?.preco ?? null,
+      quantidade: voos.length,
+      link: buildGoogleFlightsUrl(origem, destino, data_ida, data_volta),
+      warning
+    });
   } catch (err) {
     res.status(500).json({ error: err.message || String(err) });
   }
