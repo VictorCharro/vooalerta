@@ -598,9 +598,20 @@ export class VoosComponent implements OnInit, OnDestroy {
       const result = await this.supabase.scrapeFlightPrice(alert.origem, alert.destino, alert.data_ida, alert.data_volta);
 
       if (result.preco !== null) {
+        const currentPrice = await this.supabase.getMinPriceForRoute(
+          alert.origem, alert.destino, alert.data_ida,
+          alert.data_volta ?? null,
+          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+        );
+
         localStorage.setItem(key, String(Date.now()));
-        this.minPrices = { ...this.minPrices, [this.priceKey(alert)]: result.preco };
-        this.showToast(`Preço atualizado: R$ ${result.preco}`);
+        if (currentPrice !== null) {
+          this.minPrices = { ...this.minPrices, [this.priceKey(alert)]: currentPrice };
+          this.showToast(`Preço atualizado: R$ ${currentPrice}`);
+        } else {
+          await this.loadMinPrices();
+          this.showToast(`Coleta atualizada: menor preço encontrado R$ ${result.preco}, mas nenhum voo passou nos filtros deste alerta.`);
+        }
       } else {
         this.showToast(result.error ? `Nao foi possivel atualizar: ${result.error}` : 'Nao encontramos precos para esta rota agora.');
       }
