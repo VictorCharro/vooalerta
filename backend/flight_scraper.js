@@ -1,4 +1,5 @@
 const DEFAULT_TIMEOUT_MS = 45000;
+const PRICE_SETTLE_MS = Number(process.env.FLIGHT_PRICE_SETTLE_MS || 10000);
 const IS_VERCEL = !!process.env.VERCEL;
 
 function getSupabaseConfig({ serviceRole = false } = {}) {
@@ -125,6 +126,10 @@ async function collectFlightRows(page, origem, destino, link) {
     }
   } catch (_) {
     // Some serverless/headless sessions close input channels early; collect visible rows anyway.
+  }
+
+  if (PRICE_SETTLE_MS > 0) {
+    await page.waitForTimeout(PRICE_SETTLE_MS);
   }
 
   const rowTexts = await page.locator('li.pIav2d, li').evaluateAll((nodes, route) => nodes

@@ -118,6 +118,7 @@ vooalerta/
 - Fonte: Google Flights via Playwright (`backend/flight_scraper.js`)
 - Agendamento: controlado **só pelo cron** (`monitor.yml`, atualmente a cada 3h). O script coleta sempre que é executado — não há gate de orçamento interno.
 - Não usa mais `SERPAPI_KEY`.
+- Aguarda os preços do Google Flights assentarem antes de coletar; padrão `FLIGHT_PRICE_SETTLE_MS=10000`.
 - Cache: reutiliza dados com menos de 3h30 de idade (evita duplicar em disparo manual logo após o cron)
 - Filtros por alerta: `horario_minimo`, `so_direto`
 
@@ -141,6 +142,7 @@ vooalerta/
 - Roda server-side para executar Playwright fora do browser Angular
 - Recebe `{ origem, destino, data_ida, data_volta }`, salva em `price_cache`
 - Retorna `{ preco: number | null }`
+- Antes de ler os voos, aguarda o delay de preços (`FLIGHT_PRICE_SETTLE_MS`) para o Google concluir a consulta em fornecedores
 - **Cooldown:** 10 minutos por rota, rastreado em `localStorage` com chave `flight_refresh_{orig}_{dest}_{data}_{volta}`
 
 ---
