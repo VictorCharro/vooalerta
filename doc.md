@@ -87,6 +87,7 @@ Nao usar mais `SERPAPI_KEY`.
 - Fonte: Google Flights via Playwright (`backend/flight_scraper.js`)
 - Cron: `.github/workflows/monitor.yml`, atualmente a cada 3h
 - Instala Chromium no GitHub Actions com `npx playwright install --with-deps chromium`
+- Seleciona a aba "Menores precos" no Google Flights antes de coletar
 - Espera os precos do Google Flights assentarem antes de coletar; padrao `FLIGHT_PRICE_SETTLE_MS=10000`
 - Reutiliza cache com menos de 3h30
 - Processa notificacoes pelo cache em `price_cache`
@@ -98,6 +99,7 @@ Nao usar mais `SERPAPI_KEY`.
 - Recebe `{ origem, destino, data_ida, data_volta }`
 - Valida o usuario pelo token Supabase enviado pelo frontend
 - Roda Playwright server-side, salva em `price_cache` e retorna `{ preco: number | null }`
+- Clica na aba "Menores precos" do Google Flights antes de ler a lista
 - Antes de ler os voos, aguarda o delay de precos (`FLIGHT_PRICE_SETTLE_MS`) para o Google concluir a consulta em fornecedores
 - Cooldown no frontend: 10 minutos por rota, chave `flight_refresh_{orig}_{dest}_{data}_{volta}`
 

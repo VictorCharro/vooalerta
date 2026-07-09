@@ -116,6 +116,28 @@ function parseFlightRow(text, origem, destino, link) {
   };
 }
 
+async function selectLowestPricesTab(page) {
+  try {
+    const tabs = page
+      .locator('button, [role="tab"], div')
+      .filter({ hasText: /Menores pre.os/i });
+    const count = await tabs.count();
+
+    for (let i = 0; i < count; i++) {
+      const tab = tabs.nth(i);
+      if (!(await tab.isVisible().catch(() => false))) continue;
+
+      await tab.click({ timeout: 5000 });
+      await page.waitForTimeout(1500);
+      return true;
+    }
+  } catch (_) {
+    // Google may change the tab markup; fallback to the current list instead of failing the scrape.
+  }
+
+  return false;
+}
+
 async function collectFlightRows(page, origem, destino, link) {
   await page.waitForSelector('li.pIav2d', { timeout: 15000 }).catch(() => {});
 
@@ -186,6 +208,7 @@ async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     }
     await page.waitForTimeout(IS_VERCEL ? 2500 : 5000);
+    await selectLowestPricesTab(page);
 
     return await collectFlightRows(page, origem, destino, url);
   } finally {
@@ -271,6 +294,7 @@ module.exports = {
   parseFlightRow,
   parsePrice,
   refreshFlightPrice,
+  selectLowestPricesTab,
   salvarCache,
   sleep,
   supabase,
