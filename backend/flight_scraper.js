@@ -129,25 +129,59 @@ function parseFlightRow(text, origem, destino, link) {
 }
 
 async function selectLowestPricesTab(page) {
-  try {
-    const tabs = page
-      .locator('button, [role="tab"], div')
-      .filter({ hasText: /Menores pre.os/i });
-    const count = await tabs.count();
+  const target = await page.evaluate(() => {
+    const normalize = value => (value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
 
-    for (let i = 0; i < count; i++) {
-      const tab = tabs.nth(i);
-      if (!(await tab.isVisible().catch(() => false))) continue;
+    const isVisible = element => {
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && rect.width > 20
+        && rect.height > 20;
+    };
 
-      await tab.click({ timeout: 5000 });
-      await page.waitForTimeout(1500);
-      return true;
-    }
-  } catch (_) {
-    // Google may change the tab markup; fallback to the current list instead of failing the scrape.
+    const elements = Array.from(document.querySelectorAll('button, [role="tab"], [role="button"], div, span'));
+    const candidates = elements
+      .map(element => {
+        const text = normalize(element.innerText || element.textContent || '');
+        const rect = element.getBoundingClientRect();
+        return { element, text, rect };
+      })
+      .filter(item => isVisible(item.element)
+        && item.text.startsWith('menores precos')
+        && !item.text.includes('melhor opcao'))
+      .sort((a, b) => {
+        const aRole = a.element.getAttribute('role') || '';
+        const bRole = b.element.getAttribute('role') || '';
+        const aPriority = a.element.tagName === 'BUTTON' || aRole === 'tab' || aRole === 'button' ? 0 : 1;
+        const bPriority = b.element.tagName === 'BUTTON' || bRole === 'tab' || bRole === 'button' ? 0 : 1;
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        return (a.rect.width * a.rect.height) - (b.rect.width * b.rect.height);
+      });
+
+    const candidate = candidates[0];
+    if (!candidate) return null;
+
+    return {
+      x: candidate.rect.left + candidate.rect.width / 2,
+      y: candidate.rect.top + candidate.rect.height / 2,
+      text: candidate.text
+    };
+  });
+
+  if (!target) {
+    throw new Error('Nao foi possivel localizar a aba Menores precos no Google Flights.');
   }
 
-  return false;
+  await page.mouse.click(target.x, target.y);
+  await page.waitForTimeout(2500);
+  return true;
 }
 
 async function collectFlightRows(page, origem, destino, link) {
