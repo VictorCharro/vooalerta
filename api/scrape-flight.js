@@ -1,7 +1,3 @@
-if (process.env.VERCEL && !process.env.PLAYWRIGHT_BROWSERS_PATH) {
-  process.env.PLAYWRIGHT_BROWSERS_PATH = '0';
-}
-
 const {
   buildGoogleFlightsUrl,
   buscarGoogleFlightsPlaywright,
@@ -9,7 +5,7 @@ const {
   verifyUserToken
 } = require('../backend/flight_scraper');
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -60,4 +56,9 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     res.status(500).json({ error: err.message || String(err) });
   }
+}
+
+module.exports = handler;
+module.exports.config = {
+  maxDuration: 60
 };

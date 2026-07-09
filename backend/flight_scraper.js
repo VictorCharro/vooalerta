@@ -68,12 +68,8 @@ function parsePricesFromText(text) {
 }
 
 async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta) {
-  const { chromium } = require('playwright');
   const url = buildGoogleFlightsUrl(origem, destino, dataIda, dataVolta);
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage']
-  });
+  const browser = await launchBrowser();
 
   try {
     const page = await browser.newPage({
@@ -101,6 +97,27 @@ async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta
   } finally {
     await browser.close();
   }
+}
+
+async function launchBrowser() {
+  if (process.env.VERCEL) {
+    const chromium = require('@sparticuz/chromium');
+    const { chromium: playwrightChromium } = require('playwright-core');
+
+    return playwrightChromium.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      timeout: DEFAULT_TIMEOUT_MS
+    });
+  }
+
+  const { chromium } = require('playwright');
+  return chromium.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-dev-shm-usage'],
+    timeout: DEFAULT_TIMEOUT_MS
+  });
 }
 
 async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
@@ -149,6 +166,7 @@ async function refreshFlightPrice({ origem, destino, data_ida, data_volta }) {
 module.exports = {
   buildGoogleFlightsUrl,
   buscarGoogleFlightsPlaywright,
+  launchBrowser,
   refreshFlightPrice,
   salvarCache,
   sleep,
