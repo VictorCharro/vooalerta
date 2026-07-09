@@ -526,7 +526,7 @@ export class VoosComponent implements OnInit, OnDestroy {
       const prevPrices = { ...this.minPrices };
       await this.loadMinPrices();
       for (const alert of this.alerts) {
-        const key = `${alert.origem}-${alert.destino}-${alert.data_ida}`;
+        const key = this.priceKey(alert);
         const prev = prevPrices[key];
         const curr = this.minPrices[key];
         if (curr !== undefined && curr <= alert.meta && (prev === undefined || prev > alert.meta)) {
@@ -561,10 +561,11 @@ export class VoosComponent implements OnInit, OnDestroy {
     const prices: Record<string, number> = {};
     await Promise.all(
       this.alerts.map(async (alert) => {
-        const key = `${alert.origem}-${alert.destino}-${alert.data_ida}`;
+        const key = this.priceKey(alert);
         if (prices[key] === undefined) {
           const price = await this.supabase.getMinPriceForRoute(
             alert.origem, alert.destino, alert.data_ida,
+            alert.data_volta ?? null,
             { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
           );
           if (price !== null) prices[key] = price;
@@ -584,7 +585,7 @@ export class VoosComponent implements OnInit, OnDestroy {
   }
 
   getMinPrice(alert: Alert): number | null {
-    const val = this.minPrices[`${alert.origem}-${alert.destino}-${alert.data_ida}`];
+    const val = this.minPrices[this.priceKey(alert)];
     return val !== undefined ? val : null;
   }
 
@@ -598,7 +599,7 @@ export class VoosComponent implements OnInit, OnDestroy {
 
       if (result.preco !== null) {
         localStorage.setItem(key, String(Date.now()));
-        this.minPrices = { ...this.minPrices, [`${alert.origem}-${alert.destino}-${alert.data_ida}`]: result.preco };
+        this.minPrices = { ...this.minPrices, [this.priceKey(alert)]: result.preco };
         this.showToast(`Preço atualizado: R$ ${result.preco}`);
       } else {
         this.showToast(result.error ? `Nao foi possivel atualizar: ${result.error}` : 'Nao encontramos precos para esta rota agora.');
@@ -775,12 +776,18 @@ export class VoosComponent implements OnInit, OnDestroy {
 
   buildGoogleFlightsUrl(alert: Alert | null): string {
     if (!alert) return 'https://www.google.com/travel/flights?hl=pt-BR';
-    const query = `voos de ${alert.origem} para ${alert.destino} em ${alert.data_ida}`;
-    return 'https://www.google.com/travel/flights?hl=pt-BR&q=' + encodeURIComponent(query);
+    const query = alert.data_volta
+      ? `${alert.origem} to ${alert.destino} ${alert.data_ida} ${alert.data_volta}`
+      : `${alert.origem} to ${alert.destino} ${alert.data_ida}`;
+    return 'https://www.google.com/travel/flights?hl=pt-BR&curr=BRL&q=' + encodeURIComponent(query);
   }
 
   private refreshKey(alert: Alert): string {
     return `flight_refresh_${alert.origem}_${alert.destino}_${alert.data_ida}_${alert.data_volta ?? 'ida'}`;
+  }
+
+  private priceKey(alert: Alert): string {
+    return `${alert.origem}-${alert.destino}-${alert.data_ida}-${alert.data_volta ?? 'ida'}`;
   }
 
   private stripPrefix(phone: string): string {

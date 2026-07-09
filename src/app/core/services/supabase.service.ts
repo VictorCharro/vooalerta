@@ -91,6 +91,7 @@ export class SupabaseService {
     origem: string,
     destino: string,
     dataIda: string,
+    dataVolta: string | null = null,
     options: { horarioMinimo?: string | null; soDireto?: boolean } = {}
   ): Promise<number | null> {
     let query = this.client
@@ -100,6 +101,8 @@ export class SupabaseService {
         .eq('destino', destino)
         .eq('data_ida', dataIda)
         .not('preco', 'is', null);
+
+    query = dataVolta ? query.eq('data_volta', dataVolta) : query.is('data_volta', null);
 
     if (options.horarioMinimo && options.horarioMinimo !== '00:00') {
       query = query.gte('horario_partida', options.horarioMinimo);

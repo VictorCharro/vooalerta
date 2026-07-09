@@ -59,18 +59,99 @@ function sleep(ms) {
 
 function buildGoogleFlightsUrl(origem, destino, dataIda, dataVolta) {
   const query = dataVolta
-    ? `voos de ${origem} para ${destino} ida ${dataIda} volta ${dataVolta}`
-    : `voos de ${origem} para ${destino} em ${dataIda}`;
+    ? `${origem} to ${destino} ${dataIda} ${dataVolta}`
+    : `${origem} to ${destino} ${dataIda}`;
   return `https://www.google.com/travel/flights?hl=pt-BR&curr=BRL&q=${encodeURIComponent(query)}`;
 }
 
-function parsePricesFromText(text) {
-  const matches = [...text.matchAll(/R\$\s?([\d.]{2,})(?:,\d{2})?/g)];
-  const prices = matches
-    .map(match => Number(match[1].replace(/\./g, '')))
-    .filter(price => Number.isFinite(price) && price > 0 && price < 100000);
+function normalizeText(text) {
+  return (text || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-  return [...new Set(prices)].sort((a, b) => a - b);
+function parsePrice(text) {
+  const match = normalizeText(text).match(/R\$\s*([\d.]+)(?:,\d{2})?/);
+  if (!match) return null;
+
+  const price = Number(match[1].replace(/\./g, ''));
+  return Number.isFinite(price) && price > 0 && price < 100000 ? price : null;
+}
+
+function parseFlightRow(text, origem, destino, link) {
+  const normalized = normalizeText(text);
+  const routeRegex = new RegExp(`${origem}\\s*[–-]\\s*${destino}`, 'i');
+  if (!routeRegex.test(normalized)) return null;
+
+  const preco = parsePrice(normalized);
+  const timeMatch = normalized.match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/);
+  if (!preco || !timeMatch) return null;
+
+  const afterTimes = normalized.slice(timeMatch.index + timeMatch[0].length).trim();
+  const durationMatch = afterTimes.match(/(\d+)h(?:\s*(\d+))?\s*min/i);
+  const companhia = durationMatch
+    ? afterTimes.slice(0, durationMatch.index).trim() || null
+    : null;
+
+  const duracao_min = durationMatch
+    ? Number(durationMatch[1]) * 60 + Number(durationMatch[2] || 0)
+    : null;
+
+  const escalasMatch = normalized.match(/(\d+)\s+escala/i);
+  const escalas = /sem escalas/i.test(normalized)
+    ? 0
+    : (escalasMatch ? Number(escalasMatch[1]) : null);
+
+  return {
+    preco,
+    companhia,
+    horario_partida: timeMatch[1],
+    horario_chegada: timeMatch[2],
+    duracao_min,
+    escalas,
+    link
+  };
+}
+
+async function collectFlightRows(page, origem, destino, link) {
+  await page.waitForSelector('li.pIav2d', { timeout: 15000 }).catch(() => {});
+
+  try {
+    for (let i = 0; i < 4; i++) {
+      await page.mouse.wheel(0, 1800);
+      await page.waitForTimeout(700);
+    }
+  } catch (_) {
+    // Some serverless/headless sessions close input channels early; collect visible rows anyway.
+  }
+
+  const rowTexts = await page.locator('li.pIav2d, li').evaluateAll((nodes, route) => nodes
+    .map(node => node.innerText || '')
+    .filter(text => text.includes('R$') && text.includes(route.origem) && text.includes(route.destino))
+  , { origem, destino });
+
+  const seen = new Set();
+  const flights = [];
+
+  for (const rowText of rowTexts) {
+    const flight = parseFlightRow(rowText, origem, destino, link);
+    if (!flight) continue;
+
+    const key = [
+      flight.horario_partida,
+      flight.horario_chegada,
+      flight.companhia,
+      flight.preco
+    ].join('|');
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+    flights.push(flight);
+  }
+
+  return flights.sort((a, b) => a.preco - b.preco);
 }
 
 async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta) {
@@ -101,18 +182,7 @@ async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta
     }
     await page.waitForTimeout(IS_VERCEL ? 2500 : 5000);
 
-    const text = await page.locator('body').innerText({ timeout: 10000 });
-    const prices = parsePricesFromText(text);
-
-    return prices.slice(0, 12).map(preco => ({
-      preco,
-      companhia: null,
-      horario_partida: null,
-      horario_chegada: null,
-      duracao_min: null,
-      escalas: 0,
-      link: url
-    }));
+    return await collectFlightRows(page, origem, destino, url);
   } finally {
     await browser.close();
   }
@@ -191,7 +261,10 @@ async function refreshFlightPrice({ origem, destino, data_ida, data_volta }) {
 module.exports = {
   buildGoogleFlightsUrl,
   buscarGoogleFlightsPlaywright,
+  collectFlightRows,
   launchBrowser,
+  parseFlightRow,
+  parsePrice,
   refreshFlightPrice,
   salvarCache,
   sleep,
