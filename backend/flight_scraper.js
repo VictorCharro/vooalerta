@@ -115,7 +115,8 @@ async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta
 
 async function launchBrowser() {
   if (IS_VERCEL) {
-    const chromium = require('@sparticuz/chromium');
+    const chromiumModule = await import('@sparticuz/chromium');
+    const chromium = chromiumModule.default;
     const { chromium: playwrightChromium } = require('playwright-core');
 
     return playwrightChromium.launch({
