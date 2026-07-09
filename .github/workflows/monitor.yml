@@ -1,17 +1,17 @@
-name: VooAlerta — Monitoramento de Passagens
+name: VooAlerta - Monitoramento de Passagens
 
 on:
   schedule:
-    - cron: '0 15,0 * * *'  # 12h e 21h horário de Brasília (UTC-3)
+    - cron: '0 */3 * * *' # a cada 3h
   workflow_dispatch:
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
-      - name: Checkout repositório
+      - name: Checkout repositorio
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -19,9 +19,17 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Instalar Chromium do Playwright
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
+        run: npx playwright install --with-deps chromium
+
       - name: Rodar monitoramento
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          PLAYWRIGHT_BROWSERS_PATH: '0'
         run: node backend/monitor.js

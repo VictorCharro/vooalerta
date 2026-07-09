@@ -1,6 +1,6 @@
-# VooAlerta — CLAUDE.md
+# VooAlerta — AGENTS.md
 
-Documento de referência para o Claude Code. Atualizar sempre que houver mudanças estruturais.
+Documento de referência para o Codex. Atualizar sempre que houver mudanças estruturais.
 
 ---
 
@@ -56,10 +56,11 @@ vooalerta/
 │   ├── components.css  # btn-primary, btn-ghost, btn-icon, inputs, error-box, etc.
 │   └── main.css
 ├── backend/
-│   ├── monitor.js          # Monitor de VOOS — SerpAPI → Supabase → CallMeBot
+│   ├── flight_scraper.js   # Coleta Google Flights via Playwright + cache Supabase
+│   ├── monitor.js          # Monitor de VOOS — Playwright → Supabase → CallMeBot
 │   └── monitor_onibus.js   # Monitor de ÔNIBUS — scraping Buser → Supabase → CallMeBot
 ├── .github/workflows/
-│   ├── monitor.yml         # Cron voos: 12h e 21h BRT
+│   ├── monitor.yml         # Cron voos: a cada 3h
 │   └── monitor_onibus.yml  # Cron ônibus: 9h30, 13h30, 17h30, 21h30 BRT
 └── supabase/migrations/
     ├── 001_initial_schema.sql   # alerts, price_cache, notifications, views
@@ -90,7 +91,7 @@ vooalerta/
 
 ### Tabelas de voo
 - **`alerts`** — alertas do usuário (origem IATA, destino IATA, data_ida, data_volta, meta, horario_minimo, so_direto, whatsapp, ativo)
-- **`price_cache`** — voos encontrados pelo SerpAPI (preco, companhia, horario_partida, escalas, etc.)
+- **`price_cache`** — voos encontrados pelo Playwright no Google Flights (preco, companhia, horario_partida, escalas, etc.)
 - **`notifications`** — controle anti-spam 6h por alerta
 - **`profiles`** — whatsapp + callmebot_key por usuário
 
@@ -108,16 +109,15 @@ vooalerta/
 ### Secrets GitHub Actions necessários
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_KEY`
-- `SERPAPI_KEY` (só para monitor de voos)
 
 ---
 
 ## Monitores (backend)
 
 ### `monitor.js` — Voos
-- Fonte: SerpAPI (Google Flights)
-- Agendamento: controlado **só pelo cron** (`monitor.yml`, 12h e 21h BRT). O script coleta sempre que é executado — não há mais gate de orçamento interno.
-- `MONTHLY_BUDGET = 250` é apenas informativo: loga uso estimado e avisa se passar do orçamento.
+- Fonte: Google Flights via Playwright (`backend/flight_scraper.js`)
+- Agendamento: controlado **só pelo cron** (`monitor.yml`, atualmente a cada 3h). O script coleta sempre que é executado — não há gate de orçamento interno.
+- Não usa mais `SERPAPI_KEY`.
 - Cache: reutiliza dados com menos de 3h30 de idade (evita duplicar em disparo manual logo após o cron)
 - Filtros por alerta: `horario_minimo`, `so_direto`
 
@@ -135,6 +135,13 @@ vooalerta/
 - Retorna `{ preco: number | null }`
 - Deploy: `supabase functions deploy scrape-buser`
 - **Cooldown:** 10 minutos por rota, rastreado em `localStorage` com chave `bus_refresh_{orig}_{dest}_{data}`; o botão exibe contagem regressiva "M:SS" enquanto não disponível
+
+### `api/scrape-flight.js` — Vercel Function (on-demand)
+- Chamada pelo botão ↻ na página de Voos para atualizar o preço manualmente
+- Roda server-side para executar Playwright fora do browser Angular
+- Recebe `{ origem, destino, data_ida, data_volta }`, salva em `price_cache`
+- Retorna `{ preco: number | null }`
+- **Cooldown:** 10 minutos por rota, rastreado em `localStorage` com chave `flight_refresh_{orig}_{dest}_{data}_{volta}`
 
 ---
 

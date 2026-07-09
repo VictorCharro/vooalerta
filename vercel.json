@@ -1,7 +1,10 @@
 {
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
-  "buildCommand": "node scripts/generate-env.js && npm run build:prod",
+  "buildCommand": "node scripts/generate-env.js && PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium && npm run build:prod",
   "outputDirectory": "dist/vooalerta/browser",
   "installCommand": "npm install",
-  "framework": "angular"
+  "framework": "angular",
+  "env": {
+    "PLAYWRIGHT_BROWSERS_PATH": "0"
+  }
 }

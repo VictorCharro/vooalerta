@@ -134,6 +134,16 @@ import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
                 <a [href]="buildGoogleFlightsUrl(alert)" target="_blank" class="open-btn" title="Abrir no Google Flights">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                 </a>
+                <button class="refresh-btn"
+                  (click)="refreshPrice(alert)"
+                  [title]="getRefreshTitle(alert)"
+                  [class.btn-cooldown]="getCooldownSeconds(alert) > 0 && !isRefreshing(alert)">
+                  <span *ngIf="isRefreshing(alert)" class="spinner" style="width:14px;height:14px;border-width:2px"></span>
+                  <ng-container *ngIf="!isRefreshing(alert)">
+                    <svg *ngIf="getCooldownSeconds(alert) === 0" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                    <span *ngIf="getCooldownSeconds(alert) > 0" class="cooldown-label">{{ formatCooldown(alert) }}</span>
+                  </ng-container>
+                </button>
                 <button class="share-btn" (click)="shareAlert(alert)" title="Compartilhar">⤴</button>
                 <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">›</button>
               </div>
@@ -475,8 +485,12 @@ export class VoosComponent implements OnInit, OnDestroy {
 
   minPrices:        Record<string, number> = {};
   minPricesLoading  = false;
+  refreshing:       Record<string, boolean> = {};
   toasts:           string[] = [];
   private realtimeChannel: any;
+  private cooldownTick: any;
+  private cooldownNow = Date.now();
+  private readonly COOLDOWN_MS = 10 * 60 * 1000;
 
   isDark = true;
 
@@ -521,10 +535,12 @@ export class VoosComponent implements OnInit, OnDestroy {
         }
       }
     });
+    this.cooldownTick = setInterval(() => { this.cooldownNow = Date.now(); }, 1000);
   }
 
   ngOnDestroy() {
     this.realtimeChannel?.unsubscribe();
+    clearInterval(this.cooldownTick);
   }
 
   showToast(msg: string) {
@@ -571,6 +587,48 @@ export class VoosComponent implements OnInit, OnDestroy {
   getMinPrice(alert: Alert): number | null {
     const val = this.minPrices[`${alert.origem}-${alert.destino}-${alert.data_ida}`];
     return val !== undefined ? val : null;
+  }
+
+  async refreshPrice(alert: Alert) {
+    if (!alert.id || this.isRefreshing(alert) || this.getCooldownSeconds(alert) > 0) return;
+
+    this.refreshing = { ...this.refreshing, [alert.id]: true };
+    const key = this.refreshKey(alert);
+    const price = await this.supabase.scrapeFlightPrice(alert.origem, alert.destino, alert.data_ida, alert.data_volta);
+    localStorage.setItem(key, String(Date.now()));
+
+    if (price !== null) {
+      this.minPrices = { ...this.minPrices, [`${alert.origem}-${alert.destino}-${alert.data_ida}`]: price };
+      this.showToast(`Preço atualizado: R$ ${price}`);
+    } else {
+      this.showToast('Não foi possível atualizar o preço agora.');
+    }
+
+    this.refreshing = { ...this.refreshing, [alert.id]: false };
+  }
+
+  isRefreshing(alert: Alert): boolean {
+    return !!(alert.id && this.refreshing[alert.id]);
+  }
+
+  getCooldownSeconds(alert: Alert): number {
+    const last = Number(localStorage.getItem(this.refreshKey(alert)) ?? 0);
+    const remaining = this.COOLDOWN_MS - (this.cooldownNow - last);
+    return remaining > 0 ? Math.ceil(remaining / 1000) : 0;
+  }
+
+  formatCooldown(alert: Alert): string {
+    const secs = this.getCooldownSeconds(alert);
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  getRefreshTitle(alert: Alert): string {
+    if (this.isRefreshing(alert)) return 'Atualizando...';
+    const secs = this.getCooldownSeconds(alert);
+    if (secs > 0) return `Disponível em ${this.formatCooldown(alert)}`;
+    return 'Atualizar preço agora';
   }
 
   onProfileSaved(event: { whatsapp: string }) {
@@ -724,6 +782,10 @@ export class VoosComponent implements OnInit, OnDestroy {
     if (!alert) return 'https://www.google.com/travel/flights?hl=pt-BR';
     const query = `voos de ${alert.origem} para ${alert.destino} em ${alert.data_ida}`;
     return 'https://www.google.com/travel/flights?hl=pt-BR&q=' + encodeURIComponent(query);
+  }
+
+  private refreshKey(alert: Alert): string {
+    return `flight_refresh_${alert.origem}_${alert.destino}_${alert.data_ida}_${alert.data_volta ?? 'ida'}`;
   }
 
   private stripPrefix(phone: string): string {

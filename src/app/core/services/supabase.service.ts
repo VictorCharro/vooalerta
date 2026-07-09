@@ -116,6 +116,29 @@ export class SupabaseService {
     return data?.preco ?? null;
   }
 
+  async scrapeFlightPrice(origem: string, destino: string, dataIda: string, dataVolta?: string | null): Promise<number | null> {
+    const { data: { session } } = await this.client.auth.getSession();
+    if (!session) return null;
+
+    const res = await fetch('/api/scrape-flight', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({
+        origem,
+        destino,
+        data_ida: dataIda,
+        data_volta: dataVolta ?? null
+      })
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.preco ?? null;
+  }
+
   async getAlerts() {
     const { data: { session } } = await this.client.auth.getSession();
     if (!session) return { data: [], error: null };
