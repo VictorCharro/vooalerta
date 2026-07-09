@@ -37,22 +37,15 @@ async function handler(req, res) {
     }
 
     const voos = await buscarGoogleFlightsPlaywright(origem, destino, data_ida, data_volta);
-    let warning = null;
 
     if (voos.length > 0) {
-      try {
-        await salvarCache(voos, origem, destino, data_ida, data_volta);
-      } catch (err) {
-        console.error('scrape-flight cache save failed', err);
-        warning = 'cache_save_failed';
-      }
+      await salvarCache(voos, origem, destino, data_ida, data_volta);
     }
 
     res.status(200).json({
       preco: voos[0]?.preco ?? null,
       quantidade: voos.length,
-      link: buildGoogleFlightsUrl(origem, destino, data_ida, data_volta),
-      warning
+      link: buildGoogleFlightsUrl(origem, destino, data_ida, data_volta)
     });
   } catch (err) {
     console.error('scrape-flight failed', err);
