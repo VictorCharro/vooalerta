@@ -148,6 +148,7 @@ export class SupabaseService {
 
       return {
         preco: data?.preco ?? null,
+        error: data?.error ?? undefined,
         warning: data?.warning ?? undefined
       };
     } catch (err) {

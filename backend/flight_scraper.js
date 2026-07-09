@@ -1,4 +1,5 @@
 const DEFAULT_TIMEOUT_MS = 45000;
+const IS_VERCEL = !!process.env.VERCEL;
 
 function getSupabaseConfig() {
   const url = process.env.SUPABASE_URL;
@@ -78,9 +79,22 @@ async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
     });
 
+    if (IS_VERCEL) {
+      await page.route('**/*', route => {
+        const type = route.request().resourceType();
+        if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
+          route.abort();
+          return;
+        }
+        route.continue();
+      });
+    }
+
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS });
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(5000);
+    if (!IS_VERCEL) {
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    }
+    await page.waitForTimeout(IS_VERCEL ? 2500 : 5000);
 
     const text = await page.locator('body').innerText({ timeout: 10000 });
     const prices = parsePricesFromText(text);
@@ -100,15 +114,20 @@ async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta
 }
 
 async function launchBrowser() {
-  if (process.env.VERCEL) {
+  if (IS_VERCEL) {
     const chromium = require('@sparticuz/chromium');
     const { chromium: playwrightChromium } = require('playwright-core');
 
     return playwrightChromium.launch({
-      args: chromium.args,
+      args: [
+        ...chromium.args,
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--single-process'
+      ],
       executablePath: await chromium.executablePath(),
       headless: chromium.headless,
-      timeout: DEFAULT_TIMEOUT_MS
+      timeout: 20000
     });
   }
 

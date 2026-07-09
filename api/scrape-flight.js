@@ -54,7 +54,13 @@ async function handler(req, res) {
       warning
     });
   } catch (err) {
-    res.status(500).json({ error: err.message || String(err) });
+    console.error('scrape-flight failed', err);
+    res.status(200).json({
+      preco: null,
+      quantidade: 0,
+      error: err.message || String(err),
+      error_stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 }
 
