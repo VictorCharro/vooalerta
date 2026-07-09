@@ -1,17 +1,22 @@
 const DEFAULT_TIMEOUT_MS = 45000;
 const IS_VERCEL = !!process.env.VERCEL;
 
-function getSupabaseConfig() {
+function getSupabaseConfig({ serviceRole = false } = {}) {
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+  const serviceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = serviceRole ? serviceKey : (serviceKey || process.env.SUPABASE_KEY);
+
   if (!url || !key) {
-    throw new Error('SUPABASE_URL e SUPABASE_SERVICE_KEY/SUPABASE_SERVICE_ROLE_KEY ou SUPABASE_KEY sao obrigatorios');
+    throw new Error(serviceRole
+      ? 'SUPABASE_URL e SUPABASE_SERVICE_KEY/SUPABASE_SERVICE_ROLE_KEY sao obrigatorios para salvar o cache'
+      : 'SUPABASE_URL e SUPABASE_SERVICE_KEY/SUPABASE_SERVICE_ROLE_KEY ou SUPABASE_KEY sao obrigatorios');
   }
+
   return { url, key };
 }
 
 async function supabase(method, path, body = null) {
-  const { url, key } = getSupabaseConfig();
+  const { url, key } = getSupabaseConfig({ serviceRole: true });
   const headers = {
     apikey: key,
     Authorization: `Bearer ${key}`,

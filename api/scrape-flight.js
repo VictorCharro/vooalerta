@@ -43,7 +43,8 @@ async function handler(req, res) {
       try {
         await salvarCache(voos, origem, destino, data_ida, data_volta);
       } catch (err) {
-        warning = `Preco coletado, mas nao foi salvo no cache: ${err.message || String(err)}`;
+        console.error('scrape-flight cache save failed', err);
+        warning = 'cache_save_failed';
       }
     }
 

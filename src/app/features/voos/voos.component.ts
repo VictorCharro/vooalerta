@@ -599,7 +599,7 @@ export class VoosComponent implements OnInit, OnDestroy {
       if (result.preco !== null) {
         localStorage.setItem(key, String(Date.now()));
         this.minPrices = { ...this.minPrices, [`${alert.origem}-${alert.destino}-${alert.data_ida}`]: result.preco };
-        this.showToast(result.warning ? `Preco atualizado: R$ ${result.preco}. ${result.warning}` : `Preco atualizado: R$ ${result.preco}`);
+        this.showToast(`Preço atualizado: R$ ${result.preco}`);
       } else {
         this.showToast(result.error ? `Nao foi possivel atualizar: ${result.error}` : 'Nao encontramos precos para esta rota agora.');
       }
