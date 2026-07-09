@@ -144,7 +144,6 @@ import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
                     <span *ngIf="getCooldownSeconds(alert) > 0" class="cooldown-label">{{ formatCooldown(alert) }}</span>
                   </ng-container>
                 </button>
-                <button class="share-btn" (click)="shareAlert(alert)" title="Compartilhar">⤴</button>
                 <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">›</button>
               </div>
             </div>
@@ -757,12 +756,6 @@ export class VoosComponent implements OnInit, OnDestroy {
       await this.loadAlerts();
     }
     this.saving = false;
-  }
-
-  async shareAlert(alert: Alert) {
-    const url = `${window.location.origin}/share/${alert.id}`;
-    await navigator.clipboard.writeText(url);
-    this.showToast(`🔗 Link copiado! ${alert.origem} → ${alert.destino}`);
   }
 
   async toggleAlert(alert: Alert) {
