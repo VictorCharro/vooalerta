@@ -76,7 +76,8 @@ vooalerta/
 ### Vercel
 
 - `SUPABASE_URL`
-- `SUPABASE_SERVICE_KEY` ou `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_KEY` (anon/public key, usada no build do Angular)
+- `SUPABASE_SERVICE_KEY` ou `SUPABASE_SERVICE_ROLE_KEY` (service_role key, usada pela function `/api/scrape-flight` para gravar `price_cache`)
 
 Nao usar mais `SERPAPI_KEY`.
 

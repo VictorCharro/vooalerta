@@ -4,13 +4,16 @@ const IS_VERCEL = !!process.env.VERCEL;
 
 function getSupabaseConfig({ serviceRole = false } = {}) {
   const url = process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE;
   const key = serviceRole ? serviceKey : (serviceKey || process.env.SUPABASE_KEY);
 
   if (!url || !key) {
     throw new Error(serviceRole
-      ? 'SUPABASE_URL e SUPABASE_SERVICE_KEY/SUPABASE_SERVICE_ROLE_KEY sao obrigatorios para salvar o cache'
-      : 'SUPABASE_URL e SUPABASE_SERVICE_KEY/SUPABASE_SERVICE_ROLE_KEY ou SUPABASE_KEY sao obrigatorios');
+      ? 'Configuracao do servidor incompleta: defina SUPABASE_URL e SUPABASE_SERVICE_KEY na Vercel para salvar o cache.'
+      : 'Configuracao do servidor incompleta: defina SUPABASE_URL e SUPABASE_KEY na Vercel.');
   }
 
   return { url, key };
