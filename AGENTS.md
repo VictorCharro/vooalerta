@@ -128,6 +128,7 @@ vooalerta/
 - Confirma que a aba ficou selecionada e só aceita a lista quando o menor voo coincide com o preço anunciado nela; uma lista antiga nunca substitui o cache.
 - Aguarda os preços do Google Flights assentarem antes de coletar; padrão `FLIGHT_PRICE_SETTLE_MS=10000`.
 - Reabre o Chromium e tenta novamente se o Google fechar a página durante a navegação; padrão `FLIGHT_NAVIGATION_ATTEMPTS=2`.
+- Na Vercel, compartilha a extração de `/tmp/chromium`, aguarda o executável estabilizar e repete apenas o launch em caso de `ETXTBSY`; padrão `CHROMIUM_LAUNCH_ATTEMPTS=4`.
 - Cache: reutiliza dados com menos de 3h30 de idade (evita duplicar em disparo manual logo após o cron)
 - Filtros por alerta: `horario_minimo`, `so_direto`
 
@@ -154,6 +155,7 @@ vooalerta/
 - Clica na aba "Menores preços" do Google Flights antes de ler a lista
 - Valida a seleção e a sincronização da lista com o preço anunciado na aba antes de gravar no Supabase
 - Antes de ler os voos, aguarda o delay de preços (`FLIGHT_PRICE_SETTLE_MS`) para o Google concluir a consulta em fornecedores
+- Trata a corrida de extração do Chromium na Vercel sem expor o log técnico completo ao usuário
 - **Cooldown:** 10 minutos por rota, rastreado em `localStorage` com chave `flight_refresh_{orig}_{dest}_{data}_{volta}`
 
 ---

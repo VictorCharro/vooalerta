@@ -1,7 +1,9 @@
 const DEFAULT_TIMEOUT_MS = 45000;
 const NAVIGATION_ATTEMPTS = Number(process.env.FLIGHT_NAVIGATION_ATTEMPTS || 2);
 const PRICE_SETTLE_MS = Number(process.env.FLIGHT_PRICE_SETTLE_MS || 10000);
+const CHROMIUM_LAUNCH_ATTEMPTS = Number(process.env.CHROMIUM_LAUNCH_ATTEMPTS || 4);
 const IS_VERCEL = !!process.env.VERCEL;
+let vercelChromiumPathPromise;
 
 function getSupabaseConfig({ serviceRole = false } = {}) {
   const url =
@@ -310,19 +312,38 @@ async function launchBrowser() {
     const chromiumModule = await import('@sparticuz/chromium');
     const chromium = chromiumModule.default;
     const { chromium: playwrightChromium } = require('playwright-core');
+    const executablePath = await getVercelChromiumPath(chromium);
 
-    return playwrightChromium.launch({
-      args: [
-        ...chromium.args,
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-setuid-sandbox',
-        '--no-sandbox'
-      ],
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-      timeout: 20000
-    });
+    await waitForExecutableToSettle(executablePath);
+
+    let lastError;
+    for (let attempt = 1; attempt <= CHROMIUM_LAUNCH_ATTEMPTS; attempt++) {
+      try {
+        return await playwrightChromium.launch({
+          args: [
+            ...chromium.args,
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-setuid-sandbox',
+            '--no-sandbox'
+          ],
+          executablePath,
+          headless: chromium.headless,
+          timeout: 20000
+        });
+      } catch (err) {
+        lastError = err;
+        if (!/ETXTBSY/i.test(err.message || '') || attempt === CHROMIUM_LAUNCH_ATTEMPTS) {
+          throw err;
+        }
+
+        console.warn(`Chromium ocupado durante o launch (${attempt}/${CHROMIUM_LAUNCH_ATTEMPTS}); aguardando extracao terminar.`);
+        await sleep(750 * attempt);
+        await waitForExecutableToSettle(executablePath);
+      }
+    }
+
+    throw lastError;
   }
 
   const { chromium } = require('playwright');
@@ -331,6 +352,37 @@ async function launchBrowser() {
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
     timeout: DEFAULT_TIMEOUT_MS
   });
+}
+
+async function getVercelChromiumPath(chromium) {
+  if (!vercelChromiumPathPromise) {
+    vercelChromiumPathPromise = chromium.executablePath().catch(err => {
+      vercelChromiumPathPromise = undefined;
+      throw err;
+    });
+  }
+
+  return vercelChromiumPathPromise;
+}
+
+async function waitForExecutableToSettle(executablePath) {
+  const { stat } = require('node:fs/promises');
+  let previousSize = -1;
+  let stableChecks = 0;
+
+  for (let check = 0; check < 8; check++) {
+    try {
+      const { size } = await stat(executablePath);
+      stableChecks = size > 0 && size === previousSize ? stableChecks + 1 : 0;
+      previousSize = size;
+      if (stableChecks >= 2) return;
+    } catch (_) {
+      stableChecks = 0;
+      previousSize = -1;
+    }
+
+    await sleep(250);
+  }
 }
 
 async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
@@ -381,6 +433,7 @@ module.exports = {
   buscarGoogleFlightsPlaywright,
   collectFlightRows,
   launchBrowser,
+  getVercelChromiumPath,
   parseFlightRow,
   parsePrice,
   refreshFlightPrice,
@@ -388,5 +441,6 @@ module.exports = {
   salvarCache,
   sleep,
   supabase,
+  waitForExecutableToSettle,
   verifyUserToken
 };
