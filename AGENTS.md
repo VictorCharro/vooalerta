@@ -126,7 +126,9 @@ vooalerta/
 - Não usa mais `SERPAPI_KEY`.
 - Seleciona a aba "Menores preços" no Google Flights antes de coletar.
 - Confirma que a aba ficou selecionada e só aceita a lista quando o menor voo coincide com o preço anunciado nela; uma lista antiga nunca substitui o cache.
-- Após clicar, monitora a aba e a lista até o preço permanecer sincronizado e estável; espera mínima `FLIGHT_PRICE_SETTLE_MS=10000`, estabilidade `FLIGHT_PRICE_STABLE_MS=3000` e limite `FLIGHT_PRICE_TIMEOUT_MS=22000`.
+- Após clicar, monitora diretamente o valor exibido na aba "Menores preços"; espera mínima `FLIGHT_PRICE_SETTLE_MS=20000`, estabilidade `FLIGHT_PRICE_STABLE_MS=5000` e limite `FLIGHT_PRICE_TIMEOUT_MS=30000`.
+- O valor da aba é salvo como uma linha-resumo em `price_cache`, com detalhes de voo nulos, e é sempre a referência principal exibida no card.
+- A linha-resumo e os voos detalhados são inseridos no Supabase em um único lote para preservar o tempo da função Vercel.
 - Reabre o Chromium e tenta novamente se o Google fechar a página durante a navegação; padrão `FLIGHT_NAVIGATION_ATTEMPTS=2`.
 - Na Vercel, compartilha a extração de `/tmp/chromium`, aguarda o executável estabilizar e repete apenas o launch em caso de `ETXTBSY`; padrão `CHROMIUM_LAUNCH_ATTEMPTS=4`.
 - Cache: reutiliza dados com menos de 3h30 de idade (evita duplicar em disparo manual logo após o cron)
@@ -154,7 +156,7 @@ vooalerta/
 - Retorna `{ preco: number | null }`
 - Clica na aba "Menores preços" do Google Flights antes de ler a lista
 - Valida a seleção e a sincronização da lista com o preço anunciado na aba antes de gravar no Supabase
-- Antes de ler os voos, acompanha as atualizações do Google até a aba "Menores preços" e a lista coincidirem e permanecerem estáveis
+- Antes de ler os voos, espera o valor da aba "Menores preços" permanecer estável e grava esse valor diretamente no cache
 - Trata a corrida de extração do Chromium na Vercel sem expor o log técnico completo ao usuário
 - **Cooldown:** 10 minutos por rota, rastreado em `localStorage` com chave `flight_refresh_{orig}_{dest}_{data}_{volta}`
 

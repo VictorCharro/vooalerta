@@ -1,8 +1,8 @@
 const DEFAULT_TIMEOUT_MS = 45000;
 const NAVIGATION_ATTEMPTS = Number(process.env.FLIGHT_NAVIGATION_ATTEMPTS || 2);
-const PRICE_SETTLE_MS = Number(process.env.FLIGHT_PRICE_SETTLE_MS || 10000);
-const PRICE_STABLE_MS = Number(process.env.FLIGHT_PRICE_STABLE_MS || 3000);
-const PRICE_TIMEOUT_MS = Number(process.env.FLIGHT_PRICE_TIMEOUT_MS || 22000);
+const PRICE_SETTLE_MS = Number(process.env.FLIGHT_PRICE_SETTLE_MS || 20000);
+const PRICE_STABLE_MS = Number(process.env.FLIGHT_PRICE_STABLE_MS || 5000);
+const PRICE_TIMEOUT_MS = Number(process.env.FLIGHT_PRICE_TIMEOUT_MS || 30000);
 const CHROMIUM_LAUNCH_ATTEMPTS = Number(process.env.CHROMIUM_LAUNCH_ATTEMPTS || 4);
 const IS_VERCEL = !!process.env.VERCEL;
 let vercelChromiumPathPromise;
@@ -221,19 +221,13 @@ async function waitForLowestPricesToSettle(page, origem, destino) {
   while (Date.now() - startedAt < PRICE_TIMEOUT_MS) {
     const snapshot = await getLowestPricesSnapshot(page, origem, destino);
     lastSnapshot = snapshot;
-    const signature = [
-      snapshot.advertisedPrice,
-      snapshot.minPrice,
-      snapshot.rowCount,
-      snapshot.signature
-    ].join('|');
-    const synchronized = snapshot.advertisedPrice !== null
-      && snapshot.minPrice === snapshot.advertisedPrice;
+    const signature = String(snapshot.advertisedPrice);
+    const advertisedPriceAvailable = snapshot.advertisedPrice !== null;
 
-    if (synchronized && signature === previousSignature) {
+    if (advertisedPriceAvailable && signature === previousSignature) {
       stableSince ??= Date.now();
     } else {
-      stableSince = synchronized ? Date.now() : null;
+      stableSince = advertisedPriceAvailable ? Date.now() : null;
       previousSignature = signature;
     }
 
@@ -247,9 +241,21 @@ async function waitForLowestPricesToSettle(page, origem, destino) {
   }
 
   throw new Error(
-    `A aba Menores precos nao estabilizou em ${Math.round(PRICE_TIMEOUT_MS / 1000)}s `
-    + `(aba: R$ ${lastSnapshot?.advertisedPrice ?? 'indisponivel'}, lista: R$ ${lastSnapshot?.minPrice ?? 'indisponivel'}).`
+    `O valor da aba Menores precos nao estabilizou em ${Math.round(PRICE_TIMEOUT_MS / 1000)}s `
+    + `(ultimo valor: R$ ${lastSnapshot?.advertisedPrice ?? 'indisponivel'}).`
   );
+}
+
+function createAdvertisedPriceFlight(advertisedPrice, link) {
+  return {
+    preco: advertisedPrice,
+    companhia: null,
+    horario_partida: null,
+    horario_chegada: null,
+    duracao_min: null,
+    escalas: null,
+    link
+  };
 }
 
 async function collectFlightRows(page, origem, destino, link) {
@@ -346,13 +352,14 @@ async function buscarGoogleFlightsPlaywrightOnce(url, origem, destino) {
     const { advertisedPrice } = await selectLowestPricesTab(page, origem, destino);
     const flights = await collectFlightRows(page, origem, destino, url);
 
-    if (advertisedPrice && flights[0]?.preco !== advertisedPrice) {
-      throw new Error(
-        `Menor preco coletado (R$ ${flights[0]?.preco ?? 'indisponivel'}) difere da aba Menores precos (R$ ${advertisedPrice}).`
-      );
+    if (!advertisedPrice) {
+      throw new Error('Nao foi possivel ler o valor exibido na aba Menores precos.');
     }
 
-    return flights;
+    return [
+      createAdvertisedPriceFlight(advertisedPrice, url),
+      ...flights.filter(flight => flight.preco >= advertisedPrice)
+    ].sort((a, b) => a.preco - b.preco);
   } finally {
     await browser.close().catch(() => {});
   }
@@ -443,9 +450,10 @@ async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
     `price_cache?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${dataIda}${dataVoltaFilter}`
   );
 
+  if (voos.length === 0) return;
+
   const agora = new Date().toISOString();
-  for (const voo of voos) {
-    await supabase('POST', 'price_cache', {
+  const rows = voos.map(voo => ({
       origem,
       destino,
       data_ida: dataIda,
@@ -458,8 +466,9 @@ async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
       escalas: voo.escalas,
       link: voo.link,
       atualizado_em: agora
-    });
-  }
+  }));
+
+  await supabase('POST', 'price_cache', rows);
 }
 
 async function refreshFlightPrice({ origem, destino, data_ida, data_volta }) {
@@ -483,6 +492,7 @@ module.exports = {
   buildGoogleFlightsUrl,
   buscarGoogleFlightsPlaywright,
   collectFlightRows,
+  createAdvertisedPriceFlight,
   getLowestPricesSnapshot,
   launchBrowser,
   getVercelChromiumPath,

@@ -91,7 +91,9 @@ Nao usar mais `SERPAPI_KEY`.
 - Instala Chromium no GitHub Actions com `npx playwright install --with-deps chromium`
 - Seleciona a aba "Menores precos" no Google Flights antes de coletar
 - Confirma que a aba ficou selecionada e so aceita a lista quando o menor voo coincide com o preco anunciado nela; uma lista antiga nunca substitui o cache
-- Depois do clique, monitora a aba e a lista ate o preco ficar sincronizado e estavel; espera minima `FLIGHT_PRICE_SETTLE_MS=10000`, estabilidade `FLIGHT_PRICE_STABLE_MS=3000` e limite `FLIGHT_PRICE_TIMEOUT_MS=22000`
+- Depois do clique, monitora diretamente o valor exibido na aba "Menores precos"; espera minima `FLIGHT_PRICE_SETTLE_MS=20000`, estabilidade `FLIGHT_PRICE_STABLE_MS=5000` e limite `FLIGHT_PRICE_TIMEOUT_MS=30000`
+- O valor da aba e salvo como uma linha-resumo em `price_cache`, com detalhes de voo nulos, e passa a ser a referencia principal exibida no card
+- A linha-resumo e os voos detalhados sao inseridos no Supabase em um unico lote para preservar o tempo da funcao Vercel
 - Reabre o Chromium e tenta novamente se o Google fechar a pagina durante a navegacao; padrao `FLIGHT_NAVIGATION_ATTEMPTS=2`
 - Na Vercel, compartilha a extracao de `/tmp/chromium`, espera o executavel estabilizar e repete apenas o launch em caso de `ETXTBSY`; padrao `CHROMIUM_LAUNCH_ATTEMPTS=4`
 - Reutiliza cache com menos de 3h30
@@ -106,7 +108,7 @@ Nao usar mais `SERPAPI_KEY`.
 - Roda Playwright server-side, salva em `price_cache` e retorna `{ preco: number | null }`
 - Clica na aba "Menores precos" do Google Flights antes de ler a lista
 - Valida a selecao e a sincronizacao da lista com o preco anunciado na aba antes de gravar no Supabase
-- Antes de ler os voos, acompanha as atualizacoes do Google ate a aba "Menores precos" e a lista coincidirem e permanecerem estaveis
+- Antes de ler os voos, espera o valor da aba "Menores precos" permanecer estavel e grava esse valor diretamente no cache
 - Trata a corrida de extracao do Chromium na Vercel sem expor o log tecnico completo ao usuario
 - Cooldown no frontend: 10 minutos por rota, chave `flight_refresh_{orig}_{dest}_{data}_{volta}`
 

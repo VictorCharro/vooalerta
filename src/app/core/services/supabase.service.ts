@@ -96,7 +96,7 @@ export class SupabaseService {
   ): Promise<number | null> {
     let query = this.client
         .from('price_cache')
-        .select('preco')
+        .select('preco, horario_partida, escalas')
         .eq('origem', origem)
         .eq('destino', destino)
         .eq('data_ida', dataIda)
@@ -104,19 +104,20 @@ export class SupabaseService {
 
     query = dataVolta ? query.eq('data_volta', dataVolta) : query.is('data_volta', null);
 
-    if (options.horarioMinimo && options.horarioMinimo !== '00:00') {
-      query = query.gte('horario_partida', options.horarioMinimo);
-    }
-    if (options.soDireto) {
-      query = query.eq('escalas', 0);
-    }
-
     const { data } = await query
         .order('preco', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .limit(200);
 
-    return data?.preco ?? null;
+    const horarioMinimo = options.horarioMinimo && options.horarioMinimo !== '00:00'
+      ? options.horarioMinimo
+      : null;
+    const prices = (data ?? [])
+      .filter(row => !horarioMinimo || row.horario_partida === null || row.horario_partida >= horarioMinimo)
+      .filter(row => !options.soDireto || row.escalas === null || row.escalas === 0)
+      .map(row => row.preco)
+      .filter((preco): preco is number => typeof preco === 'number');
+
+    return prices.length ? Math.min(...prices) : null;
   }
 
   async scrapeFlightPrice(origem: string, destino: string, dataIda: string, dataVolta?: string | null): Promise<{ preco: number | null; error?: string; warning?: string }> {
