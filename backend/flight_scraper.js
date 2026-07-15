@@ -1,6 +1,8 @@
 const DEFAULT_TIMEOUT_MS = 45000;
 const NAVIGATION_ATTEMPTS = Number(process.env.FLIGHT_NAVIGATION_ATTEMPTS || 2);
 const PRICE_SETTLE_MS = Number(process.env.FLIGHT_PRICE_SETTLE_MS || 10000);
+const PRICE_STABLE_MS = Number(process.env.FLIGHT_PRICE_STABLE_MS || 3000);
+const PRICE_TIMEOUT_MS = Number(process.env.FLIGHT_PRICE_TIMEOUT_MS || 22000);
 const CHROMIUM_LAUNCH_ATTEMPTS = Number(process.env.CHROMIUM_LAUNCH_ATTEMPTS || 4);
 const IS_VERCEL = !!process.env.VERCEL;
 let vercelChromiumPathPromise;
@@ -166,39 +168,88 @@ async function selectLowestPricesTab(page, origem, destino) {
     );
   }, null, { timeout: 5000 });
 
-  if (PRICE_SETTLE_MS > 0) {
-    await page.waitForTimeout(PRICE_SETTLE_MS);
-  }
+  return waitForLowestPricesToSettle(page, origem, destino);
+}
 
-  const advertisedPrice = parsePrice(await lowestPricesTab.innerText());
-  if (!advertisedPrice || !origem || !destino) return { advertisedPrice };
-
-  const listMatchesTab = await page.evaluate(({ origem, destino, advertisedPrice }) => {
+async function getLowestPricesSnapshot(page, origem, destino) {
+  return page.evaluate(({ origem, destino }) => {
     const normalize = value => (value || '')
       .replace(/\u00a0/g, ' ')
       .replace(/[\u2013\u2014]/g, '-')
       .replace(/\s+/g, ' ')
       .trim();
+    const normalizeTab = value => normalize(value)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+    const parseVisiblePrice = value => {
+      const match = normalize(value).match(/R\$\s*([\d.]+)(?:,\d{2})?/);
+      return match ? Number(match[1].replace(/\./g, '')) : null;
+    };
     const routePattern = new RegExp(`${origem}\\s*-\\s*${destino}`, 'i');
+    const selectedTab = Array.from(document.querySelectorAll('[role="tab"]')).find(tab =>
+      tab.getAttribute('aria-selected') === 'true'
+      && normalizeTab(tab.innerText || tab.textContent).startsWith('menores precos')
+    );
+    const prices = Array.from(document.querySelectorAll('li.pIav2d'))
+      .filter(row => {
+        const style = window.getComputedStyle(row);
+        return style.display !== 'none'
+          && style.visibility !== 'hidden'
+          && !row.closest('[aria-hidden="true"]');
+      })
+      .map(row => normalize(row.innerText || row.textContent || ''))
+      .filter(text => routePattern.test(text))
+      .map(parseVisiblePrice)
+      .filter(price => Number.isFinite(price));
 
-    return Array.from(document.querySelectorAll('li.pIav2d')).some(row => {
-      const style = window.getComputedStyle(row);
-      if (style.display === 'none' || style.visibility === 'hidden' || row.closest('[aria-hidden="true"]')) {
-        return false;
-      }
+    return {
+      advertisedPrice: selectedTab ? parseVisiblePrice(selectedTab.innerText || selectedTab.textContent || '') : null,
+      minPrice: prices.length ? Math.min(...prices) : null,
+      rowCount: prices.length,
+      signature: prices.slice(0, 12).join(',')
+    };
+  }, { origem, destino });
+}
 
-      const text = normalize(row.innerText || row.textContent || '');
-      const match = text.match(/R\$\s*([\d.]+)(?:,\d{2})?/);
-      const price = match ? Number(match[1].replace(/\./g, '')) : null;
-      return routePattern.test(text) && price === advertisedPrice;
-    });
-  }, { origem, destino, advertisedPrice });
+async function waitForLowestPricesToSettle(page, origem, destino) {
+  const startedAt = Date.now();
+  let stableSince = null;
+  let previousSignature = null;
+  let lastSnapshot = null;
 
-  if (!listMatchesTab) {
-    throw new Error(`A lista de Menores precos nao sincronizou com o valor anunciado de R$ ${advertisedPrice}.`);
+  while (Date.now() - startedAt < PRICE_TIMEOUT_MS) {
+    const snapshot = await getLowestPricesSnapshot(page, origem, destino);
+    lastSnapshot = snapshot;
+    const signature = [
+      snapshot.advertisedPrice,
+      snapshot.minPrice,
+      snapshot.rowCount,
+      snapshot.signature
+    ].join('|');
+    const synchronized = snapshot.advertisedPrice !== null
+      && snapshot.minPrice === snapshot.advertisedPrice;
+
+    if (synchronized && signature === previousSignature) {
+      stableSince ??= Date.now();
+    } else {
+      stableSince = synchronized ? Date.now() : null;
+      previousSignature = signature;
+    }
+
+    const minimumDelayPassed = Date.now() - startedAt >= PRICE_SETTLE_MS;
+    const stableLongEnough = stableSince !== null && Date.now() - stableSince >= PRICE_STABLE_MS;
+    if (minimumDelayPassed && stableLongEnough) {
+      return { advertisedPrice: snapshot.advertisedPrice };
+    }
+
+    await page.waitForTimeout(1000);
   }
 
-  return { advertisedPrice };
+  throw new Error(
+    `A aba Menores precos nao estabilizou em ${Math.round(PRICE_TIMEOUT_MS / 1000)}s `
+    + `(aba: R$ ${lastSnapshot?.advertisedPrice ?? 'indisponivel'}, lista: R$ ${lastSnapshot?.minPrice ?? 'indisponivel'}).`
+  );
 }
 
 async function collectFlightRows(page, origem, destino, link) {
@@ -432,6 +483,7 @@ module.exports = {
   buildGoogleFlightsUrl,
   buscarGoogleFlightsPlaywright,
   collectFlightRows,
+  getLowestPricesSnapshot,
   launchBrowser,
   getVercelChromiumPath,
   parseFlightRow,
@@ -441,6 +493,7 @@ module.exports = {
   salvarCache,
   sleep,
   supabase,
+  waitForLowestPricesToSettle,
   waitForExecutableToSettle,
   verifyUserToken
 };
