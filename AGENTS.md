@@ -125,6 +125,7 @@ vooalerta/
 - Agendamento: controlado **só pelo cron** (`monitor.yml`, atualmente a cada 3h). O script coleta sempre que é executado — não há gate de orçamento interno.
 - Não usa mais `SERPAPI_KEY`.
 - Seleciona a aba "Menores preços" no Google Flights antes de coletar.
+- Confirma que a aba ficou selecionada e só aceita a lista quando o menor voo coincide com o preço anunciado nela; uma lista antiga nunca substitui o cache.
 - Aguarda os preços do Google Flights assentarem antes de coletar; padrão `FLIGHT_PRICE_SETTLE_MS=10000`.
 - Reabre o Chromium e tenta novamente se o Google fechar a página durante a navegação; padrão `FLIGHT_NAVIGATION_ATTEMPTS=2`.
 - Cache: reutiliza dados com menos de 3h30 de idade (evita duplicar em disparo manual logo após o cron)
@@ -151,6 +152,7 @@ vooalerta/
 - Recebe `{ origem, destino, data_ida, data_volta }`, salva em `price_cache`
 - Retorna `{ preco: number | null }`
 - Clica na aba "Menores preços" do Google Flights antes de ler a lista
+- Valida a seleção e a sincronização da lista com o preço anunciado na aba antes de gravar no Supabase
 - Antes de ler os voos, aguarda o delay de preços (`FLIGHT_PRICE_SETTLE_MS`) para o Google concluir a consulta em fornecedores
 - **Cooldown:** 10 minutos por rota, rastreado em `localStorage` com chave `flight_refresh_{orig}_{dest}_{data}_{volta}`
 

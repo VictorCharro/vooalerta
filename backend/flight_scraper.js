@@ -95,11 +95,11 @@ function parsePrice(text) {
 
 function parseFlightRow(text, origem, destino, link) {
   const normalized = normalizeText(text);
-  const routeRegex = new RegExp(`${origem}\\s*[–-]\\s*${destino}`, 'i');
+  const routeRegex = new RegExp(`${origem}\\s*-\\s*${destino}`, 'i');
   if (!routeRegex.test(normalized)) return null;
 
   const preco = parsePrice(normalized);
-  const timeMatch = normalized.match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/);
+  const timeMatch = normalized.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
   if (!preco || !timeMatch) return null;
 
   const afterTimes = normalized.slice(timeMatch.index + timeMatch[0].length).trim();
@@ -128,8 +128,29 @@ function parseFlightRow(text, origem, destino, link) {
   };
 }
 
-async function selectLowestPricesTab(page) {
-  const target = await page.evaluate(() => {
+async function selectLowestPricesTab(page, origem, destino) {
+  const tabs = page.locator('[role="tab"]');
+  let lowestPricesTab = null;
+
+  for (let index = 0; index < await tabs.count(); index++) {
+    const tab = tabs.nth(index);
+    const text = normalizeText(await tab.innerText().catch(() => ''))
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
+    if (text.startsWith('menores precos')) {
+      lowestPricesTab = tab;
+      break;
+    }
+  }
+
+  if (!lowestPricesTab) {
+    throw new Error('Nao foi possivel localizar a aba Menores precos no Google Flights.');
+  }
+
+  await lowestPricesTab.click({ force: true });
+  await page.waitForFunction(() => {
     const normalize = value => (value || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -137,51 +158,45 @@ async function selectLowestPricesTab(page) {
       .trim()
       .toLowerCase();
 
-    const isVisible = element => {
-      const style = window.getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
-      return style.display !== 'none'
-        && style.visibility !== 'hidden'
-        && rect.width > 20
-        && rect.height > 20;
-    };
+    return Array.from(document.querySelectorAll('[role="tab"]')).some(tab =>
+      normalize(tab.innerText || tab.textContent).startsWith('menores precos')
+      && tab.getAttribute('aria-selected') === 'true'
+    );
+  }, null, { timeout: 5000 });
 
-    const elements = Array.from(document.querySelectorAll('button, [role="tab"], [role="button"], div, span'));
-    const candidates = elements
-      .map(element => {
-        const text = normalize(element.innerText || element.textContent || '');
-        const rect = element.getBoundingClientRect();
-        return { element, text, rect };
-      })
-      .filter(item => isVisible(item.element)
-        && item.text.startsWith('menores precos')
-        && !item.text.includes('melhor opcao'))
-      .sort((a, b) => {
-        const aRole = a.element.getAttribute('role') || '';
-        const bRole = b.element.getAttribute('role') || '';
-        const aPriority = a.element.tagName === 'BUTTON' || aRole === 'tab' || aRole === 'button' ? 0 : 1;
-        const bPriority = b.element.tagName === 'BUTTON' || bRole === 'tab' || bRole === 'button' ? 0 : 1;
-        if (aPriority !== bPriority) return aPriority - bPriority;
-        return (a.rect.width * a.rect.height) - (b.rect.width * b.rect.height);
-      });
-
-    const candidate = candidates[0];
-    if (!candidate) return null;
-
-    return {
-      x: candidate.rect.left + candidate.rect.width / 2,
-      y: candidate.rect.top + candidate.rect.height / 2,
-      text: candidate.text
-    };
-  });
-
-  if (!target) {
-    throw new Error('Nao foi possivel localizar a aba Menores precos no Google Flights.');
+  if (PRICE_SETTLE_MS > 0) {
+    await page.waitForTimeout(PRICE_SETTLE_MS);
   }
 
-  await page.mouse.click(target.x, target.y);
-  await page.waitForTimeout(2500);
-  return true;
+  const advertisedPrice = parsePrice(await lowestPricesTab.innerText());
+  if (!advertisedPrice || !origem || !destino) return { advertisedPrice };
+
+  const listMatchesTab = await page.evaluate(({ origem, destino, advertisedPrice }) => {
+    const normalize = value => (value || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/[\u2013\u2014]/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const routePattern = new RegExp(`${origem}\\s*-\\s*${destino}`, 'i');
+
+    return Array.from(document.querySelectorAll('li.pIav2d')).some(row => {
+      const style = window.getComputedStyle(row);
+      if (style.display === 'none' || style.visibility === 'hidden' || row.closest('[aria-hidden="true"]')) {
+        return false;
+      }
+
+      const text = normalize(row.innerText || row.textContent || '');
+      const match = text.match(/R\$\s*([\d.]+)(?:,\d{2})?/);
+      const price = match ? Number(match[1].replace(/\./g, '')) : null;
+      return routePattern.test(text) && price === advertisedPrice;
+    });
+  }, { origem, destino, advertisedPrice });
+
+  if (!listMatchesTab) {
+    throw new Error(`A lista de Menores precos nao sincronizou com o valor anunciado de R$ ${advertisedPrice}.`);
+  }
+
+  return { advertisedPrice };
 }
 
 async function collectFlightRows(page, origem, destino, link) {
@@ -196,14 +211,16 @@ async function collectFlightRows(page, origem, destino, link) {
     // Some serverless/headless sessions close input channels early; collect visible rows anyway.
   }
 
-  if (PRICE_SETTLE_MS > 0) {
-    await page.waitForTimeout(PRICE_SETTLE_MS);
-  }
-
-  const rowTexts = await page.locator('li.pIav2d, li').evaluateAll((nodes, route) => nodes
+  const rowTexts = await page.locator('li.pIav2d').evaluateAll((nodes, route) => nodes
+    .filter(node => {
+      const style = window.getComputedStyle(node);
+      return style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && !node.closest('[aria-hidden="true"]');
+    })
     .map(node => node.innerText || '')
-    .filter(text => text.includes('R$') && text.includes(route.origem) && text.includes(route.destino))
-  , { origem, destino });
+    .filter(text => text.includes('R$') && text.includes(route.origem) && text.includes(route.destino)),
+  { origem, destino });
 
   const seen = new Set();
   const flights = [];
@@ -273,9 +290,16 @@ async function buscarGoogleFlightsPlaywrightOnce(url, origem, destino) {
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     }
     await page.waitForTimeout(IS_VERCEL ? 2500 : 5000);
-    await selectLowestPricesTab(page);
+    const { advertisedPrice } = await selectLowestPricesTab(page, origem, destino);
+    const flights = await collectFlightRows(page, origem, destino, url);
 
-    return await collectFlightRows(page, origem, destino, url);
+    if (advertisedPrice && flights[0]?.preco !== advertisedPrice) {
+      throw new Error(
+        `Menor preco coletado (R$ ${flights[0]?.preco ?? 'indisponivel'}) difere da aba Menores precos (R$ ${advertisedPrice}).`
+      );
+    }
+
+    return flights;
   } finally {
     await browser.close().catch(() => {});
   }
