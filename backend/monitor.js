@@ -30,11 +30,15 @@ async function processarRota(rota) {
     console.log('  Cache recente (< 3h30) - usando dados existentes');
   } else {
     try {
-      console.log('  Buscando no Google Flights com Playwright...');
+      console.log('  Buscando no Google Flights com Playwright e SerpAPI...');
       const result = await refreshFlightPrice({ origem, destino, data_ida, data_volta });
-      console.log(`  Cache atualizado: ${result.quantidade} preco(s), menor R$ ${result.preco ?? '-'}`);
+      const fontes = Object.entries(result.fontes ?? {})
+        .map(([nome, dados]) => `${nome}=R$ ${dados.preco ?? '-'}`)
+        .join(', ');
+      console.log(`  Cache atualizado: ${result.quantidade} preco(s), menor R$ ${result.preco ?? '-'} (${fontes})`);
+      if (result.warning) console.warn(`  Aviso: ${result.warning}`);
     } catch (err) {
-      console.error(`  Erro na coleta Playwright: ${err.message}`);
+      console.error(`  Erro na coleta de voos: ${err.message}`);
     }
   }
 

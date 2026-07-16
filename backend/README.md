@@ -1,6 +1,6 @@
 # Backend - GitHub Actions
 
-O monitoramento de voos roda via GitHub Actions usando Playwright para coletar precos no Google Flights.
+O monitoramento de voos roda via GitHub Actions usando Playwright e SerpAPI em paralelo para coletar precos no Google Flights.
 
 ## Fluxo
 
@@ -8,7 +8,8 @@ O monitoramento de voos roda via GitHub Actions usando Playwright para coletar p
 GitHub Actions cron
   -> backend/monitor.js
   -> backend/flight_scraper.js
-  -> Google Flights via Playwright
+  -> Google Flights via Playwright + SerpAPI
+  -> combina as duas fontes e escolhe o menor preco
   -> price_cache no Supabase
   -> filtros por alerta
   -> WhatsApp via CallMeBot quando preco <= meta
@@ -20,8 +21,9 @@ GitHub Actions cron
 |---|---|
 | `SUPABASE_URL` | Supabase -> Settings -> API -> Project URL |
 | `SUPABASE_SERVICE_KEY` | Supabase -> Settings -> API -> service_role key |
+| `SERPAPI_KEY` | SerpAPI -> Dashboard -> API Key |
 
-`SERPAPI_KEY` nao e mais usado.
+As duas fontes sao consultadas em toda coleta. Se uma falhar, a outra ainda pode atualizar o cache.
 
 ## Rodar manualmente
 

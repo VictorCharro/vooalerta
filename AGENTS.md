@@ -109,11 +109,13 @@ vooalerta/
 ### Secrets GitHub Actions necessários
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_KEY`
+- `SERPAPI_KEY`
 
 ### Variáveis Vercel necessárias
 - `SUPABASE_URL`
 - `SUPABASE_KEY` — anon/public key usada no build do Angular
 - `SUPABASE_SERVICE_KEY` ou `SUPABASE_SERVICE_ROLE_KEY` — service_role key usada pela function `/api/scrape-flight` para gravar `price_cache`
+- `SERPAPI_KEY` — chave usada somente no servidor para consultar a segunda fonte de preços
 - Aliases aceitos pela API: `NEXT_PUBLIC_SUPABASE_URL`, `VITE_SUPABASE_URL`, `SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `VITE_SUPABASE_ANON_KEY`
 
 ---
@@ -121,9 +123,10 @@ vooalerta/
 ## Monitores (backend)
 
 ### `monitor.js` — Voos
-- Fonte: Google Flights via Playwright (`backend/flight_scraper.js`)
+- Fontes: Google Flights via Playwright e SerpAPI em paralelo (`backend/flight_scraper.js`)
 - Agendamento: controlado **só pelo cron** (`monitor.yml`, atualmente a cada 3h). O script coleta sempre que é executado — não há gate de orçamento interno.
-- Não usa mais `SERPAPI_KEY`.
+- A SerpAPI usa `deep_search=true` e `show_hidden=true`; os resultados das duas fontes são combinados e o menor preço global é salvo/exibido.
+- Se uma fonte falhar, a outra ainda atualiza o cache e a falha fica registrada como aviso.
 - Seleciona a aba "Menores preços" no Google Flights antes de coletar.
 - Confirma que a aba ficou selecionada e só aceita a lista quando o menor voo coincide com o preço anunciado nela; uma lista antiga nunca substitui o cache.
 - Após clicar, monitora diretamente o valor exibido na aba "Menores preços"; espera mínima `FLIGHT_PRICE_SETTLE_MS=20000`, estabilidade `FLIGHT_PRICE_STABLE_MS=5000` e limite `FLIGHT_PRICE_TIMEOUT_MS=30000`.
@@ -151,9 +154,9 @@ vooalerta/
 
 ### `api/scrape-flight.js` — Vercel Function (on-demand)
 - Chamada pelo botão ↻ na página de Voos para atualizar o preço manualmente
-- Roda server-side para executar Playwright fora do browser Angular
+- Roda server-side para executar Playwright e SerpAPI em paralelo fora do browser Angular
 - Recebe `{ origem, destino, data_ida, data_volta }`, salva em `price_cache`
-- Retorna `{ preco: number | null }`
+- Retorna o menor preço global e um resumo por fonte em `fontes`
 - Clica na aba "Menores preços" do Google Flights antes de ler a lista
 - Valida a seleção e a sincronização da lista com o preço anunciado na aba antes de gravar no Supabase
 - Antes de ler os voos, espera o valor da aba "Menores preços" permanecer estável e grava esse valor diretamente no cache

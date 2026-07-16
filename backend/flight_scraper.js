@@ -4,6 +4,7 @@ const PRICE_SETTLE_MS = Number(process.env.FLIGHT_PRICE_SETTLE_MS || 20000);
 const PRICE_STABLE_MS = Number(process.env.FLIGHT_PRICE_STABLE_MS || 5000);
 const PRICE_TIMEOUT_MS = Number(process.env.FLIGHT_PRICE_TIMEOUT_MS || 30000);
 const CHROMIUM_LAUNCH_ATTEMPTS = Number(process.env.CHROMIUM_LAUNCH_ATTEMPTS || 4);
+const SERPAPI_TIMEOUT_MS = Number(process.env.SERPAPI_TIMEOUT_MS || 25000);
 const IS_VERCEL = !!process.env.VERCEL;
 let vercelChromiumPathPromise;
 
@@ -79,6 +80,86 @@ function buildGoogleFlightsUrl(origem, destino, dataIda, dataVolta) {
     ? `${origem} to ${destino} ${dataIda} ${dataVolta}`
     : `${origem} to ${destino} ${dataIda}`;
   return `https://www.google.com/travel/flights?hl=pt-BR&curr=BRL&q=${encodeURIComponent(query)}`;
+}
+
+function parseSerpApiTime(value) {
+  return String(value || '').match(/(\d{1,2}:\d{2})$/)?.[1] ?? null;
+}
+
+async function buscarGoogleFlightsSerpApi(origem, destino, dataIda, dataVolta) {
+  const apiKey = process.env.SERPAPI_KEY;
+  if (!apiKey) throw new Error('SERPAPI_KEY nao configurada no servidor.');
+
+  const params = new URLSearchParams({
+    engine: 'google_flights',
+    departure_id: origem,
+    arrival_id: destino,
+    outbound_date: dataIda,
+    type: dataVolta ? '1' : '2',
+    travel_class: '1',
+    currency: 'BRL',
+    gl: 'br',
+    hl: 'pt',
+    deep_search: 'true',
+    show_hidden: 'true',
+    api_key: apiKey
+  });
+  if (dataVolta) params.set('return_date', dataVolta);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SERPAPI_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(`https://serpapi.com/search.json?${params}`, {
+      signal: controller.signal
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`SerpAPI excedeu o limite de ${Math.round(SERPAPI_TIMEOUT_MS / 1000)}s.`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    throw new Error(`SerpAPI respondeu HTTP ${response.status}.`);
+  }
+
+  const result = await response.json();
+  if (result.error) throw new Error(`SerpAPI: ${result.error}`);
+
+  const link = result.search_metadata?.google_flights_url
+    || buildGoogleFlightsUrl(origem, destino, dataIda, dataVolta);
+  const flights = [
+    ...(result.best_flights ?? []),
+    ...(result.other_flights ?? [])
+  ].map(item => {
+    const segments = item.flights ?? [];
+    const firstSegment = segments[0] ?? {};
+    const lastSegment = segments[segments.length - 1] ?? firstSegment;
+    const airlines = [...new Set(segments.map(segment => segment.airline).filter(Boolean))];
+    const price = Number(item.price);
+
+    if (!Number.isFinite(price) || price <= 0) return null;
+    return {
+      preco: price,
+      companhia: airlines.join(', ') || item.airline || null,
+      horario_partida: parseSerpApiTime(firstSegment.departure_airport?.time),
+      horario_chegada: parseSerpApiTime(lastSegment.arrival_airport?.time),
+      duracao_min: Number(item.total_duration) || null,
+      escalas: Math.max(0, segments.length - 1),
+      link
+    };
+  }).filter(Boolean);
+
+  if (flights.length === 0) return [];
+
+  const lowestPrice = Math.min(...flights.map(flight => flight.preco));
+  return [
+    createAdvertisedPriceFlight(lowestPrice, link),
+    ...flights
+  ].sort((a, b) => a.preco - b.preco);
 }
 
 function normalizeText(text) {
@@ -323,6 +404,45 @@ async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta
   throw lastError;
 }
 
+async function buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolta) {
+  const sourceNames = ['playwright', 'serpapi'];
+  const settled = await Promise.allSettled([
+    buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta),
+    buscarGoogleFlightsSerpApi(origem, destino, dataIda, dataVolta)
+  ]);
+  const flights = [];
+  const fontes = {};
+  const warnings = [];
+
+  settled.forEach((result, index) => {
+    const source = sourceNames[index];
+    if (result.status === 'fulfilled' && result.value.length > 0) {
+      flights.push(...result.value);
+      fontes[source] = {
+        preco: result.value[0]?.preco ?? null,
+        quantidade: result.value.length
+      };
+      return;
+    }
+
+    const reason = result.status === 'rejected'
+      ? String(result.reason?.message || result.reason).split('\n')[0]
+      : 'nenhum preco encontrado';
+    warnings.push(`${source}: ${reason}`);
+    console.warn(`Coleta ${source} indisponivel: ${reason}`);
+  });
+
+  if (flights.length === 0) {
+    throw new Error(`Nenhuma fonte retornou precos. ${warnings.join(' | ')}`);
+  }
+
+  return {
+    voos: flights.sort((a, b) => a.preco - b.preco),
+    fontes,
+    warning: warnings.length ? warnings.join(' | ') : undefined
+  };
+}
+
 async function buscarGoogleFlightsPlaywrightOnce(url, origem, destino) {
   const browser = await launchBrowser();
 
@@ -476,7 +596,8 @@ async function refreshFlightPrice({ origem, destino, data_ida, data_volta }) {
     throw new Error('origem, destino e data_ida sao obrigatorios');
   }
 
-  const voos = await buscarGoogleFlightsPlaywright(origem, destino, data_ida, data_volta);
+  const result = await buscarGoogleFlightsTodasFontes(origem, destino, data_ida, data_volta);
+  const voos = result.voos;
   if (voos.length > 0) {
     await salvarCache(voos, origem, destino, data_ida, data_volta);
   }
@@ -484,13 +605,17 @@ async function refreshFlightPrice({ origem, destino, data_ida, data_volta }) {
   return {
     preco: voos[0]?.preco ?? null,
     quantidade: voos.length,
-    link: buildGoogleFlightsUrl(origem, destino, data_ida, data_volta)
+    link: buildGoogleFlightsUrl(origem, destino, data_ida, data_volta),
+    fontes: result.fontes,
+    warning: result.warning
   };
 }
 
 module.exports = {
   buildGoogleFlightsUrl,
   buscarGoogleFlightsPlaywright,
+  buscarGoogleFlightsSerpApi,
+  buscarGoogleFlightsTodasFontes,
   collectFlightRows,
   createAdvertisedPriceFlight,
   getLowestPricesSnapshot,
@@ -498,6 +623,7 @@ module.exports = {
   getVercelChromiumPath,
   parseFlightRow,
   parsePrice,
+  parseSerpApiTime,
   refreshFlightPrice,
   selectLowestPricesTab,
   salvarCache,

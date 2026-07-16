@@ -1,7 +1,5 @@
 const {
-  buildGoogleFlightsUrl,
-  buscarGoogleFlightsPlaywright,
-  salvarCache,
+  refreshFlightPrice,
   verifyUserToken
 } = require('../backend/flight_scraper');
 
@@ -36,17 +34,8 @@ async function handler(req, res) {
       return;
     }
 
-    const voos = await buscarGoogleFlightsPlaywright(origem, destino, data_ida, data_volta);
-
-    if (voos.length > 0) {
-      await salvarCache(voos, origem, destino, data_ida, data_volta);
-    }
-
-    res.status(200).json({
-      preco: voos[0]?.preco ?? null,
-      quantidade: voos.length,
-      link: buildGoogleFlightsUrl(origem, destino, data_ida, data_volta)
-    });
+    const result = await refreshFlightPrice({ origem, destino, data_ida, data_volta });
+    res.status(200).json(result);
   } catch (err) {
     console.error('scrape-flight failed', err);
     const message = err.message || String(err);

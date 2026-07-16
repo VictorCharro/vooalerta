@@ -72,21 +72,23 @@ vooalerta/
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_KEY`
+- `SERPAPI_KEY`
 
 ### Vercel
 
 - `SUPABASE_URL`
 - `SUPABASE_KEY` (anon/public key, usada no build do Angular)
 - `SUPABASE_SERVICE_KEY` ou `SUPABASE_SERVICE_ROLE_KEY` (service_role key, usada pela function `/api/scrape-flight` para gravar `price_cache`)
+- `SERPAPI_KEY` (usada somente no servidor pela function `/api/scrape-flight`)
 - Aliases aceitos pela API: `NEXT_PUBLIC_SUPABASE_URL`, `VITE_SUPABASE_URL`, `SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `VITE_SUPABASE_ANON_KEY`
-
-Nao usar mais `SERPAPI_KEY`.
 
 ## Monitor de Voos
 
 ### `backend/monitor.js`
 
-- Fonte: Google Flights via Playwright (`backend/flight_scraper.js`)
+- Fontes: Google Flights via Playwright e SerpAPI em paralelo (`backend/flight_scraper.js`)
+- A SerpAPI usa `deep_search=true` e `show_hidden=true`; os resultados das duas fontes sao combinados e o menor preco global e salvo/exibido
+- Se uma fonte falhar, a outra ainda atualiza o cache e a falha fica registrada como aviso
 - Cron: `.github/workflows/monitor.yml`, atualmente a cada 3h
 - Instala Chromium no GitHub Actions com `npx playwright install --with-deps chromium`
 - Seleciona a aba "Menores precos" no Google Flights antes de coletar
@@ -105,7 +107,7 @@ Nao usar mais `SERPAPI_KEY`.
 - Chamada pelo botao de atualizar na pagina de Voos
 - Recebe `{ origem, destino, data_ida, data_volta }`
 - Valida o usuario pelo token Supabase enviado pelo frontend
-- Roda Playwright server-side, salva em `price_cache` e retorna `{ preco: number | null }`
+- Roda Playwright e SerpAPI em paralelo, salva os dois resultados em `price_cache` e retorna o menor preco global
 - Clica na aba "Menores precos" do Google Flights antes de ler a lista
 - Valida a selecao e a sincronizacao da lista com o preco anunciado na aba antes de gravar no Supabase
 - Antes de ler os voos, espera o valor da aba "Menores precos" permanecer estavel e grava esse valor diretamente no cache
