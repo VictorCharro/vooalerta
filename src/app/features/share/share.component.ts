@@ -47,7 +47,7 @@ import { Alert } from '@core/models/alert.model';
         </div>
 
         <div class="share-badge share-badge-below" *ngIf="minPrice !== null && minPrice <= alert.meta">
-          🎉 Abaixo da meta! Corre comprar.
+           Abaixo da meta! Corre comprar.
         </div>
         <div class="share-badge share-badge-above" *ngIf="minPrice !== null && minPrice > alert.meta">
           ⏳ Ainda acima da meta — continue monitorando.
