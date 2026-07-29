@@ -15,457 +15,488 @@ import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
     styleUrls: ['./voos.component.css'],
     template: `
     <div class="layout">
-
+    
       <app-sidebar active="voos" [userEmail]="userEmail" [isDark]="isDark"
         (themeChange)="isDark = $event"
         (profileSaved)="onProfileSaved($event)">
       </app-sidebar>
-
+    
       <!-- ── Main ── -->
       <main class="main">
-
+    
         <!-- ── Toasts ── -->
         <div class="toast-container">
-          <div class="toast fade-up" *ngFor="let t of toasts">{{ t }}</div>
+          @for (t of toasts; track t) {
+            <div class="toast fade-up">{{ t }}</div>
+          }
         </div>
-
+    
         <!-- ══ LISTA ══ -->
-        <ng-container *ngIf="!selectedAlert">
-
+        @if (!selectedAlert) {
           <div class="page-header fade-up">
             <div>
               <h1>Voos</h1>
-              <p class="page-sub" *ngIf="!loading">
-                {{ alerts.length }} rota{{ alerts.length !== 1 ? 's' : '' }} monitorada{{ alerts.length !== 1 ? 's' : '' }}
-              </p>
+              @if (!loading) {
+                <p class="page-sub">
+                  {{ alerts.length }} rota{{ alerts.length !== 1 ? 's' : '' }} monitorada{{ alerts.length !== 1 ? 's' : '' }}
+                </p>
+              }
             </div>
             <button class="btn-primary" (click)="openModal()">+ Novo alerta</button>
           </div>
-
           <!-- Aviso callmebot_key ausente -->
-          <div class="warn-banner fade-up" *ngIf="missingCallmebotKey">
-            ⚠️ Você ainda não cadastrou sua <strong>CallMeBot API Key</strong>. As notificações não serão enviadas. Acesse <strong>Perfil</strong> na sidebar para configurar.
-          </div>
-
+          @if (missingCallmebotKey) {
+            <div class="warn-banner fade-up">
+              ⚠️ Você ainda não cadastrou sua <strong>CallMeBot API Key</strong>. As notificações não serão enviadas. Acesse <strong>Perfil</strong> na sidebar para configurar.
+            </div>
+          }
           <!-- Banners de alerta de preço -->
-          <div class="price-banner fade-up" *ngFor="let a of alertsBelowMeta">
-            🔔 Alerta! O voo <strong>{{ a.origem }} → {{ a.destino }}</strong> está abaixo da sua meta —
-            R$&nbsp;{{ getMinPrice(a) | number:'1.0-0' }}
-            (meta: R$&nbsp;{{ a.meta | number:'1.0-0' }})
-          </div>
-
+          @for (a of alertsBelowMeta; track a) {
+            <div class="price-banner fade-up">
+              🔔 Alerta! O voo <strong>{{ a.origem }} → {{ a.destino }}</strong> está abaixo da sua meta —
+              R$&nbsp;{{ getMinPrice(a) | number:'1.0-0' }}
+              (meta: R$&nbsp;{{ a.meta | number:'1.0-0' }})
+            </div>
+          }
           <!-- Loading -->
-          <div class="center-state" *ngIf="loading">
-            <div class="spinner spinner-dark" style="width:28px;height:28px;border-width:3px"></div>
-          </div>
-
+          @if (loading) {
+            <div class="center-state">
+              <div class="spinner spinner-dark" style="width:28px;height:28px;border-width:3px"></div>
+            </div>
+          }
           <!-- Empty state -->
-          <div class="empty-state fade-up" *ngIf="!loading && alerts.length === 0">
-            <div class="empty-icon">✈</div>
-            <h3>Nenhum alerta ainda</h3>
-            <p>Crie seu primeiro alerta e receba no WhatsApp quando o preço cair.</p>
-            <button class="btn-primary" (click)="openModal()" style="margin-top:20px">Criar primeiro alerta</button>
-          </div>
-
+          @if (!loading && alerts.length === 0) {
+            <div class="empty-state fade-up">
+              <div class="empty-icon">✈</div>
+              <h3>Nenhum alerta ainda</h3>
+              <p>Crie seu primeiro alerta e receba no WhatsApp quando o preço cair.</p>
+              <button class="btn-primary" (click)="openModal()" style="margin-top:20px">Criar primeiro alerta</button>
+            </div>
+          }
           <!-- Alert cards -->
-          <div class="alerts-list" *ngIf="!loading && alerts.length > 0">
-            <div
-              class="alert-card fade-up"
-              *ngFor="let alert of alerts; let i = index"
-              [style.animation-delay]="(i * 0.04) + 's'"
-              [class.card-inactive]="!alert.ativo"
-            >
-              <div class="card-route">
-                <div class="route-iata">
-                  <span class="iata">{{ alert.origem }}</span>
-                  <span class="route-sep">→</span>
-                  <span class="iata">{{ alert.destino }}</span>
-                </div>
-                <div class="route-date">
-                  {{ alert.data_ida | date:'dd/MM/yyyy' }}
-                  <ng-container *ngIf="alert.data_volta"> → {{ alert.data_volta | date:'dd/MM/yyyy' }}</ng-container>
-                  <ng-container *ngIf="!alert.data_volta"> · Só ida</ng-container>
-                </div>
-                <div class="route-countdown"
-                  [class.countdown-green]="daysUntil(alert.data_ida) > 30"
-                  [class.countdown-yellow]="daysUntil(alert.data_ida) >= 7 && daysUntil(alert.data_ida) <= 30"
-                  [class.countdown-red]="daysUntil(alert.data_ida) > 0 && daysUntil(alert.data_ida) < 7"
-                  [class.countdown-muted]="daysUntil(alert.data_ida) <= 0">
-                  <ng-container *ngIf="daysUntil(alert.data_ida) > 0">
-                    Faltam {{ daysUntil(alert.data_ida) }} dia{{ daysUntil(alert.data_ida) !== 1 ? 's' : '' }}
-                  </ng-container>
-                  <ng-container *ngIf="daysUntil(alert.data_ida) <= 0">Viagem realizada</ng-container>
-                </div>
-              </div>
-
-              <div class="card-price-col">
-                <span class="card-meta-label">Meta: R$&nbsp;{{ alert.meta | number:'1.0-0' }}</span>
-                <ng-container *ngIf="minPricesLoading && getMinPrice(alert) === null">
-                  <span class="price-skeleton"></span>
-                </ng-container>
-                <ng-container *ngIf="!minPricesLoading || getMinPrice(alert) !== null">
-                  <span class="card-price-value"
-                    [class.price-below]="getMinPrice(alert) !== null && getMinPrice(alert)! <= alert.meta"
-                    [class.price-above]="getMinPrice(alert) !== null && getMinPrice(alert)! > alert.meta"
-                    [class.price-muted]="getMinPrice(alert) === null">
-                    <ng-container *ngIf="getMinPrice(alert) !== null">
-                      R$&nbsp;{{ getMinPrice(alert) | number:'1.0-0' }}
-                      {{ getMinPrice(alert)! <= alert.meta ? '↓' : '↑' }}
-                    </ng-container>
-                    <ng-container *ngIf="getMinPrice(alert) === null">—</ng-container>
-                  </span>
-                  <span class="card-price-diff"
-                    *ngIf="getMinPrice(alert) !== null"
-                    [class.diff-green]="getMinPrice(alert)! <= alert.meta"
-                    [class.diff-red]="getMinPrice(alert)! > alert.meta">
-                    {{ getMinPrice(alert)! <= alert.meta ? '-' : '+' }}
-                    R$&nbsp;{{ absDiff(alert.meta, getMinPrice(alert)!) | number:'1.0-0' }}
-                  </span>
-                </ng-container>
-              </div>
-
-              <div class="card-controls">
-                <label class="toggle" [title]="alert.ativo ? 'Pausar' : 'Ativar'">
-                  <input type="checkbox" [checked]="alert.ativo" (change)="toggleAlert(alert)" />
-                  <span class="track"></span>
-                  <span class="thumb"></span>
-                </label>
-                <a [href]="buildGoogleFlightsUrl(alert)" target="_blank" class="open-btn" title="Abrir no Google Flights">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                </a>
-                <button class="refresh-btn"
-                  (click)="refreshPrice(alert)"
-                  [title]="getRefreshTitle(alert)"
-                  [class.btn-cooldown]="getCooldownSeconds(alert) > 0 && !isRefreshing(alert)">
-                  <span *ngIf="isRefreshing(alert)" class="spinner" style="width:14px;height:14px;border-width:2px"></span>
-                  <ng-container *ngIf="!isRefreshing(alert)">
-                    <svg *ngIf="getCooldownSeconds(alert) === 0" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                    <span *ngIf="getCooldownSeconds(alert) > 0" class="cooldown-label">{{ formatCooldown(alert) }}</span>
-                  </ng-container>
-                </button>
-                <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">›</button>
-              </div>
-            </div>
-          </div>
-
-        </ng-container>
-
-        <!-- ══ DETALHE ══ -->
-        <div class="detail-view fade-up" *ngIf="selectedAlert">
-
-          <div class="detail-header">
-            <button class="back-btn" (click)="closeDetail()">← Voltar</button>
-            <h1 class="detail-title">
-              {{ selectedAlert.origem }}
-              <span class="detail-arrow">→</span>
-              {{ selectedAlert.destino }}
-            </h1>
-          </div>
-
-          <!-- Cards de estatística -->
-          <div class="stat-grid">
-            <div class="stat-card">
-              <span class="stat-label">Menor preço</span>
-              <span class="stat-value"
-                [class.stat-green]="getMinPrice(selectedAlert) !== null && getMinPrice(selectedAlert)! <= selectedAlert.meta"
-                [class.stat-red]="getMinPrice(selectedAlert) !== null && getMinPrice(selectedAlert)! > selectedAlert.meta">
-                <ng-container *ngIf="getMinPrice(selectedAlert) !== null">
-                  R$&nbsp;{{ getMinPrice(selectedAlert) | number:'1.0-0' }}
-                </ng-container>
-                <ng-container *ngIf="getMinPrice(selectedAlert) === null && minPricesLoading">
-                  <span class="price-skeleton" style="width:80px;height:28px;display:inline-block"></span>
-                </ng-container>
-                <ng-container *ngIf="getMinPrice(selectedAlert) === null && !minPricesLoading">—</ng-container>
-              </span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">Preço atual</span>
-              <span class="stat-value"
-                [class.stat-green]="getMinPrice(selectedAlert) !== null && getMinPrice(selectedAlert)! <= selectedAlert.meta"
-                [class.stat-red]="getMinPrice(selectedAlert) !== null && getMinPrice(selectedAlert)! > selectedAlert.meta">
-                <ng-container *ngIf="getMinPrice(selectedAlert) !== null">
-                  R$&nbsp;{{ getMinPrice(selectedAlert) | number:'1.0-0' }}
-                </ng-container>
-                <ng-container *ngIf="getMinPrice(selectedAlert) === null">—</ng-container>
-              </span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">Sua meta</span>
-              <span class="stat-value">R$&nbsp;{{ selectedAlert.meta | number:'1.0-0' }}</span>
-            </div>
-          </div>
-
-          <!-- Formulário de edição (grid 2 colunas) -->
-          <form (ngSubmit)="saveAlert()">
-
-            <div class="detail-grid">
-
-              <!-- Coluna esquerda: campos da rota -->
-              <div class="info-section">
-                <h3 class="section-title">Detalhes da rota</h3>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>Origem</label>
-                    <app-airport-search
-                      inputId="d-origem"
-                      placeholder="GRU — São Paulo"
-                      [value]="form.origem || ''"
-                      (selected)="form.origem = $event">
-                    </app-airport-search>
+          @if (!loading && alerts.length > 0) {
+            <div class="alerts-list">
+              @for (alert of alerts; track alert; let i = $index) {
+                <div
+                  class="alert-card fade-up"
+                  [style.animation-delay]="(i * 0.04) + 's'"
+                  [class.card-inactive]="!alert.ativo"
+                  >
+                  <div class="card-route">
+                    <div class="route-iata">
+                      <span class="iata">{{ alert.origem }}</span>
+                      <span class="route-sep">→</span>
+                      <span class="iata">{{ alert.destino }}</span>
+                    </div>
+                    <div class="route-date">
+                      {{ alert.data_ida | date:'dd/MM/yyyy' }}
+                      @if (alert.data_volta) {
+                        → {{ alert.data_volta | date:'dd/MM/yyyy' }}
+                      }
+                      @if (!alert.data_volta) {
+                        · Só ida
+                      }
+                    </div>
+                    <div class="route-countdown"
+                      [class.countdown-green]="daysUntil(alert.data_ida) > 30"
+                      [class.countdown-yellow]="daysUntil(alert.data_ida) >= 7 && daysUntil(alert.data_ida) <= 30"
+                      [class.countdown-red]="daysUntil(alert.data_ida) > 0 && daysUntil(alert.data_ida) < 7"
+                      [class.countdown-muted]="daysUntil(alert.data_ida) <= 0">
+                      @if (daysUntil(alert.data_ida) > 0) {
+                        Faltam {{ daysUntil(alert.data_ida) }} dia{{ daysUntil(alert.data_ida) !== 1 ? 's' : '' }}
+                      }
+                      @if (daysUntil(alert.data_ida) <= 0) {
+                        Viagem realizada
+                      }
+                    </div>
                   </div>
-                  <div class="form-group">
-                    <label>Destino</label>
-                    <app-airport-search
-                      inputId="d-destino"
-                      placeholder="LIS — Lisboa"
-                      [value]="form.destino || ''"
-                      (selected)="form.destino = $event">
-                    </app-airport-search>
+                  <div class="card-price-col">
+                    <span class="card-meta-label">Meta: R$&nbsp;{{ alert.meta | number:'1.0-0' }}</span>
+                    @if (minPricesLoading && getMinPrice(alert) === null) {
+                      <span class="price-skeleton"></span>
+                    }
+                    @if (!minPricesLoading || getMinPrice(alert) !== null) {
+                      <span class="card-price-value"
+                        [class.price-below]="getMinPrice(alert) !== null && getMinPrice(alert)! <= alert.meta"
+                        [class.price-above]="getMinPrice(alert) !== null && getMinPrice(alert)! > alert.meta"
+                        [class.price-muted]="getMinPrice(alert) === null">
+                        @if (getMinPrice(alert) !== null) {
+                          R$&nbsp;{{ getMinPrice(alert) | number:'1.0-0' }}
+                          {{ getMinPrice(alert)! <= alert.meta ? '↓' : '↑' }}
+                        }
+                        @if (getMinPrice(alert) === null) {
+                          —
+                        }
+                      </span>
+                      @if (getMinPrice(alert) !== null) {
+                        <span class="card-price-diff"
+                          [class.diff-green]="getMinPrice(alert)! <= alert.meta"
+                          [class.diff-red]="getMinPrice(alert)! > alert.meta">
+                          {{ getMinPrice(alert)! <= alert.meta ? '-' : '+' }}
+                          R$&nbsp;{{ absDiff(alert.meta, getMinPrice(alert)!) | number:'1.0-0' }}
+                        </span>
+                      }
+                    }
                   </div>
-                </div>
-                <div class="form-row" style="margin-top:14px">
-                  <div class="form-group">
-                    <label>Data de ida</label>
-                    <app-date-picker
-                      [value]="form.data_ida || ''"
-                      [min]="today"
-                      placeholder="Selecionar data"
-                      (valueChange)="form.data_ida = $event">
-                    </app-date-picker>
-                  </div>
-                  <div class="form-group">
-                    <label>Data de volta <span class="form-optional">(opcional)</span></label>
-                    <app-date-picker
-                      [value]="form.data_volta || ''"
-                      [min]="form.data_ida || today"
-                      [disabled]="!!form.so_ida"
-                      placeholder="Selecionar data"
-                      (valueChange)="form.data_volta = $event">
-                    </app-date-picker>
-                  </div>
-                </div>
-                <div class="form-group" style="margin-top:14px">
-                  <label class="toggle-label">
-                    <label class="toggle" style="width:38px;height:22px">
-                      <input type="checkbox" [(ngModel)]="form.so_ida" name="d_so_ida" (change)="onSoIdaChange()" />
+                  <div class="card-controls">
+                    <label class="toggle" [title]="alert.ativo ? 'Pausar' : 'Ativar'">
+                      <input type="checkbox" [checked]="alert.ativo" (change)="toggleAlert(alert)" />
                       <span class="track"></span>
                       <span class="thumb"></span>
                     </label>
-                    <span style="font-size:14px;color:var(--color-text)">Só ida</span>
-                  </label>
-                </div>
-                <div class="form-row" style="margin-top:14px">
-                  <div class="form-group">
-                    <label for="d-meta">Meta de preço (R$)</label>
-                    <input id="d-meta" type="number" [(ngModel)]="form.meta" name="d_meta"
-                      placeholder="3000" min="1" required />
+                    <a [href]="buildGoogleFlightsUrl(alert)" target="_blank" class="open-btn" title="Abrir no Google Flights">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    </a>
+                    <button class="refresh-btn"
+                      (click)="refreshPrice(alert)"
+                      [title]="getRefreshTitle(alert)"
+                      [class.btn-cooldown]="getCooldownSeconds(alert) > 0 && !isRefreshing(alert)">
+                      @if (isRefreshing(alert)) {
+                        <span class="spinner" style="width:14px;height:14px;border-width:2px"></span>
+                      }
+                      @if (!isRefreshing(alert)) {
+                        @if (getCooldownSeconds(alert) === 0) {
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                        }
+                        @if (getCooldownSeconds(alert) > 0) {
+                          <span class="cooldown-label">{{ formatCooldown(alert) }}</span>
+                        }
+                      }
+                    </button>
+                    <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">›</button>
                   </div>
-                  <div class="form-group">
-                    <label for="d-horario">Horário a partir de <span class="form-optional">(opcional)</span></label>
-                    <app-time-picker name="d_horario"
-                      [value]="form.horario_minimo || '00:00'"
-                      (valueChange)="form.horario_minimo = $event">
-                    </app-time-picker>
-                  </div>
                 </div>
-                <div class="form-group" style="margin-top:14px">
-                  <label for="d-whatsapp">WhatsApp para notificação</label>
-                  <div class="phone-input">
-                    <span class="phone-prefix">55</span>
-                    <input id="d-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="d_whatsapp"
-                      placeholder="11999999999" maxlength="11" required />
-                  </div>
-                  <span class="form-hint">DDD + número (ex: 11999999999)</span>
-                </div>
+              }
+            </div>
+          }
+        }
+    
+        <!-- ══ DETALHE ══ -->
+        @if (selectedAlert) {
+          <div class="detail-view fade-up">
+            <div class="detail-header">
+              <button class="back-btn" (click)="closeDetail()">← Voltar</button>
+              <h1 class="detail-title">
+                {{ selectedAlert.origem }}
+                <span class="detail-arrow">→</span>
+                {{ selectedAlert.destino }}
+              </h1>
+            </div>
+            <!-- Cards de estatística -->
+            <div class="stat-grid">
+              <div class="stat-card">
+                <span class="stat-label">Menor preço</span>
+                <span class="stat-value"
+                  [class.stat-green]="getMinPrice(selectedAlert) !== null && getMinPrice(selectedAlert)! <= selectedAlert.meta"
+                  [class.stat-red]="getMinPrice(selectedAlert) !== null && getMinPrice(selectedAlert)! > selectedAlert.meta">
+                  @if (getMinPrice(selectedAlert) !== null) {
+                    R$&nbsp;{{ getMinPrice(selectedAlert) | number:'1.0-0' }}
+                  }
+                  @if (getMinPrice(selectedAlert) === null && minPricesLoading) {
+                    <span class="price-skeleton" style="width:80px;height:28px;display:inline-block"></span>
+                  }
+                  @if (getMinPrice(selectedAlert) === null && !minPricesLoading) {
+                    —
+                  }
+                </span>
               </div>
-
-              <!-- Coluna direita: info do voo + configurações -->
-              <div class="detail-right">
-
+              <div class="stat-card">
+                <span class="stat-label">Preço atual</span>
+                <span class="stat-value"
+                  [class.stat-green]="getMinPrice(selectedAlert) !== null && getMinPrice(selectedAlert)! <= selectedAlert.meta"
+                  [class.stat-red]="getMinPrice(selectedAlert) !== null && getMinPrice(selectedAlert)! > selectedAlert.meta">
+                  @if (getMinPrice(selectedAlert) !== null) {
+                    R$&nbsp;{{ getMinPrice(selectedAlert) | number:'1.0-0' }}
+                  }
+                  @if (getMinPrice(selectedAlert) === null) {
+                    —
+                  }
+                </span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Sua meta</span>
+                <span class="stat-value">R$&nbsp;{{ selectedAlert.meta | number:'1.0-0' }}</span>
+              </div>
+            </div>
+            <!-- Formulário de edição (grid 2 colunas) -->
+            <form (ngSubmit)="saveAlert()">
+              <div class="detail-grid">
+                <!-- Coluna esquerda: campos da rota -->
                 <div class="info-section">
-                  <h3 class="section-title">Informações do voo</h3>
-                  <div class="info-row">
-                    <span class="info-label">Companhia</span>
-                    <span class="info-value">Qualquer</span>
+                  <h3 class="section-title">Detalhes da rota</h3>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Origem</label>
+                      <app-airport-search
+                        inputId="d-origem"
+                        placeholder="GRU — São Paulo"
+                        [value]="form.origem || ''"
+                        (selected)="form.origem = $event">
+                      </app-airport-search>
+                    </div>
+                    <div class="form-group">
+                      <label>Destino</label>
+                      <app-airport-search
+                        inputId="d-destino"
+                        placeholder="LIS — Lisboa"
+                        [value]="form.destino || ''"
+                        (selected)="form.destino = $event">
+                      </app-airport-search>
+                    </div>
                   </div>
-                  <div class="info-row">
-                    <span class="info-label">Classe</span>
-                    <span class="info-value">Econômica</span>
+                  <div class="form-row" style="margin-top:14px">
+                    <div class="form-group">
+                      <label>Data de ida</label>
+                      <app-date-picker
+                        [value]="form.data_ida || ''"
+                        [min]="today"
+                        placeholder="Selecionar data"
+                        (valueChange)="form.data_ida = $event">
+                      </app-date-picker>
+                    </div>
+                    <div class="form-group">
+                      <label>Data de volta <span class="form-optional">(opcional)</span></label>
+                      <app-date-picker
+                        [value]="form.data_volta || ''"
+                        [min]="form.data_ida || today"
+                        [disabled]="!!form.so_ida"
+                        placeholder="Selecionar data"
+                        (valueChange)="form.data_volta = $event">
+                      </app-date-picker>
+                    </div>
                   </div>
-                  <div class="info-row">
-                    <span class="info-label">Escalas</span>
-                    <span class="info-value">{{ form.so_direto ? 'Só direto' : 'Qualquer' }}</span>
-                  </div>
-                  <div class="info-row">
-                    <label class="toggle-label" style="width:100%">
+                  <div class="form-group" style="margin-top:14px">
+                    <label class="toggle-label">
                       <label class="toggle" style="width:38px;height:22px">
-                        <input type="checkbox" [(ngModel)]="form.so_direto" name="d_so_direto" />
+                        <input type="checkbox" [(ngModel)]="form.so_ida" name="d_so_ida" (change)="onSoIdaChange()" />
                         <span class="track"></span>
                         <span class="thumb"></span>
                       </label>
-                      <span style="font-size:14px;color:var(--color-text)">Somente voos diretos</span>
+                      <span style="font-size:14px;color:var(--color-text)">Só ida</span>
                     </label>
                   </div>
-                  <div class="info-row" style="border-bottom:none;padding-bottom:0">
-                    <span class="info-label">Abrir no Google Flights</span>
-                    <a class="open-btn" [href]="buildGoogleFlightsUrl(selectedAlert)" target="_blank" rel="noopener" title="Abrir no Google Flights">↗</a>
-                  </div>
-                </div>
-
-                <div class="info-section">
-                  <h3 class="section-title">Configurações</h3>
-                  <div class="info-row" style="border-bottom:none;padding-bottom:0">
-                    <div>
-                      <span class="info-label" style="font-size:14px;color:var(--color-text)">Ativar notificações</span>
-                      <p class="form-hint" style="margin:2px 0 0">
-                        Receba uma mensagem no WhatsApp quando o preço cair abaixo da meta.
-                      </p>
+                  <div class="form-row" style="margin-top:14px">
+                    <div class="form-group">
+                      <label for="d-meta">Meta de preço (R$)</label>
+                      <input id="d-meta" type="number" [(ngModel)]="form.meta" name="d_meta"
+                        placeholder="3000" min="1" required />
+                      </div>
+                      <div class="form-group">
+                        <label for="d-horario">Horário a partir de <span class="form-optional">(opcional)</span></label>
+                        <app-time-picker name="d_horario"
+                          [value]="form.horario_minimo || '00:00'"
+                          (valueChange)="form.horario_minimo = $event">
+                        </app-time-picker>
+                      </div>
                     </div>
-                    <label class="toggle" style="flex-shrink:0">
-                      <input type="checkbox" [(ngModel)]="form.ativo" name="d_ativo" (change)="toggleDetailAlert()" />
-                      <span class="track"></span>
-                      <span class="thumb"></span>
+                    <div class="form-group" style="margin-top:14px">
+                      <label for="d-whatsapp">WhatsApp para notificação</label>
+                      <div class="phone-input">
+                        <span class="phone-prefix">55</span>
+                        <input id="d-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="d_whatsapp"
+                          placeholder="11999999999" maxlength="11" required />
+                        </div>
+                        <span class="form-hint">DDD + número (ex: 11999999999)</span>
+                      </div>
+                    </div>
+                    <!-- Coluna direita: info do voo + configurações -->
+                    <div class="detail-right">
+                      <div class="info-section">
+                        <h3 class="section-title">Informações do voo</h3>
+                        <div class="info-row">
+                          <span class="info-label">Companhia</span>
+                          <span class="info-value">Qualquer</span>
+                        </div>
+                        <div class="info-row">
+                          <span class="info-label">Classe</span>
+                          <span class="info-value">Econômica</span>
+                        </div>
+                        <div class="info-row">
+                          <span class="info-label">Escalas</span>
+                          <span class="info-value">{{ form.so_direto ? 'Só direto' : 'Qualquer' }}</span>
+                        </div>
+                        <div class="info-row">
+                          <label class="toggle-label" style="width:100%">
+                            <label class="toggle" style="width:38px;height:22px">
+                              <input type="checkbox" [(ngModel)]="form.so_direto" name="d_so_direto" />
+                              <span class="track"></span>
+                              <span class="thumb"></span>
+                            </label>
+                            <span style="font-size:14px;color:var(--color-text)">Somente voos diretos</span>
+                          </label>
+                        </div>
+                        <div class="info-row" style="border-bottom:none;padding-bottom:0">
+                          <span class="info-label">Abrir no Google Flights</span>
+                          <a class="open-btn" [href]="buildGoogleFlightsUrl(selectedAlert)" target="_blank" rel="noopener" title="Abrir no Google Flights">↗</a>
+                        </div>
+                      </div>
+                      <div class="info-section">
+                        <h3 class="section-title">Configurações</h3>
+                        <div class="info-row" style="border-bottom:none;padding-bottom:0">
+                          <div>
+                            <span class="info-label" style="font-size:14px;color:var(--color-text)">Ativar notificações</span>
+                            <p class="form-hint" style="margin:2px 0 0">
+                              Receba uma mensagem no WhatsApp quando o preço cair abaixo da meta.
+                            </p>
+                          </div>
+                          <label class="toggle" style="flex-shrink:0">
+                            <input type="checkbox" [(ngModel)]="form.ativo" name="d_ativo" (change)="toggleDetailAlert()" />
+                            <span class="track"></span>
+                            <span class="thumb"></span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  @if (formError) {
+                    <div class="error-box" style="margin-top:4px">{{ formError }}</div>
+                  }
+                  <div class="detail-actions">
+                    <button type="button" class="btn-danger" (click)="confirmDeleteDetail()">Excluir alerta</button>
+                    <button type="submit" class="btn-primary" [disabled]="saving">
+                      @if (saving) {
+                        <span class="spinner"></span>
+                      }
+                      @if (!saving) {
+                        <span>Salvar alterações</span>
+                      }
+                    </button>
+                  </div>
+                </form>
+              </div>
+            }
+    
+          </main>
+    
+          <!-- ── Modal novo alerta ── -->
+          @if (showModal) {
+            <div class="modal-overlay" (click)="onOverlayClick($event)">
+              <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+                <div class="modal-head">
+                  <h2 id="modal-title">Novo alerta</h2>
+                  <button class="btn-icon" (click)="closeModal()" aria-label="Fechar">✕</button>
+                </div>
+                <form (ngSubmit)="saveAlert()">
+                  <div class="form-row" style="align-items: flex-start">
+                    <div class="form-group">
+                      <label>Origem</label>
+                      <div class="chips-input">
+                        @for (o of origens; track o) {
+                          <span class="chip">
+                            {{ o }}
+                            <button type="button" class="chip-remove" (click)="removeOrigen(o)">×</button>
+                          </span>
+                        }
+                        <app-airport-search
+                          inputId="m-origem"
+                          [placeholder]="origens.length === 0 ? 'GRU — São Paulo' : '+ Adicionar'"
+                          value=""
+                          (selected)="addOrigenFromSearch($event)"
+                          style="flex:1;min-width:120px">
+                        </app-airport-search>
+                      </div>
+                      <span class="form-hint">Digite e pressione Enter para adicionar mais</span>
+                    </div>
+                    <div class="form-group">
+                      <label>Destino</label>
+                      <app-airport-search
+                        inputId="m-destino"
+                        placeholder="LIS — Lisboa"
+                        [value]="form.destino || ''"
+                        (selected)="form.destino = $event">
+                      </app-airport-search>
+                    </div>
+                  </div>
+                  <div class="form-row" style="margin-top:14px">
+                    <div class="form-group">
+                      <label>Data de ida</label>
+                      <app-date-picker
+                        [value]="form.data_ida || ''"
+                        [min]="today"
+                        placeholder="Selecionar data"
+                        (valueChange)="form.data_ida = $event">
+                      </app-date-picker>
+                    </div>
+                    <div class="form-group">
+                      <label>Data de volta <span class="form-optional">(opcional)</span></label>
+                      <app-date-picker
+                        [value]="form.data_volta || ''"
+                        [min]="form.data_ida || today"
+                        [disabled]="!!form.so_ida"
+                        align="right"
+                        placeholder="Selecionar data"
+                        (valueChange)="form.data_volta = $event">
+                      </app-date-picker>
+                    </div>
+                  </div>
+                  <div class="form-group" style="margin-top:14px">
+                    <label class="toggle-label">
+                      <label class="toggle" style="width:38px;height:22px">
+                        <input type="checkbox" [(ngModel)]="form.so_ida" name="so_ida" (change)="onSoIdaChange()" />
+                        <span class="track"></span>
+                        <span class="thumb"></span>
+                      </label>
+                      <span style="font-size:14px;color:var(--color-text)">Só ida</span>
                     </label>
                   </div>
+                  <div class="form-row" style="margin-top:14px">
+                    <div class="form-group">
+                      <label for="m-meta">Meta de preço (R$)</label>
+                      <input id="m-meta" type="number" [(ngModel)]="form.meta" name="meta"
+                        placeholder="3000" min="1" required />
+                      </div>
+                      <div class="form-group">
+                        <label for="m-horario">
+                          Horário a partir de <span class="form-optional">(opcional)</span>
+                        </label>
+                        <app-time-picker name="horario_minimo"
+                          [value]="form.horario_minimo || '00:00'"
+                          (valueChange)="form.horario_minimo = $event">
+                        </app-time-picker>
+                      </div>
+                    </div>
+                    <div class="form-group" style="margin-top:14px">
+                      <label for="m-whatsapp">WhatsApp para notificação</label>
+                      <div class="phone-input">
+                        <span class="phone-prefix">55</span>
+                        <input id="m-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="whatsapp"
+                          placeholder="11999999999" maxlength="11" required />
+                        </div>
+                        <span class="form-hint">DDD + número (ex: 11999999999)</span>
+                      </div>
+                      <div class="form-group" style="margin-top:14px">
+                        <label class="toggle-label">
+                          <label class="toggle" style="width:38px;height:22px">
+                            <input type="checkbox" [(ngModel)]="form.so_direto" name="so_direto" />
+                            <span class="track"></span>
+                            <span class="thumb"></span>
+                          </label>
+                          <span style="font-size:14px;color:var(--color-text)">Somente voos diretos</span>
+                        </label>
+                      </div>
+                      @if (formError) {
+                        <div class="error-box" style="margin-top:14px">{{ formError }}</div>
+                      }
+                      <div class="modal-actions">
+                        <button type="button" class="btn-ghost" (click)="closeModal()">Cancelar</button>
+                        <button type="submit" class="btn-primary modal-save" [disabled]="saving">
+                          @if (saving) {
+                            <span class="spinner"></span>
+                          }
+                          @if (!saving) {
+                            <span>
+                              Salvar{{ origens.length > 1 ? ' ' + origens.length + ' alertas' : ' alerta' }}
+                            </span>
+                          }
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
-
-              </div>
+              }
+    
             </div>
-
-            <div *ngIf="formError" class="error-box" style="margin-top:4px">{{ formError }}</div>
-
-            <div class="detail-actions">
-              <button type="button" class="btn-danger" (click)="confirmDeleteDetail()">Excluir alerta</button>
-              <button type="submit" class="btn-primary" [disabled]="saving">
-                <span *ngIf="saving" class="spinner"></span>
-                <span *ngIf="!saving">Salvar alterações</span>
-              </button>
-            </div>
-
-          </form>
-        </div>
-
-      </main>
-
-      <!-- ── Modal novo alerta ── -->
-      <div class="modal-overlay" *ngIf="showModal" (click)="onOverlayClick($event)">
-        <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-          <div class="modal-head">
-            <h2 id="modal-title">Novo alerta</h2>
-            <button class="btn-icon" (click)="closeModal()" aria-label="Fechar">✕</button>
-          </div>
-          <form (ngSubmit)="saveAlert()">
-            <div class="form-row" style="align-items: flex-start">
-              <div class="form-group">
-                <label>Origem</label>
-                <div class="chips-input">
-                  <span class="chip" *ngFor="let o of origens">
-                    {{ o }}
-                    <button type="button" class="chip-remove" (click)="removeOrigen(o)">×</button>
-                  </span>
-                  <app-airport-search
-                    inputId="m-origem"
-                    [placeholder]="origens.length === 0 ? 'GRU — São Paulo' : '+ Adicionar'"
-                    value=""
-                    (selected)="addOrigenFromSearch($event)"
-                    style="flex:1;min-width:120px">
-                  </app-airport-search>
-                </div>
-                <span class="form-hint">Digite e pressione Enter para adicionar mais</span>
-              </div>
-              <div class="form-group">
-                <label>Destino</label>
-                <app-airport-search
-                  inputId="m-destino"
-                  placeholder="LIS — Lisboa"
-                  [value]="form.destino || ''"
-                  (selected)="form.destino = $event">
-                </app-airport-search>
-              </div>
-            </div>
-            <div class="form-row" style="margin-top:14px">
-              <div class="form-group">
-                <label>Data de ida</label>
-                <app-date-picker
-                  [value]="form.data_ida || ''"
-                  [min]="today"
-                  placeholder="Selecionar data"
-                  (valueChange)="form.data_ida = $event">
-                </app-date-picker>
-              </div>
-              <div class="form-group">
-                <label>Data de volta <span class="form-optional">(opcional)</span></label>
-                <app-date-picker
-                  [value]="form.data_volta || ''"
-                  [min]="form.data_ida || today"
-                  [disabled]="!!form.so_ida"
-                  align="right"
-                  placeholder="Selecionar data"
-                  (valueChange)="form.data_volta = $event">
-                </app-date-picker>
-              </div>
-            </div>
-            <div class="form-group" style="margin-top:14px">
-              <label class="toggle-label">
-                <label class="toggle" style="width:38px;height:22px">
-                  <input type="checkbox" [(ngModel)]="form.so_ida" name="so_ida" (change)="onSoIdaChange()" />
-                  <span class="track"></span>
-                  <span class="thumb"></span>
-                </label>
-                <span style="font-size:14px;color:var(--color-text)">Só ida</span>
-              </label>
-            </div>
-            <div class="form-row" style="margin-top:14px">
-              <div class="form-group">
-                <label for="m-meta">Meta de preço (R$)</label>
-                <input id="m-meta" type="number" [(ngModel)]="form.meta" name="meta"
-                  placeholder="3000" min="1" required />
-              </div>
-              <div class="form-group">
-                <label for="m-horario">
-                  Horário a partir de <span class="form-optional">(opcional)</span>
-                </label>
-                <app-time-picker name="horario_minimo"
-                  [value]="form.horario_minimo || '00:00'"
-                  (valueChange)="form.horario_minimo = $event">
-                </app-time-picker>
-              </div>
-            </div>
-            <div class="form-group" style="margin-top:14px">
-              <label for="m-whatsapp">WhatsApp para notificação</label>
-              <div class="phone-input">
-                <span class="phone-prefix">55</span>
-                <input id="m-whatsapp" type="tel" [(ngModel)]="form.whatsapp" name="whatsapp"
-                  placeholder="11999999999" maxlength="11" required />
-              </div>
-              <span class="form-hint">DDD + número (ex: 11999999999)</span>
-            </div>
-            <div class="form-group" style="margin-top:14px">
-              <label class="toggle-label">
-                <label class="toggle" style="width:38px;height:22px">
-                  <input type="checkbox" [(ngModel)]="form.so_direto" name="so_direto" />
-                  <span class="track"></span>
-                  <span class="thumb"></span>
-                </label>
-                <span style="font-size:14px;color:var(--color-text)">Somente voos diretos</span>
-              </label>
-            </div>
-            <div *ngIf="formError" class="error-box" style="margin-top:14px">{{ formError }}</div>
-            <div class="modal-actions">
-              <button type="button" class="btn-ghost" (click)="closeModal()">Cancelar</button>
-              <button type="submit" class="btn-primary modal-save" [disabled]="saving">
-                <span *ngIf="saving" class="spinner"></span>
-                <span *ngIf="!saving">
-                  Salvar{{ origens.length > 1 ? ' ' + origens.length + ' alertas' : ' alerta' }}
-                </span>
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-    </div>
-  `
+    `
 })
 export class VoosComponent implements OnInit, OnDestroy {
   alerts:    Alert[] = [];

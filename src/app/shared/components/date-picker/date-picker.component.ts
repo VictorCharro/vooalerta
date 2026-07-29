@@ -1,44 +1,48 @@
 import { Component, Input, Output, EventEmitter, HostListener, ElementRef, OnChanges } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DAYS   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
 @Component({
     selector: 'app-date-picker',
-    imports: [CommonModule],
+    imports: [],
     template: `
     <div class="dp-wrap">
       <button type="button" class="dp-input" (click)="toggle()" [class.dp-disabled]="disabled">
         <span [class.dp-placeholder]="!value">{{ displayValue || placeholder }}</span>
         <span class="dp-icon">📅</span>
       </button>
-
-      <div class="dp-popup" *ngIf="open" [style.left]="align === 'left' ? '0' : 'auto'" [style.right]="align === 'right' ? '0' : 'auto'">
-        <div class="dp-header">
-          <button type="button" class="dp-nav" (click)="prevMonth()">‹</button>
-          <span class="dp-month-label">{{ monthLabel }}</span>
-          <button type="button" class="dp-nav" (click)="nextMonth()">›</button>
+    
+      @if (open) {
+        <div class="dp-popup" [style.left]="align === 'left' ? '0' : 'auto'" [style.right]="align === 'right' ? '0' : 'auto'">
+          <div class="dp-header">
+            <button type="button" class="dp-nav" (click)="prevMonth()">‹</button>
+            <span class="dp-month-label">{{ monthLabel }}</span>
+            <button type="button" class="dp-nav" (click)="nextMonth()">›</button>
+          </div>
+          <div class="dp-grid dp-weekdays">
+            @for (d of weekDays; track d) {
+              <span>{{ d }}</span>
+            }
+          </div>
+          <div class="dp-grid dp-days">
+            @for (slot of calendarSlots; track slot) {
+              <span
+                [class.dp-empty]="slot === null"
+                [class.dp-day]="slot !== null"
+                [class.dp-selected]="slot !== null && isSelected(slot)"
+                [class.dp-today]="slot !== null && isToday(slot)"
+                [class.dp-past]="slot !== null && isDisabled(slot)"
+                (click)="slot !== null && !isDisabled(slot) && select(slot)">
+                {{ slot !== null ? slot : '' }}
+              </span>
+            }
+          </div>
         </div>
-
-        <div class="dp-grid dp-weekdays">
-          <span *ngFor="let d of weekDays">{{ d }}</span>
-        </div>
-
-        <div class="dp-grid dp-days">
-          <span *ngFor="let slot of calendarSlots"
-            [class.dp-empty]="slot === null"
-            [class.dp-day]="slot !== null"
-            [class.dp-selected]="slot !== null && isSelected(slot)"
-            [class.dp-today]="slot !== null && isToday(slot)"
-            [class.dp-past]="slot !== null && isDisabled(slot)"
-            (click)="slot !== null && !isDisabled(slot) && select(slot)">
-            {{ slot !== null ? slot : '' }}
-          </span>
-        </div>
-      </div>
+      }
     </div>
-  `,
+    `,
     styles: [`
     .dp-wrap { position: relative; }
     .dp-input {

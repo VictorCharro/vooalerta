@@ -1,21 +1,25 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 
 @Component({
     selector: 'app-time-picker',
-    imports: [CommonModule, FormsModule],
+    imports: [FormsModule],
     template: `
     <div class="tp-wrap">
       <select class="tp-select" [(ngModel)]="hour" (ngModelChange)="emit()" [name]="name + '_h'">
-        <option *ngFor="let h of hours" [value]="h">{{ h }}</option>
+        @for (h of hours; track h) {
+          <option [value]="h">{{ h }}</option>
+        }
       </select>
       <span class="tp-sep">:</span>
       <select class="tp-select" [(ngModel)]="minute" (ngModelChange)="emit()" [name]="name + '_m'">
-        <option *ngFor="let m of minutes" [value]="m">{{ m }}</option>
+        @for (m of minutes; track m) {
+          <option [value]="m">{{ m }}</option>
+        }
       </select>
     </div>
-  `,
+    `,
     styles: [`
     .tp-wrap { display: flex; align-items: center; gap: 6px; }
     .tp-select {
