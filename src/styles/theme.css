@@ -4,32 +4,32 @@
    ============================================================ */
 
 :root {
-  /* Cores principais */
-  --color-bg:           #0a0a0f;
-  --color-bg-2:         #111118;
-  --color-bg-3:         #18181f;
+  /* Cores principais — paleta do Figma (VooAlerta redesign) */
+  --color-bg:           #111010;
+  --color-bg-2:         #161616;
+  --color-bg-3:         #242323;
 
-  --color-accent:       #7c6dfa;
-  --color-accent-hover: #9585fc;
-  --color-accent-dim:   rgba(124, 109, 250, 0.12);
+  --color-accent:       #C6194D;
+  --color-accent-hover: #6F132F;
+  --color-accent-dim:   rgba(198, 25, 77, 0.14);
 
-  --color-green:        #2dd4a0;
-  --color-green-dim:    rgba(45, 212, 160, 0.10);
+  --color-green:        #09AE00;
+  --color-green-dim:    rgba(9, 174, 0, 0.12);
 
-  --color-red:          #f0605a;
-  --color-red-dim:      rgba(240, 96, 90, 0.10);
+  --color-red:          #BB070A;
+  --color-red-dim:      rgba(187, 7, 10, 0.12);
 
-  --color-amber:        #f5a623;
-  --color-amber-dim:    rgba(245, 166, 35, 0.10);
+  --color-amber:        #D17300;
+  --color-amber-dim:    rgba(209, 115, 0, 0.12);
 
   /* Texto */
-  --color-text:         #f0eff6;
-  --color-text-muted:   #7a7988;
-  --color-text-dim:     #3d3c4a;
+  --color-text:         #E8E8E8;
+  --color-text-muted:   #8B8B8B;
+  --color-text-dim:     #5a5a5a;
 
   /* Bordas */
-  --color-border:       rgba(255, 255, 255, 0.07);
-  --color-border-hover: rgba(255, 255, 255, 0.14);
+  --color-border:       #232021;
+  --color-border-hover: #2e2a2b;
 
   /* Tipografia */
   --font-display: 'Inter', sans-serif;
