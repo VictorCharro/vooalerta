@@ -1,15 +1,14 @@
 import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
 
 @Component({
-  selector: 'app-sidebar',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  styleUrls: ['./sidebar.component.css'],
-  template: `
+    selector: 'app-sidebar',
+    imports: [FormsModule],
+    styleUrls: ['./sidebar.component.css'],
+    template: `
     <aside class="sidebar">
       <div class="sidebar-top">
         <div class="brand">
@@ -38,61 +37,81 @@ import { SupabaseService } from '@core/services/supabase.service';
         </div>
       </div>
     </aside>
-
+    
     <!-- ── Modal perfil ── -->
-    <div class="modal-overlay" *ngIf="showProfileModal" (click)="onOverlayClick($event)">
-      <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
-        <div class="modal-head">
-          <h2 id="profile-modal-title">Meu perfil</h2>
-          <button class="btn-icon" (click)="closeProfileModal()" aria-label="Fechar">✕</button>
-        </div>
-        <div *ngIf="profileLoading" class="center-state" style="padding:32px">
-          <div class="spinner spinner-dark" style="width:24px;height:24px;border-width:3px"></div>
-        </div>
-        <form *ngIf="!profileLoading" (ngSubmit)="saveProfile()">
-          <div class="form-group">
-            <label>E-mail</label>
-            <input type="email" [value]="userEmail" disabled style="opacity:.45;cursor:not-allowed" />
+    @if (showProfileModal) {
+      <div class="modal-overlay" (click)="onOverlayClick($event)">
+        <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+          <div class="modal-head">
+            <h2 id="profile-modal-title">Meu perfil</h2>
+            <button class="btn-icon" (click)="closeProfileModal()" aria-label="Fechar">✕</button>
           </div>
-          <div class="form-group" style="margin-top:14px">
-            <label for="p-whatsapp">WhatsApp</label>
-            <div class="phone-input">
-              <span class="phone-prefix">55</span>
-              <input id="p-whatsapp" type="tel" [(ngModel)]="profileForm.whatsapp" name="whatsapp"
-                placeholder="11999999999" maxlength="11" />
+          @if (profileLoading) {
+            <div class="center-state" style="padding:32px">
+              <div class="spinner spinner-dark" style="width:24px;height:24px;border-width:3px"></div>
             </div>
-            <span class="form-hint">DDD + número (ex: 11999999999)</span>
-          </div>
-          <div class="form-group" style="margin-top:14px">
-            <label for="p-key">CallMeBot API Key</label>
-            <input id="p-key" type="text" [(ngModel)]="profileForm.callmebot_key" name="callmebot_key"
-              placeholder="Ex: 123456" />
-            <span class="form-hint" *ngIf="!profileForm.callmebot_key">
-              Não tem? Envie <strong>I allow callmebot to send me messages</strong> para
-              <strong>+34 644 81 58 78</strong> no WhatsApp — a key chega em segundos.
-            </span>
-          </div>
-          <div *ngIf="profileError" class="error-box" style="margin-top:14px">{{ profileError }}</div>
-          <div *ngIf="profileSuccess" class="success-box" style="margin-top:14px">Perfil salvo com sucesso!</div>
-          <div class="modal-actions" style="justify-content:space-between">
-            <a class="btn-whatsapp" *ngIf="!profileForm.callmebot_key"
-              href="https://wa.me/34644815878?text=I%20allow%20callmebot%20to%20send%20me%20messages"
-              target="_blank" rel="noopener">
-              📲 Ativar CallMeBot
-            </a>
-            <span *ngIf="profileForm.callmebot_key"></span>
-            <div style="display:flex;gap:8px">
-              <button type="button" class="btn-ghost" (click)="closeProfileModal()">Cancelar</button>
-              <button type="submit" class="btn-primary modal-save" [disabled]="profileSaving">
-                <span *ngIf="profileSaving" class="spinner"></span>
-                <span *ngIf="!profileSaving">Salvar</span>
-              </button>
+          }
+          @if (!profileLoading) {
+            <form (ngSubmit)="saveProfile()">
+              <div class="form-group">
+                <label>E-mail</label>
+                <input type="email" [value]="userEmail" disabled style="opacity:.45;cursor:not-allowed" />
+              </div>
+              <div class="form-group" style="margin-top:14px">
+                <label for="p-whatsapp">WhatsApp</label>
+                <div class="phone-input">
+                  <span class="phone-prefix">55</span>
+                  <input id="p-whatsapp" type="tel" [(ngModel)]="profileForm.whatsapp" name="whatsapp"
+                    placeholder="11999999999" maxlength="11" />
+                  </div>
+                  <span class="form-hint">DDD + número (ex: 11999999999)</span>
+                </div>
+                <div class="form-group" style="margin-top:14px">
+                  <label for="p-key">CallMeBot API Key</label>
+                  <input id="p-key" type="text" [(ngModel)]="profileForm.callmebot_key" name="callmebot_key"
+                    placeholder="Ex: 123456" />
+                    @if (!profileForm.callmebot_key) {
+                      <span class="form-hint">
+                        Não tem? Envie <strong>I allow callmebot to send me messages</strong> para
+                        <strong>+34 644 81 58 78</strong> no WhatsApp — a key chega em segundos.
+                      </span>
+                    }
+                  </div>
+                  @if (profileError) {
+                    <div class="error-box" style="margin-top:14px">{{ profileError }}</div>
+                  }
+                  @if (profileSuccess) {
+                    <div class="success-box" style="margin-top:14px">Perfil salvo com sucesso!</div>
+                  }
+                  <div class="modal-actions" style="justify-content:space-between">
+                    @if (!profileForm.callmebot_key) {
+                      <a class="btn-whatsapp"
+                        href="https://wa.me/34644815878?text=I%20allow%20callmebot%20to%20send%20me%20messages"
+                        target="_blank" rel="noopener">
+                        📲 Ativar CallMeBot
+                      </a>
+                    }
+                    @if (profileForm.callmebot_key) {
+                      <span></span>
+                    }
+                    <div style="display:flex;gap:8px">
+                      <button type="button" class="btn-ghost" (click)="closeProfileModal()">Cancelar</button>
+                      <button type="submit" class="btn-primary modal-save" [disabled]="profileSaving">
+                        @if (profileSaving) {
+                          <span class="spinner"></span>
+                        }
+                        @if (!profileSaving) {
+                          <span>Salvar</span>
+                        }
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              }
             </div>
           </div>
-        </form>
-      </div>
-    </div>
-  `
+        }
+    `
 })
 export class SidebarComponent implements OnInit {
   @Input() active: 'voos' | 'onibus' = 'voos';

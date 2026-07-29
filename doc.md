@@ -8,7 +8,7 @@ Documentação de referência do projeto. Atualizar sempre que houver mudanças 
 
 Aplicação de alertas de preço para **voos** e **ônibus (Buser)**. O usuário cadastra uma rota + meta de preço e recebe notificação no WhatsApp quando o preço cai abaixo da meta.
 
-- **Frontend:** Angular 17 standalone, Supabase JS client
+- **Frontend:** Angular 21 standalone, Supabase JS client
 - **Backend:** Node.js scripts via GitHub Actions (cron) e Vercel Functions (on-demand)
 - **Banco:** Supabase (Postgres + RLS + Realtime)
 - **Notificações:** CallMeBot (WhatsApp gratuito)
@@ -199,7 +199,8 @@ Classes globais reutilizáveis em `src/styles/components.css`: `btn-primary`, `b
 
 ## Convenções
 
-- Componentes standalone (sem NgModules)
+- Componentes standalone (sem NgModules), sem `standalone: true` explícito (é o padrão desde Angular 19)
+- Control flow com sintaxe de bloco (`@if`/`@for`), não `*ngIf`/`*ngFor`
 - Path aliases: `@core/`, `@features/`, `@shared/`, `@env/`
 - Notificações WhatsApp sempre com prefixo `55` no banco; strip ao exibir
 - Slugs do Buser seguem padrão `{cidade-normalizada}-{uf}` ex: `sao-paulo-sp`

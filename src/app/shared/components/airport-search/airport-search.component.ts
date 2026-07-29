@@ -1,13 +1,12 @@
 import { Component, Input, Output, EventEmitter, HostListener, ElementRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { Airport, searchAirports } from '@shared/data/airports';
 
 @Component({
-  selector: 'app-airport-search',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  template: `
+    selector: 'app-airport-search',
+    imports: [FormsModule],
+    template: `
     <div class="airport-search">
       <input
         [id]="inputId"
@@ -22,20 +21,23 @@ import { Airport, searchAirports } from '@shared/data/airports';
         (keydown.arrowup)="moveUp($event)"
         (keydown.enter)="selectActive($event)"
         autocomplete="off"
-      />
-      <ul class="airport-dropdown" *ngIf="results.length > 0">
-        <li
-          *ngFor="let a of results; let i = index"
-          [class.active]="i === activeIndex"
-          (mousedown)="select(a)">
-          <span class="airport-iata">{{ a.iata }}</span>
-          <span class="airport-info">{{ a.city }} · {{ a.name }}</span>
-          <span class="airport-country">{{ a.country }}</span>
-        </li>
-      </ul>
-    </div>
-  `,
-  styles: [`
+        />
+        @if (results.length > 0) {
+          <ul class="airport-dropdown">
+            @for (a of results; track a; let i = $index) {
+              <li
+                [class.active]="i === activeIndex"
+                (mousedown)="select(a)">
+                <span class="airport-iata">{{ a.iata }}</span>
+                <span class="airport-info">{{ a.city }} · {{ a.name }}</span>
+                <span class="airport-country">{{ a.country }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    `,
+    styles: [`
     .airport-search { position: relative; }
     .airport-dropdown {
       position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200;

@@ -5,78 +5,93 @@ import { SupabaseService } from '@core/services/supabase.service';
 import { Alert } from '@core/models/alert.model';
 
 @Component({
-  selector: 'app-share',
-  standalone: true,
-  imports: [CommonModule, RouterModule],
-  template: `
+    selector: 'app-share',
+    imports: [CommonModule, RouterModule],
+    template: `
     <div class="share-page">
-      <div class="share-card fade-up" *ngIf="!loading && alert">
-
-        <div class="share-brand">
-          <span class="brand-icon">✈</span>
-          <span class="brand-name">VooAlerta</span>
-        </div>
-
-        <div class="share-route">
-          <span class="iata">{{ alert.origem }}</span>
-          <span class="route-arrow">→</span>
-          <span class="iata">{{ alert.destino }}</span>
-        </div>
-
-        <div class="share-date">
-          {{ alert.data_ida | date:'dd/MM/yyyy' }}
-          <ng-container *ngIf="alert.data_volta"> → {{ alert.data_volta | date:'dd/MM/yyyy' }}</ng-container>
-          <ng-container *ngIf="!alert.data_volta"> · Só ida</ng-container>
-        </div>
-
-        <div class="share-prices">
-          <div class="price-block">
-            <span class="price-label">Preço atual</span>
-            <span class="price-value"
-              [class.price-below]="minPrice !== null && minPrice <= alert.meta"
-              [class.price-above]="minPrice !== null && minPrice > alert.meta">
-              <ng-container *ngIf="minPrice !== null">R$ {{ minPrice | number:'1.0-0' }}</ng-container>
-              <ng-container *ngIf="minPrice === null">—</ng-container>
-            </span>
+      @if (!loading && alert) {
+        <div class="share-card fade-up">
+          <div class="share-brand">
+            <span class="brand-icon">✈</span>
+            <span class="brand-name">VooAlerta</span>
           </div>
-          <div class="price-divider"></div>
-          <div class="price-block">
-            <span class="price-label">Meta</span>
-            <span class="price-value meta-value">R$ {{ alert.meta | number:'1.0-0' }}</span>
+          <div class="share-route">
+            <span class="iata">{{ alert.origem }}</span>
+            <span class="route-arrow">→</span>
+            <span class="iata">{{ alert.destino }}</span>
           </div>
+          <div class="share-date">
+            {{ alert.data_ida | date:'dd/MM/yyyy' }}
+            @if (alert.data_volta) {
+              → {{ alert.data_volta | date:'dd/MM/yyyy' }}
+            }
+            @if (!alert.data_volta) {
+              · Só ida
+            }
+          </div>
+          <div class="share-prices">
+            <div class="price-block">
+              <span class="price-label">Preço atual</span>
+              <span class="price-value"
+                [class.price-below]="minPrice !== null && minPrice <= alert.meta"
+                [class.price-above]="minPrice !== null && minPrice > alert.meta">
+                @if (minPrice !== null) {
+                  R$ {{ minPrice | number:'1.0-0' }}
+                }
+                @if (minPrice === null) {
+                  —
+                }
+              </span>
+            </div>
+            <div class="price-divider"></div>
+            <div class="price-block">
+              <span class="price-label">Meta</span>
+              <span class="price-value meta-value">R$ {{ alert.meta | number:'1.0-0' }}</span>
+            </div>
+          </div>
+          @if (minPrice !== null && minPrice <= alert.meta) {
+            <div class="share-badge share-badge-below">
+              Abaixo da meta! Corre comprar.
+            </div>
+          }
+          @if (minPrice !== null && minPrice > alert.meta) {
+            <div class="share-badge share-badge-above">
+              ⏳ Ainda acima da meta — continue monitorando.
+            </div>
+          }
+          @if (alert.so_direto || alert.horario_minimo) {
+            <div class="share-tags">
+              @if (alert.so_direto) {
+                <span class="tag">Só direto</span>
+              }
+              @if (alert.horario_minimo) {
+                <span class="tag">A partir das {{ alert.horario_minimo }}</span>
+              }
+            </div>
+          }
+          <a class="btn-primary share-cta" href="/" routerLink="/">
+            Criar meu alerta de voo
+          </a>
         </div>
-
-        <div class="share-badge share-badge-below" *ngIf="minPrice !== null && minPrice <= alert.meta">
-           Abaixo da meta! Corre comprar.
+      }
+    
+      @if (loading) {
+        <div class="center-state">
+          <div class="spinner" style="width:32px;height:32px;border-width:3px"></div>
         </div>
-        <div class="share-badge share-badge-above" *ngIf="minPrice !== null && minPrice > alert.meta">
-          ⏳ Ainda acima da meta — continue monitorando.
+      }
+    
+      @if (!loading && !alert) {
+        <div class="share-card fade-up center-state">
+          <div style="font-size:40px;margin-bottom:16px">✈</div>
+          <h2>Alerta não encontrado</h2>
+          <p style="color:var(--color-text-muted);margin-top:8px">O link pode ter expirado ou sido removido.</p>
+          <a class="btn-primary" style="margin-top:24px;display:inline-block" routerLink="/">Ir para o VooAlerta</a>
         </div>
-
-        <div class="share-tags" *ngIf="alert.so_direto || alert.horario_minimo">
-          <span class="tag" *ngIf="alert.so_direto">Só direto</span>
-          <span class="tag" *ngIf="alert.horario_minimo">A partir das {{ alert.horario_minimo }}</span>
-        </div>
-
-        <a class="btn-primary share-cta" href="/" routerLink="/">
-          Criar meu alerta de voo
-        </a>
-
-      </div>
-
-      <div class="center-state" *ngIf="loading">
-        <div class="spinner" style="width:32px;height:32px;border-width:3px"></div>
-      </div>
-
-      <div class="share-card fade-up center-state" *ngIf="!loading && !alert">
-        <div style="font-size:40px;margin-bottom:16px">✈</div>
-        <h2>Alerta não encontrado</h2>
-        <p style="color:var(--color-text-muted);margin-top:8px">O link pode ter expirado ou sido removido.</p>
-        <a class="btn-primary" style="margin-top:24px;display:inline-block" routerLink="/">Ir para o VooAlerta</a>
-      </div>
+      }
     </div>
-  `,
-  styles: [`
+    `,
+    styles: [`
     .share-page {
       min-height: 100vh;
       display: flex; align-items: center; justify-content: center;
