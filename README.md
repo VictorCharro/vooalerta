@@ -9,3 +9,4 @@ Angular 17 com Supabase. Site em produção: [vooalerta-seven.vercel.app](https:
 ```bash
 npm install
 ```
+ 
