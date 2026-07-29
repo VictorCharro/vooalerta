@@ -10,11 +10,10 @@ import { TimePickerComponent } from '@shared/components/time-picker/time-picker.
 import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
 
 @Component({
-  selector: 'app-voos',
-  standalone: true,
-  imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent],
-  styleUrls: ['./voos.component.css'],
-  template: `
+    selector: 'app-voos',
+    imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent],
+    styleUrls: ['./voos.component.css'],
+    template: `
     <div class="layout">
 
       <app-sidebar active="voos" [userEmail]="userEmail" [isDark]="isDark"

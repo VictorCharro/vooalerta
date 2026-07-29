@@ -5,11 +5,10 @@ import { Router, RouterLink } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
 
 @Component({
-  selector: 'app-login',
-  standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
-  styleUrls: ['../auth.styles.css'],
-  template: `
+    selector: 'app-login',
+    imports: [CommonModule, FormsModule, RouterLink],
+    styleUrls: ['../auth.styles.css'],
+    template: `
     <div class="auth-page">
       <div class="auth-box fade-up">
 

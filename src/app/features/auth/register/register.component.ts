@@ -5,11 +5,10 @@ import { RouterLink } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
 
 @Component({
-  selector: 'app-register',
-  standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
-  styleUrls: ['../auth.styles.css'],
-  template: `
+    selector: 'app-register',
+    imports: [CommonModule, FormsModule, RouterLink],
+    styleUrls: ['../auth.styles.css'],
+    template: `
     <div class="auth-page">
       <div class="auth-box fade-up">
 
@@ -86,7 +85,7 @@ import { SupabaseService } from '@core/services/supabase.service';
       </div>
     </div>
   `,
-  styles: [`
+    styles: [`
     .success-confirm { text-align: center; padding: 8px 0 4px; }
     .confirm-icon {
       width: 52px; height: 52px;

@@ -4,10 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { Airport, searchAirports } from '@shared/data/airports';
 
 @Component({
-  selector: 'app-airport-search',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  template: `
+    selector: 'app-airport-search',
+    imports: [CommonModule, FormsModule],
+    template: `
     <div class="airport-search">
       <input
         [id]="inputId"
@@ -35,7 +34,7 @@ import { Airport, searchAirports } from '@shared/data/airports';
       </ul>
     </div>
   `,
-  styles: [`
+    styles: [`
     .airport-search { position: relative; }
     .airport-dropdown {
       position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200;

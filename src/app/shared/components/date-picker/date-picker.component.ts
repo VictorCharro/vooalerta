@@ -5,10 +5,9 @@ const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','A
 const DAYS   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
 @Component({
-  selector: 'app-date-picker',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-date-picker',
+    imports: [CommonModule],
+    template: `
     <div class="dp-wrap">
       <button type="button" class="dp-input" (click)="toggle()" [class.dp-disabled]="disabled">
         <span [class.dp-placeholder]="!value">{{ displayValue || placeholder }}</span>
@@ -40,7 +39,7 @@ const DAYS   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
       </div>
     </div>
   `,
-  styles: [`
+    styles: [`
     .dp-wrap { position: relative; }
     .dp-input {
       display: flex; align-items: center; justify-content: space-between;

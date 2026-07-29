@@ -5,10 +5,9 @@ import { SupabaseService } from '@core/services/supabase.service';
 import { Alert } from '@core/models/alert.model';
 
 @Component({
-  selector: 'app-share',
-  standalone: true,
-  imports: [CommonModule, RouterModule],
-  template: `
+    selector: 'app-share',
+    imports: [CommonModule, RouterModule],
+    template: `
     <div class="share-page">
       <div class="share-card fade-up" *ngIf="!loading && alert">
 
@@ -76,7 +75,7 @@ import { Alert } from '@core/models/alert.model';
       </div>
     </div>
   `,
-  styles: [`
+    styles: [`
     .share-page {
       min-height: 100vh;
       display: flex; align-items: center; justify-content: center;

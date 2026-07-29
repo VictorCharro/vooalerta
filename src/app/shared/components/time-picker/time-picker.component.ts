@@ -3,10 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 @Component({
-  selector: 'app-time-picker',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  template: `
+    selector: 'app-time-picker',
+    imports: [CommonModule, FormsModule],
+    template: `
     <div class="tp-wrap">
       <select class="tp-select" [(ngModel)]="hour" (ngModelChange)="emit()" [name]="name + '_h'">
         <option *ngFor="let h of hours" [value]="h">{{ h }}</option>
@@ -17,7 +16,7 @@ import { FormsModule } from '@angular/forms';
       </select>
     </div>
   `,
-  styles: [`
+    styles: [`
     .tp-wrap { display: flex; align-items: center; gap: 6px; }
     .tp-select {
       flex: 1; padding: 9px 8px; border: 1px solid var(--color-border);

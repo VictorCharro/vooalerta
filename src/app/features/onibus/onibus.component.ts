@@ -22,11 +22,10 @@ interface BusAlert {
 }
 
 @Component({
-  selector: 'app-onibus',
-  standalone: true,
-  imports: [CommonModule, FormsModule, DatePickerComponent, SidebarComponent],
-  styleUrls: ['./onibus.component.css'],
-  template: `
+    selector: 'app-onibus',
+    imports: [CommonModule, FormsModule, DatePickerComponent, SidebarComponent],
+    styleUrls: ['./onibus.component.css'],
+    template: `
     <div class="layout">
 
       <app-sidebar active="onibus" [userEmail]="userEmail" [isDark]="isDark"

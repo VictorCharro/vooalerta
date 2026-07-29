@@ -5,11 +5,10 @@ import { Router } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
 
 @Component({
-  selector: 'app-sidebar',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  styleUrls: ['./sidebar.component.css'],
-  template: `
+    selector: 'app-sidebar',
+    imports: [CommonModule, FormsModule],
+    styleUrls: ['./sidebar.component.css'],
+    template: `
     <aside class="sidebar">
       <div class="sidebar-top">
         <div class="brand">
