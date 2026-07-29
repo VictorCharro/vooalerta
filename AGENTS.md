@@ -8,7 +8,7 @@ Documento de referência para o Codex. Atualizar sempre que houver mudanças est
 
 Aplicação de alertas de preço para **voos** e **ônibus (Buser)**. O usuário cadastra uma rota + meta de preço e recebe notificação no WhatsApp quando o preço cai abaixo da meta.
 
-- **Frontend:** Angular 17 standalone, Supabase JS client
+- **Frontend:** Angular 21 standalone, Supabase JS client
 - **Backend:** Node.js scripts rodando via GitHub Actions (cron)
 - **Banco:** Supabase (Postgres + RLS + Realtime)
 - **Notificações:** CallMeBot (WhatsApp gratuito)
