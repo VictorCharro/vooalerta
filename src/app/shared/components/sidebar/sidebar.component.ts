@@ -3,41 +3,44 @@ import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
+import { ButtonDirective } from 'primeng/button';
 
 @Component({
     selector: 'app-sidebar',
-    imports: [FormsModule],
+    imports: [FormsModule, ButtonDirective],
     styleUrls: ['./sidebar.component.css'],
     template: `
     <aside class="sidebar">
       <div class="sidebar-top">
         <div class="brand">
-          <div class="brand-icon">✈</div>
+          <div class="brand-icon">
+            <img src="assets/icons/icon_aviao.png" alt="" />
+          </div>
           <span class="brand-name">Viagem Alerta</span>
         </div>
         <nav class="sidebar-nav">
-          <button class="nav-item" [class.active]="active === 'voos'" (click)="router.navigate(['/voos'])">
-            <span class="nav-icon">◫</span> Voos
+          <button pButton class="nav-item" [class.active]="active === 'voos'" (click)="router.navigate(['/voos'])">
+            <img class="nav-icon" src="assets/icons/icon_aviao.png" alt="" /> Voos
           </button>
-          <button class="nav-item" [class.active]="active === 'onibus'" (click)="router.navigate(['/onibus'])">
-            <span class="nav-icon">⊟</span> Ônibus
+          <button pButton class="nav-item" [class.active]="active === 'onibus'" (click)="router.navigate(['/onibus'])">
+            <img class="nav-icon" src="assets/icons/icon_onibus.png" alt="" /> Ônibus
           </button>
-          <button class="nav-item" (click)="openProfileModal()">
-            <span class="nav-icon">◯</span> Perfil
+          <button pButton class="nav-item" (click)="openProfileModal()">
+            <img class="nav-icon" src="assets/icons/icon_perfil.png" alt="" /> Perfil
           </button>
         </nav>
       </div>
       <div class="sidebar-bottom">
-        <button class="theme-btn" (click)="toggleTheme()" [title]="isDark ? 'Modo claro' : 'Modo escuro'">
-          {{ isDark ? '☀' : '☾' }} {{ isDark ? 'Modo claro' : 'Modo escuro' }}
-        </button>
         <div class="sidebar-user">
-          <span class="user-email">{{ userEmail }}</span>
-          <button class="btn-ghost sidebar-logout" (click)="logout()">Sair</button>
+          <button pButton class="theme-btn" [rounded]="true" text severity="secondary"
+            (click)="toggleTheme()" [title]="isDark ? 'Modo claro' : 'Modo escuro'">
+            <img src="assets/icons/icon_lightmode.png" alt="" />
+          </button>
+          <button pButton class="sidebar-logout" severity="secondary" (click)="logout()">Sair</button>
         </div>
       </div>
     </aside>
-    
+
     <!-- ── Modal perfil ── -->
     @if (showProfileModal) {
       <div class="modal-overlay" (click)="onOverlayClick($event)">

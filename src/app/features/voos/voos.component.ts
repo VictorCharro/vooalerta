@@ -8,10 +8,11 @@ import { AirportSearchComponent } from '@shared/components/airport-search/airpor
 import { DatePickerComponent } from '@shared/components/date-picker/date-picker.component';
 import { TimePickerComponent } from '@shared/components/time-picker/time-picker.component';
 import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
+import { ButtonDirective } from 'primeng/button';
 
 @Component({
     selector: 'app-voos',
-    imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent],
+    imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent, ButtonDirective],
     styleUrls: ['./voos.component.css'],
     template: `
     <div class="layout">
@@ -33,17 +34,24 @@ import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
     
         <!-- ══ LISTA ══ -->
         @if (!selectedAlert) {
-          <div class="page-header fade-up">
-            <div>
-              <h1>Voos</h1>
+          <div class="greeting-header fade-up">
+            <div class="greeting-bar"></div>
+            <div class="greeting-text">
+              <h1>Olá, {{ firstName }}! Qual será sua próxima viagem?</h1>
               @if (!loading) {
                 <p class="page-sub">
-                  {{ alerts.length }} rota{{ alerts.length !== 1 ? 's' : '' }} monitorada{{ alerts.length !== 1 ? 's' : '' }}
+                  {{ alerts.length }} Rota{{ alerts.length !== 1 ? 's' : '' }} Monitorada{{ alerts.length !== 1 ? 's' : '' }}
                 </p>
               }
             </div>
-            <button class="btn-primary" (click)="openModal()">+ Novo alerta</button>
+            <div class="greeting-actions">
+              <button pButton [rounded]="true" severity="primary" class="favorite-btn" aria-label="Favoritos">
+                <img src="assets/icons/icon_favorito.png" alt="" />
+              </button>
+              <button pButton [rounded]="true" severity="primary" (click)="openModal()">+ Novo Alerta</button>
+            </div>
           </div>
+          <h2 class="section-title">Voos</h2>
           <!-- Aviso callmebot_key ausente -->
           @if (missingCallmebotKey) {
             <div class="warn-banner fade-up">
@@ -67,10 +75,9 @@ import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
           <!-- Empty state -->
           @if (!loading && alerts.length === 0) {
             <div class="empty-state fade-up">
-              <div class="empty-icon">✈</div>
+              <img class="empty-icon" src="assets/icons/icon_aviaoSemRotas.png" alt="" />
               <h3>Nenhum alerta ainda</h3>
               <p>Crie seu primeiro alerta e receba no WhatsApp quando o preço cair.</p>
-              <button class="btn-primary" (click)="openModal()" style="margin-top:20px">Criar primeiro alerta</button>
             </div>
           }
           <!-- Alert cards -->
@@ -530,6 +537,11 @@ export class VoosComponent implements OnInit, OnDestroy {
   readonly today = new Date().toISOString().split('T')[0];
 
   get activeCount() { return this.alerts.filter(a => a.ativo).length; }
+
+  get firstName(): string {
+    const local = this.userEmail.split('@')[0] || '';
+    return local.charAt(0).toUpperCase() + local.slice(1);
+  }
 
   get alertsBelowMeta(): Alert[] {
     return this.alerts.filter(a => {
