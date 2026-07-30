@@ -8,7 +8,7 @@ Documentação de referência do projeto. Atualizar sempre que houver mudanças 
 
 Aplicação de alertas de preço para **voos** e **ônibus (Buser)**. O usuário cadastra uma rota + meta de preço e recebe notificação no WhatsApp quando o preço cai abaixo da meta.
 
-- **Frontend:** Angular 21 standalone, Supabase JS client
+- **Frontend:** Angular 21 standalone, PrimeNG (tema customizado) + Supabase JS client
 - **Backend:** Node.js scripts via GitHub Actions (cron) e Vercel Functions (on-demand)
 - **Banco:** Supabase (Postgres + RLS + Realtime)
 - **Notificações:** CallMeBot (WhatsApp gratuito)
@@ -22,19 +22,22 @@ Aplicação de alertas de preço para **voos** e **ônibus (Buser)**. O usuário
 vooalerta/
 ├── src/
 │   ├── environments/                      # environment.ts / environment.prod.ts — gitignored, gerados no build (Vercel) ou preenchidos localmente
+│   ├── assets/icons/                      # Ícones PNG exportados do Figma (avião, ônibus, perfil, favorito, lightmode, etc.)
 │   ├── styles/
-│   │   ├── theme.css       # Variáveis CSS (cores, espaçamentos, radius)
+│   │   ├── theme.css       # Variáveis CSS (cores, espaçamentos, radius) — paleta do Figma
 │   │   ├── base.css
-│   │   ├── components.css  # btn-primary, btn-ghost, btn-icon, inputs, error-box, toggle, etc.
+│   │   ├── components.css  # btn-primary, btn-ghost, btn-icon, inputs, error-box, toggle, etc. (legado, pré-PrimeNG)
 │   │   └── main.css
 │   └── app/
 │       ├── app.routes.ts                  # Rotas Angular
-│       ├── app.config.ts
+│       ├── app.config.ts                  # providePrimeNG com o preset customizado
 │       ├── core/
 │       │   ├── guards/auth.guard.ts       # authGuard + guestGuard
 │       │   ├── models/
 │       │   │   ├── alert.model.ts         # Interface Alert (voos)
 │       │   │   └── user.model.ts
+│       │   ├── theme/
+│       │   │   └── vooalerta-preset.ts    # Preset PrimeNG (definePreset sobre Aura) com as cores do Figma
 │       │   └── services/
 │       │       └── supabase.service.ts    # Toda comunicação com Supabase
 │       ├── features/
@@ -179,21 +182,37 @@ vooalerta/
 
 ## Design system
 
-Todas as páginas usam variáveis CSS de `src/styles/theme.css`. As principais:
+Redesign em andamento baseado no Figma, migrando de CSS custom pra **PrimeNG** (`primeng`, `@primeuix/themes`, `primeicons`). Paleta em `src/styles/theme.css` (variáveis CSS) e espelhada no preset do PrimeNG (`src/app/core/theme/vooalerta-preset.ts`, `definePreset` sobre o tema Aura):
 
 ```css
---color-accent: #7c6dfa        /* roxo — botões primários, nav ativo */
---color-green:  #2dd4a0        /* preço abaixo da meta */
---color-red:    #f0605a        /* preço acima da meta */
---color-bg-2:   #111118        /* fundo de cards e sidebar */
---color-bg-3:   #18181f        /* fundo de inputs */
+--color-accent:       #C6194D   /* rosa — botões primários, nav ativo */
+--color-accent-hover: #6F132F   /* rosa sombra — hover/shadow projetada */
+--color-bg:           #111010   /* preto — fundo da sidebar */
+--color-bg-2:         #161616   /* cinza chumbo — fundo da área principal */
+--color-bg-3:         #242323   /* cinza claro — cards, inputs, botões inativos da sidebar */
+--color-border:       #232021   /* cinza claro sombra — bordas e sombra projetada dos botões inativos */
+--color-text:         #E8E8E8   /* branco */
+--color-text-muted:   #8B8B8B   /* texto de rotas/labels */
+--color-green:        #09AE00   /* preço abaixo da meta */
+--color-red:          #BB070A   /* preço acima da meta */
+--color-amber:        #D17300
 ```
 
-Tema claro disponível via `html[data-theme="light"]`, toggled por `localStorage('theme')`.
+`providePrimeNG` é registrado em `app.config.ts` com `options.darkModeSelector: false` — o app só tem o tema escuro do Figma por enquanto (o toggle de tema claro/escuro existente é legado e está **temporariamente desabilitado** na sidebar, junto com o botão de favoritos, até serem implementados de verdade).
 
-Classes globais reutilizáveis em `src/styles/components.css`: `btn-primary`, `btn-ghost`, `btn-icon`, `spinner`, `error-box`, `success-box`, `form-hint`, `toggle` (switch).
-- O `.toggle` global (`components.css`) é a única definição — não duplicar em CSS de componente.
-- Botão `.open-btn` (link externo) presente nos cards de voos (Google Flights) e ônibus (Buser); também no detalhe de ambas as páginas.
+Fonte `Mulish` (Google Fonts, carregada em `src/index.html`) é usada especificamente no título de saudação ("Olá, {nome}! Qual será sua próxima viagem?") das páginas de Voos e Ônibus; o resto do texto continua em Inter (`--font-display`/`--font-body`).
+
+**Convenção de sombra:** botões usam sombra "dura" (sem blur), tipo bloco sólido projetado embaixo — `box-shadow: 0 4px 0 0 <cor>`, usando a cor de sombra correspondente (`#6F132F` pra elementos rosa/ativos, `#232021` pra elementos cinza/inativos). Não usar `box-shadow` com blur nesse padrão.
+
+**Ícones:** os PNGs de `src/assets/icons/` (exportados do Figma) substituem emojis/glifos nos elementos redesenhados (logo, nav da sidebar, botões de ação, estado vazio). Ícones genéricos ainda não redesenhados podem usar PrimeIcons.
+
+**Status do redesign (por tela):**
+- **Voos** e **Ônibus**: cabeçalho de saudação (`.greeting-header`/`.greeting-bar`/`.list-heading`) e estado vazio (`.empty-state`) já redesenhados com PrimeNG. Lista de cards, modal de novo alerta/perfil e painel de detalhe **ainda não foram redesenhados** — mantêm o CSS legado (`components.css`, classes `btn-primary`, `.section-title`, etc.).
+- **Sidebar**: totalmente redesenhada (marca, nav com `pButton`, tema e sair). Modal de perfil embutido nela continua com o layout legado.
+- **Login/Register/Share**: ainda não redesenhados.
+
+Classes globais legadas em `src/styles/components.css` (`btn-primary`, `btn-ghost`, `btn-icon`, `spinner`, `error-box`, `success-box`, `form-hint`, `toggle`) continuam em uso nas partes ainda não migradas — não remover até o redesign cobrir tudo.
+- Atenção ao nome de classe `.section-title`: já existe (legado, uppercase/muted) nos cabeçalhos do modal/painel de detalhe de Voos e Ônibus. O título de lista novo usa `.list-heading` propositalmente para não colidir.
 
 ---
 

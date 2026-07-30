@@ -45,13 +45,13 @@ import { ButtonDirective } from 'primeng/button';
               }
             </div>
             <div class="greeting-actions">
-              <button pButton [rounded]="true" severity="primary" class="favorite-btn" aria-label="Favoritos">
+              <button pButton severity="primary" class="favorite-btn" disabled aria-label="Favoritos" title="Em breve">
                 <img src="assets/icons/icon_favorito.png" alt="" />
               </button>
-              <button pButton [rounded]="true" severity="primary" (click)="openModal()">+ Novo Alerta</button>
+              <button pButton severity="primary" class="new-alert-btn" (click)="openModal()">+ Novo Alerta</button>
             </div>
           </div>
-          <h2 class="section-title">Voos</h2>
+          <h2 class="list-heading">Voos</h2>
           <!-- Aviso callmebot_key ausente -->
           @if (missingCallmebotKey) {
             <div class="warn-banner fade-up">

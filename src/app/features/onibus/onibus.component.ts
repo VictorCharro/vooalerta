@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
 import { DatePickerComponent } from '@shared/components/date-picker/date-picker.component';
 import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
+import { ButtonDirective } from 'primeng/button';
 
 interface BusAlert {
   id: string;
@@ -23,7 +24,7 @@ interface BusAlert {
 
 @Component({
     selector: 'app-onibus',
-    imports: [CommonModule, FormsModule, DatePickerComponent, SidebarComponent],
+    imports: [CommonModule, FormsModule, DatePickerComponent, SidebarComponent, ButtonDirective],
     styleUrls: ['./onibus.component.css'],
     template: `
     <div class="layout">
@@ -52,17 +53,24 @@ interface BusAlert {
               (meta: R$&nbsp;{{ a.meta | number:'1.0-0' }})
             </div>
           }
-          <div class="page-header fade-up">
-            <div>
-              <h1>Ônibus</h1>
+          <div class="greeting-header fade-up">
+            <div class="greeting-bar"></div>
+            <div class="greeting-text">
+              <h1>Olá, {{ firstName }}! Qual será sua próxima viagem?</h1>
               @if (!loading) {
                 <p class="page-sub">
-                  {{ alerts.length }} rota{{ alerts.length !== 1 ? 's' : '' }} monitorada{{ alerts.length !== 1 ? 's' : '' }}
+                  {{ alerts.length }} Rota{{ alerts.length !== 1 ? 's' : '' }} Monitorada{{ alerts.length !== 1 ? 's' : '' }}
                 </p>
               }
             </div>
-            <button class="btn-primary" (click)="openModal()">+ Novo alerta</button>
+            <div class="greeting-actions">
+              <button pButton severity="primary" class="favorite-btn" disabled aria-label="Favoritos" title="Em breve">
+                <img src="assets/icons/icon_favorito.png" alt="" />
+              </button>
+              <button pButton severity="primary" class="new-alert-btn" (click)="openModal()">+ Novo Alerta</button>
+            </div>
           </div>
+          <h2 class="list-heading">Ônibus</h2>
           <!-- Loading -->
           @if (loading) {
             <div class="center-state">
@@ -72,10 +80,9 @@ interface BusAlert {
           <!-- Empty state -->
           @if (!loading && alerts.length === 0) {
             <div class="empty-state fade-up">
-              <div class="empty-icon">—</div>
+              <img class="empty-icon" src="assets/icons/icon_onibus.png" alt="" />
               <h3>Nenhum alerta de ônibus</h3>
               <p>Crie um alerta e receba no WhatsApp quando a passagem cair.</p>
-              <button class="btn-primary" (click)="openModal()" style="margin-top:20px">Criar primeiro alerta</button>
             </div>
           }
           <!-- Cards de alertas -->
@@ -470,6 +477,11 @@ export class OnibusComponent implements OnInit, OnDestroy {
   form       = this.emptyForm();
   detailForm = this.emptyDetailForm();
   readonly today = new Date().toISOString().split('T')[0];
+
+  get firstName(): string {
+    const local = this.userEmail.split('@')[0] || '';
+    return local.charAt(0).toUpperCase() + local.slice(1);
+  }
 
   get alertsBelowMeta(): BusAlert[] {
     return this.alerts.filter(a => {

@@ -20,20 +20,20 @@ import { ButtonDirective } from 'primeng/button';
         </div>
         <nav class="sidebar-nav">
           <button pButton class="nav-item" [class.active]="active === 'voos'" (click)="router.navigate(['/voos'])">
-            <img class="nav-icon" src="assets/icons/icon_aviao.png" alt="" /> Voos
+            <img class="nav-icon" src="assets/icons/icon_aviao.png" alt="" /><span class="nav-label">Voos</span>
           </button>
           <button pButton class="nav-item" [class.active]="active === 'onibus'" (click)="router.navigate(['/onibus'])">
-            <img class="nav-icon" src="assets/icons/icon_onibus.png" alt="" /> Ônibus
+            <img class="nav-icon" src="assets/icons/icon_onibus.png" alt="" /><span class="nav-label">Ônibus</span>
           </button>
           <button pButton class="nav-item" (click)="openProfileModal()">
-            <img class="nav-icon" src="assets/icons/icon_perfil.png" alt="" /> Perfil
+            <img class="nav-icon" src="assets/icons/icon_perfil.png" alt="" /><span class="nav-label">Perfil</span>
           </button>
         </nav>
       </div>
       <div class="sidebar-bottom">
         <div class="sidebar-user">
-          <button pButton class="theme-btn" [rounded]="true" text severity="secondary"
-            (click)="toggleTheme()" [title]="isDark ? 'Modo claro' : 'Modo escuro'">
+          <button pButton class="theme-btn" [rounded]="true" text severity="secondary" disabled
+            (click)="toggleTheme()" title="Em breve">
             <img src="assets/icons/icon_lightmode.png" alt="" />
           </button>
           <button pButton class="sidebar-logout" severity="secondary" (click)="logout()">Sair</button>

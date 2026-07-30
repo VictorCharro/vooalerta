@@ -1,5 +1,5 @@
 /* ── Layout ──────────────────────────────────────────────── */
-.layout { display: flex; min-height: 100vh; background: var(--color-bg); }
+.layout { display: flex; min-height: 100vh; background: var(--color-bg-2); }
 
 /* ── Chips de origem ─────────────────────────────────────── */
 .chips-input {
@@ -41,7 +41,7 @@
 .toast { background: var(--color-green); color: #fff; padding: 14px 20px; border-radius: var(--radius-md); font-size: 14px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,.25); max-width: 320px; }
 
 /* ── Main ────────────────────────────────────────────────── */
-.main { flex: 1; max-width: 860px; padding: 36px 32px; min-width: 0; }
+.main { flex: 1; padding: 40px 48px; min-width: 0; }
 
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 16px; }
 h1 { font-size: 26px; margin-bottom: 4px; }
@@ -49,14 +49,15 @@ h1 { font-size: 26px; margin-bottom: 4px; }
 .center-state { display: flex; justify-content: center; padding: 60px; }
 
 /* ── Greeting header ─────────────────────────────────────── */
-.greeting-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+.greeting-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .greeting-bar { width: 4px; align-self: stretch; background: var(--color-accent); border-radius: 2px; flex-shrink: 0; }
 .greeting-text { flex: 1; min-width: 0; }
-.greeting-text h1 { font-size: 22px; margin-bottom: 6px; }
+.greeting-text h1 { font-family: 'Mulish', sans-serif; font-weight: 400; font-size: 25px; margin-bottom: 6px; }
 .greeting-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.favorite-btn { width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; }
-.favorite-btn img { width: 18px; height: 18px; }
-.section-title { font-size: 18px; margin-bottom: 16px; }
+.favorite-btn { width: 46px; height: 42px; padding: 0; border-radius: var(--radius-md) !important; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 0 0 #6F132F; }
+.favorite-btn img { width: 28px; height: 28px; }
+.new-alert-btn { height: 42px; padding: 0 20px; border-radius: var(--radius-md) !important; font-size: 14px; font-weight: 600; box-shadow: 0 4px 0 0 #6F132F; }
+.list-heading { font-size: 20px; font-weight: 700; color: var(--color-text); margin-bottom: 12px; }
 
 /* ── Banners ─────────────────────────────────────────────── */
 .warn-banner { display: flex; align-items: center; gap: 12px; background: var(--color-amber-dim); color: var(--color-amber); border: 1px solid rgba(245,166,35,0.2); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -65,8 +66,8 @@ h1 { font-size: 26px; margin-bottom: 4px; }
 .price-banner { display: flex; align-items: center; gap: 8px; background: var(--color-green-dim); color: var(--color-green); border: 1px solid rgba(45,212,160,0.2); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; margin-bottom: 12px; }
 
 /* ── Empty state ─────────────────────────────────────────── */
-.empty-state { text-align: center; padding: 60px 24px; }
-.empty-icon { width: 64px; height: 64px; opacity: 0.35; margin-bottom: 16px; }
+.empty-state { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 110px 24px 60px; }
+.empty-icon { width: 64px; height: 64px; opacity: 0.35; margin: 0 auto 16px; }
 .empty-state h3 { font-size: 18px; margin-bottom: 8px; }
 .empty-state p { color: var(--color-text-muted); font-size: 14px; }
 
