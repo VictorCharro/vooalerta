@@ -1,3 +1,7 @@
+/* ── PrimeNG p-password (login/register) ──────────────────── */
+.auth-password { width: 100%; display: block; }
+.auth-password .p-password-toggle-mask-icon { color: var(--color-text); }
+
 /* ── Inputs ─────────────────────────────────────────────── */
 input, select, textarea {
   font-family: var(--font-body);

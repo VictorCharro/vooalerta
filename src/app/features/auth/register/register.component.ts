@@ -13,11 +13,16 @@ import { SupabaseService } from '@core/services/supabase.service';
       <div class="auth-box fade-up">
     
         <div class="auth-brand">
-          <div class="auth-brand-icon">✈</div>
+          <div class="auth-brand-icon">
+            <img src="assets/icons/icon_aviao.png" alt="" />
+          </div>
           <span class="auth-brand-name">Viagem Alerta</span>
         </div>
     
-        <h1 class="auth-title">Criar conta</h1>
+        <div class="auth-heading">
+          <div class="auth-heading-bar"></div>
+          <h1 class="auth-title">Criar conta</h1>
+        </div>
         <p class="auth-subtitle">Defina suas rotas e meta de preço — a gente avisa no WhatsApp.</p>
     
         @if (!success) {
