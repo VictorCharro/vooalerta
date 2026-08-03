@@ -125,6 +125,7 @@ vooalerta/
 - `SUPABASE_SERVICE_KEY` ou `SUPABASE_SERVICE_ROLE_KEY` — service_role key usada pela function `/api/scrape-flight` para gravar `price_cache`
 - `SERPAPI_KEY` — chave usada somente no servidor para consultar a segunda fonte de preços
 - Aliases aceitos pela API: `NEXT_PUBLIC_SUPABASE_URL`, `VITE_SUPABASE_URL`, `SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `VITE_SUPABASE_ANON_KEY`
+- `vercel.json` define `"regions": ["gru1"]` (São Paulo) — companhias aéreas filtram tarifas por país de origem da requisição (ponto de venda), então rodar a function fora do Brasil pode mostrar preços mais altos do que os vistos por um usuário navegando do Brasil, mesmo com `curr=BRL` forçado na URL. **Atenção:** seleção de região de function pode ser recurso do plano Pro da Vercel; no Hobby a config pode ser ignorada. O cron via GitHub Actions (`monitor.yml`) não é coberto por essa mudança — os runners hospedados do GitHub não rodam no Brasil.
 
 ### Rodando local
 `src/environments/environment.ts` (e `environment.prod.ts`) não existem no repo (gitignored). Pra rodar `npm start` local, criar esses dois arquivos manualmente com `supabaseUrl`/`supabaseKey` reais do projeto (Supabase → Settings → API). Nunca commitar esses arquivos — o `.gitignore` já bloqueia, mas vale checar `git status` depois de criar/editar.
@@ -134,10 +135,10 @@ vooalerta/
 ## Monitores (backend)
 
 ### `monitor.js` — Voos
-- Fontes: Google Flights via Playwright e SerpAPI em paralelo (`backend/flight_scraper.js`)
+- Fontes: Google Flights via Playwright é a fonte principal; SerpAPI é usada **só como fallback** quando o Playwright falha ou não retorna nenhum voo (`backend/flight_scraper.js`)
 - Agendamento: controlado **só pelo cron** (`monitor.yml`, atualmente a cada 3h). O script coleta sempre que é executado — não há gate de orçamento interno.
-- A SerpAPI usa `deep_search=true` e `show_hidden=true`; os resultados das duas fontes são combinados e o menor preço global é salvo/exibido.
-- Se uma fonte falhar, a outra ainda atualiza o cache e a falha fica registrada como aviso.
+- A SerpAPI usa `deep_search=true` e `show_hidden=true`. Ela não é combinada com o Playwright: o preço do Playwright vem da aba "Menores preços" real do Google, enquanto o preço da SerpAPI (`best_flights` + `other_flights`) equivale à aba "Melhor opção" e não deve substituir um resultado válido do Playwright.
+- Se o Playwright falhar ou não achar nada, a SerpAPI assume e a falha do Playwright fica registrada como aviso.
 - Seleciona a aba "Menores preços" no Google Flights antes de coletar.
 - Confirma que a aba ficou selecionada e só aceita a lista quando o menor voo coincide com o preço anunciado nela; uma lista antiga nunca substitui o cache.
 - Após clicar, monitora diretamente o valor exibido na aba "Menores preços"; espera mínima `FLIGHT_PRICE_SETTLE_MS=20000`, estabilidade `FLIGHT_PRICE_STABLE_MS=5000` e limite `FLIGHT_PRICE_TIMEOUT_MS=30000`.

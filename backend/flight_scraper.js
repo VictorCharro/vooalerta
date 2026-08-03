@@ -405,42 +405,56 @@ async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta
 }
 
 async function buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolta) {
-  const sourceNames = ['playwright', 'serpapi'];
-  const settled = await Promise.allSettled([
-    buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta),
-    buscarGoogleFlightsSerpApi(origem, destino, dataIda, dataVolta)
-  ]);
-  const flights = [];
   const fontes = {};
   const warnings = [];
 
-  settled.forEach((result, index) => {
-    const source = sourceNames[index];
-    if (result.status === 'fulfilled' && result.value.length > 0) {
-      flights.push(...result.value);
-      fontes[source] = {
-        preco: result.value[0]?.preco ?? null,
-        quantidade: result.value.length
+  try {
+    const playwrightFlights = await buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta);
+    if (playwrightFlights.length > 0) {
+      fontes.playwright = {
+        preco: playwrightFlights[0]?.preco ?? null,
+        quantidade: playwrightFlights.length
       };
-      return;
+      return {
+        voos: playwrightFlights.sort((a, b) => a.preco - b.preco),
+        fontes,
+        warning: undefined
+      };
     }
-
-    const reason = result.status === 'rejected'
-      ? String(result.reason?.message || result.reason).split('\n')[0]
-      : 'nenhum preco encontrado';
-    warnings.push(`${source}: ${reason}`);
-    console.warn(`Coleta ${source} indisponivel: ${reason}`);
-  });
-
-  if (flights.length === 0) {
-    throw new Error(`Nenhuma fonte retornou precos. ${warnings.join(' | ')}`);
+    warnings.push('playwright: nenhum preco encontrado');
+    console.warn('Coleta playwright indisponivel: nenhum preco encontrado');
+  } catch (err) {
+    const reason = String(err?.message || err).split('\n')[0];
+    warnings.push(`playwright: ${reason}`);
+    console.warn(`Coleta playwright indisponivel: ${reason}`);
   }
 
-  return {
-    voos: flights.sort((a, b) => a.preco - b.preco),
-    fontes,
-    warning: warnings.length ? warnings.join(' | ') : undefined
-  };
+  // SerpAPI so entra como fallback: a aba "Menores precos" do Playwright e a
+  // referencia real do preco anunciado pelo Google; o SerpAPI (best_flights +
+  // other_flights) equivale a "Melhor opcao" e nao deve substituir esse valor
+  // quando o Playwright funciona.
+  try {
+    const serpApiFlights = await buscarGoogleFlightsSerpApi(origem, destino, dataIda, dataVolta);
+    if (serpApiFlights.length > 0) {
+      fontes.serpapi = {
+        preco: serpApiFlights[0]?.preco ?? null,
+        quantidade: serpApiFlights.length
+      };
+      return {
+        voos: serpApiFlights.sort((a, b) => a.preco - b.preco),
+        fontes,
+        warning: warnings.length ? warnings.join(' | ') : undefined
+      };
+    }
+    warnings.push('serpapi: nenhum preco encontrado');
+    console.warn('Coleta serpapi indisponivel: nenhum preco encontrado');
+  } catch (err) {
+    const reason = String(err?.message || err).split('\n')[0];
+    warnings.push(`serpapi: ${reason}`);
+    console.warn(`Coleta serpapi indisponivel: ${reason}`);
+  }
+
+  throw new Error(`Nenhuma fonte retornou precos. ${warnings.join(' | ')}`);
 }
 
 async function buscarGoogleFlightsPlaywrightOnce(url, origem, destino) {
@@ -450,7 +464,28 @@ async function buscarGoogleFlightsPlaywrightOnce(url, origem, destino) {
     const page = await browser.newPage({
       locale: 'pt-BR',
       timezoneId: 'America/Sao_Paulo',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      viewport: { width: 1366, height: 900 },
+      geolocation: { latitude: -23.5505, longitude: -46.6333 },
+      permissions: ['geolocation'],
+      extraHTTPHeaders: {
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+      }
+    });
+
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt', 'en-US', 'en'] });
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+      window.chrome = { runtime: {} };
+      const originalQuery = window.navigator.permissions?.query;
+      if (originalQuery) {
+        window.navigator.permissions.query = parameters => (
+          parameters.name === 'notifications'
+            ? Promise.resolve({ state: Notification.permission })
+            : originalQuery(parameters)
+        );
+      }
     });
 
     if (IS_VERCEL) {
