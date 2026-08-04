@@ -120,6 +120,38 @@ export class SupabaseService {
     return prices.length ? Math.min(...prices) : null;
   }
 
+  async getMinPriceLinkForRoute(
+    origem: string,
+    destino: string,
+    dataIda: string,
+    dataVolta: string | null = null,
+    options: { horarioMinimo?: string | null; soDireto?: boolean } = {}
+  ): Promise<string | null> {
+    let query = this.client
+        .from('price_cache')
+        .select('preco, link, horario_partida, escalas')
+        .eq('origem', origem)
+        .eq('destino', destino)
+        .eq('data_ida', dataIda)
+        .not('preco', 'is', null);
+
+    query = dataVolta ? query.eq('data_volta', dataVolta) : query.is('data_volta', null);
+
+    const { data } = await query
+        .order('preco', { ascending: true })
+        .limit(200);
+
+    const horarioMinimo = options.horarioMinimo && options.horarioMinimo !== '00:00'
+      ? options.horarioMinimo
+      : null;
+    const row = (data ?? [])
+      .filter(row => !horarioMinimo || row.horario_partida === null || row.horario_partida >= horarioMinimo)
+      .filter(row => !options.soDireto || row.escalas === null || row.escalas === 0)
+      .find(row => typeof row.preco === 'number' && row.link);
+
+    return row?.link ?? null;
+  }
+
   async scrapeFlightPrice(origem: string, destino: string, dataIda: string, dataVolta?: string | null): Promise<{ preco: number | null; error?: string; warning?: string }> {
     const { data: { session } } = await this.client.auth.getSession();
     if (!session) return { preco: null, error: 'Sessão expirada. Faça login novamente.' };

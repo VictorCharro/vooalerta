@@ -144,7 +144,7 @@ import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
                       <span class="track"></span>
                       <span class="thumb"></span>
                     </label>
-                    <a [href]="buildGoogleFlightsUrl(alert)" target="_blank" class="open-btn" title="Abrir no Google Flights">
+                    <a [href]="getMinLink(alert)" target="_blank" class="open-btn" title="Abrir oferta">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </a>
                     <button class="refresh-btn"
@@ -326,8 +326,8 @@ import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
                           </label>
                         </div>
                         <div class="info-row" style="border-bottom:none;padding-bottom:0">
-                          <span class="info-label">Abrir no Google Flights</span>
-                          <a class="open-btn" [href]="buildGoogleFlightsUrl(selectedAlert)" target="_blank" rel="noopener" title="Abrir no Google Flights">↗</a>
+                          <span class="info-label">Abrir oferta</span>
+                          <a class="open-btn" [href]="getMinLink(selectedAlert)" target="_blank" rel="noopener" title="Abrir oferta">↗</a>
                         </div>
                       </div>
                       <div class="info-section">
@@ -513,6 +513,7 @@ export class VoosComponent implements OnInit, OnDestroy {
   profileWhatsapp     = '';
 
   minPrices:        Record<string, number> = {};
+  minLinks:         Record<string, string> = {};
   minPricesLoading  = false;
   refreshing:       Record<string, boolean> = {};
   toasts:           string[] = [];
@@ -589,20 +590,30 @@ export class VoosComponent implements OnInit, OnDestroy {
     if (!this.alerts.length) return;
     this.minPricesLoading = true;
     const prices: Record<string, number> = {};
+    const links: Record<string, string> = {};
     await Promise.all(
       this.alerts.map(async (alert) => {
         const key = this.priceKey(alert);
         if (prices[key] === undefined) {
-          const price = await this.supabase.getMinPriceForRoute(
-            alert.origem, alert.destino, alert.data_ida,
-            alert.data_volta ?? null,
-            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-          );
+          const [price, link] = await Promise.all([
+            this.supabase.getMinPriceForRoute(
+              alert.origem, alert.destino, alert.data_ida,
+              alert.data_volta ?? null,
+              { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+            ),
+            this.supabase.getMinPriceLinkForRoute(
+              alert.origem, alert.destino, alert.data_ida,
+              alert.data_volta ?? null,
+              { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+            )
+          ]);
           if (price !== null) prices[key] = price;
+          if (link !== null) links[key] = link;
         }
       })
     );
     this.minPrices = prices;
+    this.minLinks = links;
     this.minPricesLoading = false;
   }
 
@@ -619,6 +630,11 @@ export class VoosComponent implements OnInit, OnDestroy {
     return val !== undefined ? val : null;
   }
 
+  getMinLink(alert: Alert | null): string {
+    if (!alert) return this.buildGoogleFlightsUrl(alert);
+    return this.minLinks[this.priceKey(alert)] ?? this.buildGoogleFlightsUrl(alert);
+  }
+
   async refreshPrice(alert: Alert) {
     if (!alert.id || this.isRefreshing(alert) || this.getCooldownSeconds(alert) > 0) return;
 
@@ -628,15 +644,25 @@ export class VoosComponent implements OnInit, OnDestroy {
       const result = await this.supabase.scrapeFlightPrice(alert.origem, alert.destino, alert.data_ida, alert.data_volta);
 
       if (result.preco !== null) {
-        const currentPrice = await this.supabase.getMinPriceForRoute(
-          alert.origem, alert.destino, alert.data_ida,
-          alert.data_volta ?? null,
-          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-        );
+        const [currentPrice, currentLink] = await Promise.all([
+          this.supabase.getMinPriceForRoute(
+            alert.origem, alert.destino, alert.data_ida,
+            alert.data_volta ?? null,
+            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+          ),
+          this.supabase.getMinPriceLinkForRoute(
+            alert.origem, alert.destino, alert.data_ida,
+            alert.data_volta ?? null,
+            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+          )
+        ]);
 
         localStorage.setItem(key, String(Date.now()));
         if (currentPrice !== null) {
           this.minPrices = { ...this.minPrices, [this.priceKey(alert)]: currentPrice };
+          if (currentLink !== null) {
+            this.minLinks = { ...this.minLinks, [this.priceKey(alert)]: currentLink };
+          }
           this.showToast(`Preço atualizado: R$ ${currentPrice}`);
         } else {
           await this.loadMinPrices();
