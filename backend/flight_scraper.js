@@ -457,48 +457,152 @@ async function buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolt
   throw new Error(`Nenhuma fonte retornou precos. ${warnings.join(' | ')}`);
 }
 
+async function createStealthPage(browser) {
+  const page = await browser.newPage({
+    locale: 'pt-BR',
+    timezoneId: 'America/Sao_Paulo',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    viewport: { width: 1366, height: 900 },
+    geolocation: { latitude: -23.5505, longitude: -46.6333 },
+    permissions: ['geolocation'],
+    extraHTTPHeaders: {
+      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+    }
+  });
+
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt', 'en-US', 'en'] });
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+    window.chrome = { runtime: {} };
+    const originalQuery = window.navigator.permissions?.query;
+    if (originalQuery) {
+      window.navigator.permissions.query = parameters => (
+        parameters.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission })
+          : originalQuery(parameters)
+      );
+    }
+  });
+
+  if (IS_VERCEL) {
+    await page.route('**/*', route => {
+      const type = route.request().resourceType();
+      if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
+        route.abort();
+        return;
+      }
+      route.continue();
+    });
+  }
+
+  return page;
+}
+
+function buildMaxMilhasUrl(origem, destino, dataIda, dataVolta) {
+  return dataVolta
+    ? `https://www.maxmilhas.com.br/busca-passagens-aereas/RT/${origem}/${destino}/${dataIda}/${dataVolta}/1/0/0/EC`
+    : `https://www.maxmilhas.com.br/busca-passagens-aereas/OW/${origem}/${destino}/${dataIda}/1/0/0/EC`;
+}
+
+async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
+  const url = buildMaxMilhasUrl(origem, destino, dataIda, dataVolta);
+  const browser = await launchBrowser();
+
+  try {
+    const page = await createStealthPage(browser);
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: IS_VERCEL ? 30000 : DEFAULT_TIMEOUT_MS });
+    await page.waitForSelector('strong', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(IS_VERCEL ? 3000 : 4000);
+
+    const result = await page.evaluate(() => {
+      const normalize = value => (value || '')
+        .replace(/ /g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const parsePrice = value => {
+        const match = normalize(value).match(/R\$\s*([\d.]+)(?:,\d{2})?/);
+        return match ? Number(match[1].replace(/\./g, '')) : null;
+      };
+
+      const strong = Array.from(document.querySelectorAll('strong'))
+        .find(el => /R\$/.test(el.textContent || ''));
+      const preco = strong ? parsePrice(strong.textContent) : null;
+
+      const airlineLabel = Array.from(document.querySelectorAll('p'))
+        .find(el => /^Na\s+\S+/i.test(normalize(el.textContent)));
+      const companhiaMatch = airlineLabel
+        ? normalize(airlineLabel.textContent).match(/^Na\s+(\S+)/i)
+        : null;
+
+      return { preco, companhia: companhiaMatch ? companhiaMatch[1] : null };
+    });
+
+    if (!result.preco) {
+      throw new Error('Nao foi possivel ler o preco na Maxmilhas.');
+    }
+
+    return [{
+      preco: result.preco,
+      companhia: result.companhia,
+      horario_partida: null,
+      horario_chegada: null,
+      duracao_min: null,
+      escalas: null,
+      link: url
+    }];
+  } finally {
+    await browser.close().catch(() => {});
+  }
+}
+
+async function buscarTodasFontes(origem, destino, dataIda, dataVolta) {
+  const [googleResult, maxmilhasResult] = await Promise.allSettled([
+    buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolta),
+    buscarMaxMilhas(origem, destino, dataIda, dataVolta)
+  ]);
+
+  const voos = [];
+  const fontes = {};
+  const warnings = [];
+
+  if (googleResult.status === 'fulfilled') {
+    voos.push(...googleResult.value.voos);
+    Object.assign(fontes, googleResult.value.fontes);
+    if (googleResult.value.warning) warnings.push(googleResult.value.warning);
+  } else {
+    warnings.push(`google: ${String(googleResult.reason?.message || googleResult.reason).split('\n')[0]}`);
+  }
+
+  if (maxmilhasResult.status === 'fulfilled' && maxmilhasResult.value.length > 0) {
+    voos.push(...maxmilhasResult.value);
+    fontes.maxmilhas = {
+      preco: maxmilhasResult.value[0]?.preco ?? null,
+      quantidade: maxmilhasResult.value.length
+    };
+  } else {
+    const reason = maxmilhasResult.status === 'rejected'
+      ? String(maxmilhasResult.reason?.message || maxmilhasResult.reason).split('\n')[0]
+      : 'nenhum preco encontrado';
+    warnings.push(`maxmilhas: ${reason}`);
+  }
+
+  if (voos.length === 0) {
+    throw new Error(`Nenhuma fonte retornou precos. ${warnings.join(' | ')}`);
+  }
+
+  return {
+    voos: voos.sort((a, b) => a.preco - b.preco),
+    fontes,
+    warning: warnings.length ? warnings.join(' | ') : undefined
+  };
+}
+
 async function buscarGoogleFlightsPlaywrightOnce(url, origem, destino) {
   const browser = await launchBrowser();
 
   try {
-    const page = await browser.newPage({
-      locale: 'pt-BR',
-      timezoneId: 'America/Sao_Paulo',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      viewport: { width: 1366, height: 900 },
-      geolocation: { latitude: -23.5505, longitude: -46.6333 },
-      permissions: ['geolocation'],
-      extraHTTPHeaders: {
-        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
-      }
-    });
-
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-      Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt', 'en-US', 'en'] });
-      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-      window.chrome = { runtime: {} };
-      const originalQuery = window.navigator.permissions?.query;
-      if (originalQuery) {
-        window.navigator.permissions.query = parameters => (
-          parameters.name === 'notifications'
-            ? Promise.resolve({ state: Notification.permission })
-            : originalQuery(parameters)
-        );
-      }
-    });
-
-    if (IS_VERCEL) {
-      await page.route('**/*', route => {
-        const type = route.request().resourceType();
-        if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
-          route.abort();
-          return;
-        }
-        route.continue();
-      });
-    }
-
+    const page = await createStealthPage(browser);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: IS_VERCEL ? 30000 : DEFAULT_TIMEOUT_MS });
     if (!IS_VERCEL) {
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -631,7 +735,7 @@ async function refreshFlightPrice({ origem, destino, data_ida, data_volta }) {
     throw new Error('origem, destino e data_ida sao obrigatorios');
   }
 
-  const result = await buscarGoogleFlightsTodasFontes(origem, destino, data_ida, data_volta);
+  const result = await buscarTodasFontes(origem, destino, data_ida, data_volta);
   const voos = result.voos;
   if (voos.length > 0) {
     await salvarCache(voos, origem, destino, data_ida, data_volta);
@@ -640,7 +744,7 @@ async function refreshFlightPrice({ origem, destino, data_ida, data_volta }) {
   return {
     preco: voos[0]?.preco ?? null,
     quantidade: voos.length,
-    link: buildGoogleFlightsUrl(origem, destino, data_ida, data_volta),
+    link: voos[0]?.link ?? buildGoogleFlightsUrl(origem, destino, data_ida, data_volta),
     fontes: result.fontes,
     warning: result.warning
   };
@@ -648,11 +752,15 @@ async function refreshFlightPrice({ origem, destino, data_ida, data_volta }) {
 
 module.exports = {
   buildGoogleFlightsUrl,
+  buildMaxMilhasUrl,
   buscarGoogleFlightsPlaywright,
   buscarGoogleFlightsSerpApi,
   buscarGoogleFlightsTodasFontes,
+  buscarMaxMilhas,
+  buscarTodasFontes,
   collectFlightRows,
   createAdvertisedPriceFlight,
+  createStealthPage,
   getLowestPricesSnapshot,
   launchBrowser,
   getVercelChromiumPath,

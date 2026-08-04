@@ -135,10 +135,11 @@ vooalerta/
 ## Monitores (backend)
 
 ### `monitor.js` — Voos
-- Fontes: Google Flights via Playwright é a fonte principal; SerpAPI é usada **só como fallback** quando o Playwright falha ou não retorna nenhum voo (`backend/flight_scraper.js`)
+- Fontes combinadas em `buscarTodasFontes` (`backend/flight_scraper.js`): **Google Flights** (Playwright, com SerpAPI como fallback) e **MaxMilhas**, rodando em paralelo via `Promise.allSettled`. O menor preço entre as fontes que responderam é o que vai pro cache/alerta; o `link` salvo aponta pro site de origem do preço vencedor (Google ou MaxMilhas).
 - Agendamento: controlado **só pelo cron** (`monitor.yml`, atualmente a cada 3h). O script coleta sempre que é executado — não há gate de orçamento interno.
-- A SerpAPI usa `deep_search=true` e `show_hidden=true`. Ela não é combinada com o Playwright: o preço do Playwright vem da aba "Menores preços" real do Google, enquanto o preço da SerpAPI (`best_flights` + `other_flights`) equivale à aba "Melhor opção" e não deve substituir um resultado válido do Playwright.
-- Se o Playwright falhar ou não achar nada, a SerpAPI assume e a falha do Playwright fica registrada como aviso.
+- **Google Flights**: SerpAPI (`deep_search=true`, `show_hidden=true`) é usada **só como fallback** quando o Playwright falha ou não retorna nenhum voo — não é combinada com ele. O preço do Playwright vem da aba "Menores preços" real do Google; o preço da SerpAPI (`best_flights` + `other_flights`) equivale à aba "Melhor opção" e não deve substituir um resultado válido do Playwright.
+- **MaxMilhas** (`buscarMaxMilhas`): navega direto pra URL de busca (`https://www.maxmilhas.com.br/busca-passagens-aereas/{RT|OW}/{origem}/{destino}/{data_ida}[/{data_volta}]/1/0/0/EC`), sem precisar clicar em aba — os resultados já vêm ordenados "Mais baratos primeiro" por padrão. Lê o preço total (com taxas) do primeiro `<strong>` com `R$` no painel de resumo, e a companhia da linha "Na {companhia} R$ ...". Sem voos detalhados (horário/escalas), só o resumo do menor preço.
+- Se uma fonte falhar ou não achar nada, a outra ainda atualiza o cache; a falha fica registrada como aviso em `fontes`/`warning`.
 - Seleciona a aba "Menores preços" no Google Flights antes de coletar.
 - Confirma que a aba ficou selecionada e só aceita a lista quando o menor voo coincide com o preço anunciado nela; uma lista antiga nunca substitui o cache.
 - Após clicar, monitora diretamente o valor exibido na aba "Menores preços"; espera mínima `FLIGHT_PRICE_SETTLE_MS=20000`, estabilidade `FLIGHT_PRICE_STABLE_MS=5000` e limite `FLIGHT_PRICE_TIMEOUT_MS=30000`.
