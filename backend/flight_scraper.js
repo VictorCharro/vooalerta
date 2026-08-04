@@ -557,34 +557,35 @@ async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
 }
 
 async function buscarTodasFontes(origem, destino, dataIda, dataVolta) {
-  const [googleResult, maxmilhasResult] = await Promise.allSettled([
-    buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolta),
-    buscarMaxMilhas(origem, destino, dataIda, dataVolta)
-  ]);
-
+  // Roda as fontes em sequencia (nao em paralelo): dois Chromium abertos ao
+  // mesmo tempo estouram facil o limite de memoria/tempo da function na
+  // Vercel, causando falha silenciosa de uma das fontes.
   const voos = [];
   const fontes = {};
   const warnings = [];
 
-  if (googleResult.status === 'fulfilled') {
-    voos.push(...googleResult.value.voos);
-    Object.assign(fontes, googleResult.value.fontes);
-    if (googleResult.value.warning) warnings.push(googleResult.value.warning);
-  } else {
-    warnings.push(`google: ${String(googleResult.reason?.message || googleResult.reason).split('\n')[0]}`);
+  try {
+    const googleResult = await buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolta);
+    voos.push(...googleResult.voos);
+    Object.assign(fontes, googleResult.fontes);
+    if (googleResult.warning) warnings.push(googleResult.warning);
+  } catch (err) {
+    warnings.push(`google: ${String(err?.message || err).split('\n')[0]}`);
   }
 
-  if (maxmilhasResult.status === 'fulfilled' && maxmilhasResult.value.length > 0) {
-    voos.push(...maxmilhasResult.value);
-    fontes.maxmilhas = {
-      preco: maxmilhasResult.value[0]?.preco ?? null,
-      quantidade: maxmilhasResult.value.length
-    };
-  } else {
-    const reason = maxmilhasResult.status === 'rejected'
-      ? String(maxmilhasResult.reason?.message || maxmilhasResult.reason).split('\n')[0]
-      : 'nenhum preco encontrado';
-    warnings.push(`maxmilhas: ${reason}`);
+  try {
+    const maxmilhasFlights = await buscarMaxMilhas(origem, destino, dataIda, dataVolta);
+    if (maxmilhasFlights.length > 0) {
+      voos.push(...maxmilhasFlights);
+      fontes.maxmilhas = {
+        preco: maxmilhasFlights[0]?.preco ?? null,
+        quantidade: maxmilhasFlights.length
+      };
+    } else {
+      warnings.push('maxmilhas: nenhum preco encontrado');
+    }
+  } catch (err) {
+    warnings.push(`maxmilhas: ${String(err?.message || err).split('\n')[0]}`);
   }
 
   if (voos.length === 0) {
