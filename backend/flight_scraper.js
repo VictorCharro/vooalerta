@@ -558,27 +558,35 @@ async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
   }
 }
 
-async function tentarAdquirirLockGoogle(ttlMs = GOOGLE_LOCK_TTL_MS) {
+async function tentarAdquirirLockScrape(ttlMs = GOOGLE_LOCK_TTL_MS) {
   const agora = new Date();
   const novoLimite = new Date(agora.getTime() + ttlMs).toISOString();
 
   try {
     const rows = await supabase(
       'PATCH',
-      `scrape_lock?id=eq.1&google_busy_until=lt.${agora.toISOString()}`,
-      { google_busy_until: novoLimite }
+      `scrape_lock?id=eq.1&busy_until=lt.${agora.toISOString()}`,
+      { busy_until: novoLimite }
     );
     return rows.length > 0;
   } catch (err) {
     // Se a tabela/lock nao existir ainda (migration nao aplicada) ou o
     // Supabase falhar, nao bloqueia a coleta: segue sem fila.
-    console.warn(`Lock do Google indisponivel, seguindo sem fila: ${err.message}`);
+    console.warn(`Lock de coleta indisponivel, seguindo sem fila: ${err.message}`);
     return true;
   }
 }
 
-async function liberarLockGoogle() {
-  await supabase('PATCH', 'scrape_lock?id=eq.1', { google_busy_until: new Date().toISOString() });
+async function liberarLockScrape() {
+  await supabase('PATCH', 'scrape_lock?id=eq.1', { busy_until: new Date().toISOString() });
+}
+
+async function buscarCacheExistente(origem, destino, dataIda, dataVolta) {
+  const dataVoltaFilter = dataVolta ? `&data_volta=eq.${dataVolta}` : '&data_volta=is.null';
+  return supabase(
+    'GET',
+    `price_cache?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${dataIda}${dataVoltaFilter}&preco=not.is.null&order=preco.asc&limit=1`
+  );
 }
 
 async function buscarTodasFontes(origem, destino, dataIda, dataVolta) {
@@ -589,20 +597,13 @@ async function buscarTodasFontes(origem, destino, dataIda, dataVolta) {
   const fontes = {};
   const warnings = [];
 
-  const lockAdquirido = await tentarAdquirirLockGoogle();
-  if (lockAdquirido) {
-    try {
-      const googleResult = await buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolta);
-      voos.push(...googleResult.voos);
-      Object.assign(fontes, googleResult.fontes);
-      if (googleResult.warning) warnings.push(googleResult.warning);
-    } catch (err) {
-      warnings.push(`google: ${String(err?.message || err).split('\n')[0]}`);
-    } finally {
-      await liberarLockGoogle().catch(() => {});
-    }
-  } else {
-    warnings.push('google: pulado (outra coleta em andamento)');
+  try {
+    const googleResult = await buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolta);
+    voos.push(...googleResult.voos);
+    Object.assign(fontes, googleResult.fontes);
+    if (googleResult.warning) warnings.push(googleResult.warning);
+  } catch (err) {
+    warnings.push(`google: ${String(err?.message || err).split('\n')[0]}`);
   }
 
   try {
@@ -763,24 +764,54 @@ async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
   await supabase('POST', 'price_cache', rows);
 }
 
+function cacheRowParaResposta(row) {
+  return {
+    preco: row.preco,
+    quantidade: 1,
+    link: row.link ?? undefined,
+    fontes: {},
+    warning: 'fila ocupada: retornado o ultimo preco coletado'
+  };
+}
+
 async function refreshFlightPrice({ origem, destino, data_ida, data_volta }) {
   if (!origem || !destino || !data_ida) {
     throw new Error('origem, destino e data_ida sao obrigatorios');
   }
 
-  const result = await buscarTodasFontes(origem, destino, data_ida, data_volta);
-  const voos = result.voos;
-  if (voos.length > 0) {
-    await salvarCache(voos, origem, destino, data_ida, data_volta);
+  // So uma coleta completa (Google + Maxmilhas) roda por vez. Se outro
+  // refresh ja esta em andamento, nao abre navegador nenhum: devolve na
+  // hora o ultimo preco em cache pra essa rota, se houver.
+  const lockAdquirido = await tentarAdquirirLockScrape();
+  if (!lockAdquirido) {
+    const cache = await buscarCacheExistente(origem, destino, data_ida, data_volta).catch(() => []);
+    if (cache.length > 0) return cacheRowParaResposta(cache[0]);
+    throw new Error('Muitas coletas simultaneas no momento. Tente novamente em instantes.');
   }
 
-  return {
-    preco: voos[0]?.preco ?? null,
-    quantidade: voos.length,
-    link: voos[0]?.link ?? buildGoogleFlightsUrl(origem, destino, data_ida, data_volta),
-    fontes: result.fontes,
-    warning: result.warning
-  };
+  try {
+    const result = await buscarTodasFontes(origem, destino, data_ida, data_volta);
+    const voos = result.voos;
+    if (voos.length > 0) {
+      await salvarCache(voos, origem, destino, data_ida, data_volta);
+    }
+
+    return {
+      preco: voos[0]?.preco ?? null,
+      quantidade: voos.length,
+      link: voos[0]?.link ?? buildGoogleFlightsUrl(origem, destino, data_ida, data_volta),
+      fontes: result.fontes,
+      warning: result.warning
+    };
+  } catch (err) {
+    // Se as duas fontes falharem de vez, cai pro ultimo preco em cache em
+    // vez de propagar um erro tecnico pro usuario.
+    const cache = await buscarCacheExistente(origem, destino, data_ida, data_volta).catch(() => []);
+    if (cache.length > 0) return cacheRowParaResposta(cache[0]);
+    throw err;
+  } finally {
+    await liberarLockScrape().catch(() => {});
+  }
 }
 
 module.exports = {
@@ -792,19 +823,20 @@ module.exports = {
   buscarMaxMilhas,
   buscarTodasFontes,
   collectFlightRows,
+  buscarCacheExistente,
   createAdvertisedPriceFlight,
   createStealthPage,
   getLowestPricesSnapshot,
   launchBrowser,
   getVercelChromiumPath,
-  liberarLockGoogle,
+  liberarLockScrape,
   parseFlightRow,
   parsePrice,
   parseSerpApiTime,
   refreshFlightPrice,
   selectLowestPricesTab,
   salvarCache,
-  tentarAdquirirLockGoogle,
+  tentarAdquirirLockScrape,
   sleep,
   supabase,
   waitForLowestPricesToSettle,

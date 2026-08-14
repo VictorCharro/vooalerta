@@ -39,11 +39,13 @@ async function handler(req, res) {
   } catch (err) {
     console.error('scrape-flight failed', err);
     const message = err.message || String(err);
-    let userMessage = message;
+    let userMessage = 'Nao foi possivel atualizar o preco agora. Tente novamente em instantes.';
     if (/Target page, context or browser has been closed|page\.goto/i.test(message)) {
       userMessage = 'Google Flights fechou a pagina durante a coleta. Tente novamente em alguns segundos.';
     } else if (/ETXTBSY|browserType\.launch: spawn/i.test(message)) {
       userMessage = 'O navegador de coleta ainda estava sendo preparado pelo servidor. Tente novamente em alguns segundos.';
+    } else if (/Muitas coletas simultaneas/i.test(message)) {
+      userMessage = message;
     }
 
     res.status(200).json({

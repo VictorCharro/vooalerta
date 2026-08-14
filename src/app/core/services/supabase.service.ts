@@ -175,11 +175,13 @@ export class SupabaseService {
       const data = contentType.includes('application/json') ? await res.json() : null;
 
       if (!contentType.includes('application/json')) {
-        return { preco: null, error: 'A API /api/scrape-flight não retornou JSON. Em desenvolvimento local, rode pela Vercel ou configure um proxy para a API.' };
+        console.warn('scrape-flight nao retornou JSON (dev local sem proxy, ou a function travou por timeout/sobrecarga)');
+        return { preco: null, error: 'Não foi possível atualizar o preço agora. Tente novamente em instantes.' };
       }
 
       if (!res.ok) {
-        return { preco: null, error: data?.error ?? `Erro ${res.status} ao chamar /api/scrape-flight` };
+        console.warn(`scrape-flight respondeu ${res.status}:`, data?.error);
+        return { preco: null, error: 'Não foi possível atualizar o preço agora. Tente novamente em instantes.' };
       }
 
       return {
@@ -188,7 +190,8 @@ export class SupabaseService {
         warning: data?.warning ?? undefined
       };
     } catch (err) {
-      return { preco: null, error: (err as Error).message };
+      console.warn('scrape-flight falhou:', err);
+      return { preco: null, error: 'Não foi possível atualizar o preço agora. Tente novamente em instantes.' };
     }
   }
 
