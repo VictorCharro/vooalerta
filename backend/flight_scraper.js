@@ -5,6 +5,7 @@ const PRICE_STABLE_MS = Number(process.env.FLIGHT_PRICE_STABLE_MS || 5000);
 const PRICE_TIMEOUT_MS = Number(process.env.FLIGHT_PRICE_TIMEOUT_MS || 30000);
 const CHROMIUM_LAUNCH_ATTEMPTS = Number(process.env.CHROMIUM_LAUNCH_ATTEMPTS || 4);
 const SERPAPI_TIMEOUT_MS = Number(process.env.SERPAPI_TIMEOUT_MS || 25000);
+const GOOGLE_LOCK_TTL_MS = Number(process.env.GOOGLE_LOCK_TTL_MS || 45000);
 const IS_VERCEL = !!process.env.VERCEL;
 let vercelChromiumPathPromise;
 
@@ -42,6 +43,7 @@ async function supabase(method, path, body = null) {
   };
 
   if (method === 'POST') headers.Prefer = 'resolution=merge-duplicates';
+  if (method === 'PATCH') headers.Prefer = 'return=representation';
 
   const res = await fetch(`${url}/rest/v1/${path}`, {
     method,
@@ -556,6 +558,29 @@ async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
   }
 }
 
+async function tentarAdquirirLockGoogle(ttlMs = GOOGLE_LOCK_TTL_MS) {
+  const agora = new Date();
+  const novoLimite = new Date(agora.getTime() + ttlMs).toISOString();
+
+  try {
+    const rows = await supabase(
+      'PATCH',
+      `scrape_lock?id=eq.1&google_busy_until=lt.${agora.toISOString()}`,
+      { google_busy_until: novoLimite }
+    );
+    return rows.length > 0;
+  } catch (err) {
+    // Se a tabela/lock nao existir ainda (migration nao aplicada) ou o
+    // Supabase falhar, nao bloqueia a coleta: segue sem fila.
+    console.warn(`Lock do Google indisponivel, seguindo sem fila: ${err.message}`);
+    return true;
+  }
+}
+
+async function liberarLockGoogle() {
+  await supabase('PATCH', 'scrape_lock?id=eq.1', { google_busy_until: new Date().toISOString() });
+}
+
 async function buscarTodasFontes(origem, destino, dataIda, dataVolta) {
   // Roda as fontes em sequencia (nao em paralelo): dois Chromium abertos ao
   // mesmo tempo estouram facil o limite de memoria/tempo da function na
@@ -564,13 +589,20 @@ async function buscarTodasFontes(origem, destino, dataIda, dataVolta) {
   const fontes = {};
   const warnings = [];
 
-  try {
-    const googleResult = await buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolta);
-    voos.push(...googleResult.voos);
-    Object.assign(fontes, googleResult.fontes);
-    if (googleResult.warning) warnings.push(googleResult.warning);
-  } catch (err) {
-    warnings.push(`google: ${String(err?.message || err).split('\n')[0]}`);
+  const lockAdquirido = await tentarAdquirirLockGoogle();
+  if (lockAdquirido) {
+    try {
+      const googleResult = await buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolta);
+      voos.push(...googleResult.voos);
+      Object.assign(fontes, googleResult.fontes);
+      if (googleResult.warning) warnings.push(googleResult.warning);
+    } catch (err) {
+      warnings.push(`google: ${String(err?.message || err).split('\n')[0]}`);
+    } finally {
+      await liberarLockGoogle().catch(() => {});
+    }
+  } else {
+    warnings.push('google: pulado (outra coleta em andamento)');
   }
 
   try {
@@ -765,12 +797,14 @@ module.exports = {
   getLowestPricesSnapshot,
   launchBrowser,
   getVercelChromiumPath,
+  liberarLockGoogle,
   parseFlightRow,
   parsePrice,
   parseSerpApiTime,
   refreshFlightPrice,
   selectLowestPricesTab,
   salvarCache,
+  tentarAdquirirLockGoogle,
   sleep,
   supabase,
   waitForLowestPricesToSettle,
