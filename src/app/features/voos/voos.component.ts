@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -8,6 +8,8 @@ import { AirportSearchComponent } from '@shared/components/airport-search/airpor
 import { DatePickerComponent } from '@shared/components/date-picker/date-picker.component';
 import { TimePickerComponent } from '@shared/components/time-picker/time-picker.component';
 import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
+
+type JobStatus = { status: string; preco: number | null; link?: string; warning?: string; error?: string };
 
 @Component({
     selector: 'app-voos',
@@ -541,7 +543,8 @@ export class VoosComponent implements OnInit, OnDestroy {
 
   constructor(
       private supabase: SupabaseService,
-      public router: Router
+      public router: Router,
+      private ngZone: NgZone
   ) {}
 
   async ngOnInit() {
@@ -642,6 +645,21 @@ export class VoosComponent implements OnInit, OnDestroy {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  // Roda fora da zone do Angular: o polling faz varios ciclos de espera/fetch
+  // (ate ~2min) e, sem isso, cada tick disparava change detection na tela
+  // inteira (todos os cards recalculando classes/valores), causando um
+  // "piscar" visivel em todos os alertas enquanto um so estava atualizando.
+  private pollJobStatus(jobId: string): Promise<JobStatus | null> {
+    return this.ngZone.runOutsideAngular(async () => {
+      for (let tentativa = 0; tentativa < this.JOB_POLL_MAX_ATTEMPTS; tentativa++) {
+        await this.sleep(this.JOB_POLL_INTERVAL_MS);
+        const job = await this.supabase.getJobStatus(jobId);
+        if (job.status === 'done' || job.status === 'error') return job;
+      }
+      return null;
+    });
+  }
+
   async refreshPrice(alert: Alert) {
     if (!alert.id || this.isRefreshing(alert) || this.getCooldownSeconds(alert) > 0) return;
 
@@ -657,54 +675,44 @@ export class VoosComponent implements OnInit, OnDestroy {
         return;
       }
 
-      let job: { status: string; preco: number | null; link?: string; warning?: string; error?: string } = { status: 'pending', preco: null };
-      let tentativas = 0;
-      let concluido = false;
+      const job = await this.pollJobStatus(jobId);
 
-      while (tentativas < this.JOB_POLL_MAX_ATTEMPTS) {
-        await this.sleep(this.JOB_POLL_INTERVAL_MS);
-        job = await this.supabase.getJobStatus(jobId);
-        if (job.status === 'done' || job.status === 'error') {
-          concluido = true;
-          break;
+      await this.ngZone.run(async () => {
+        if (!job) {
+          this.showToast('A atualização está demorando mais que o normal. Tente novamente em instantes.');
+          return;
         }
-        tentativas++;
-      }
 
-      if (!concluido) {
-        this.showToast('A atualização está demorando mais que o normal. Tente novamente em instantes.');
-        return;
-      }
-
-      if (job.status === 'error' || job.preco === null) {
-        this.showToast(job.error ?? 'Não encontramos preços para esta rota agora.');
-        return;
-      }
-
-      const [currentPrice, currentLink] = await Promise.all([
-        this.supabase.getMinPriceForRoute(
-          alert.origem, alert.destino, alert.data_ida,
-          alert.data_volta ?? null,
-          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-        ),
-        this.supabase.getMinPriceLinkForRoute(
-          alert.origem, alert.destino, alert.data_ida,
-          alert.data_volta ?? null,
-          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-        )
-      ]);
-
-      localStorage.setItem(key, String(Date.now()));
-      if (currentPrice !== null) {
-        this.minPrices = { ...this.minPrices, [this.priceKey(alert)]: currentPrice };
-        if (currentLink !== null) {
-          this.minLinks = { ...this.minLinks, [this.priceKey(alert)]: currentLink };
+        if (job.status === 'error' || job.preco === null) {
+          this.showToast(job.error ?? 'Não encontramos preços para esta rota agora.');
+          return;
         }
-        this.showToast(`Preço atualizado: R$ ${currentPrice}`);
-      } else {
-        await this.loadMinPrices();
-        this.showToast(`Coleta atualizada: menor preço encontrado R$ ${job.preco}, mas nenhum voo passou nos filtros deste alerta.`);
-      }
+
+        const [currentPrice, currentLink] = await Promise.all([
+          this.supabase.getMinPriceForRoute(
+            alert.origem, alert.destino, alert.data_ida,
+            alert.data_volta ?? null,
+            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+          ),
+          this.supabase.getMinPriceLinkForRoute(
+            alert.origem, alert.destino, alert.data_ida,
+            alert.data_volta ?? null,
+            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+          )
+        ]);
+
+        localStorage.setItem(key, String(Date.now()));
+        if (currentPrice !== null) {
+          this.minPrices = { ...this.minPrices, [this.priceKey(alert)]: currentPrice };
+          if (currentLink !== null) {
+            this.minLinks = { ...this.minLinks, [this.priceKey(alert)]: currentLink };
+          }
+          this.showToast(`Preço atualizado: R$ ${currentPrice}`);
+        } else {
+          await this.loadMinPrices();
+          this.showToast(`Coleta atualizada: menor preço encontrado R$ ${job.preco}, mas nenhum voo passou nos filtros deste alerta.`);
+        }
+      });
     } finally {
       this.refreshing = { ...this.refreshing, [alert.id]: false };
     }
