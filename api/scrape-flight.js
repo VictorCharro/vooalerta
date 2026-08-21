@@ -58,10 +58,7 @@ async function handler(req, res) {
     res.status(200).json({ job_id: job.id, status: job.status });
   } catch (err) {
     console.error('scrape-flight (enqueue) failed', err);
-    res.status(200).json({
-      job_id: null,
-      error: 'Nao foi possivel iniciar a atualizacao agora. Tente novamente em instantes.'
-    });
+    res.status(200).json({ job_id: null });
   }
 }
 

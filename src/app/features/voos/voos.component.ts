@@ -665,29 +665,21 @@ export class VoosComponent implements OnInit, OnDestroy {
 
     this.refreshing = { ...this.refreshing, [alert.id]: true };
     try {
+      // Se algo falhar daqui pra frente (nao enfileirou, demorou demais,
+      // job deu erro), nao mostramos toast nenhum: o preco que ja estava
+      // na tela (do carregamento anterior) continua valendo. O usuario
+      // nunca fica olhando pra uma mensagem de erro tecnica.
       const key = this.refreshKey(alert);
-      const { jobId, error: enqueueError } = await this.supabase.enqueueFlightRefresh(
+      const { jobId } = await this.supabase.enqueueFlightRefresh(
         alert.origem, alert.destino, alert.data_ida, alert.data_volta
       );
 
-      if (!jobId) {
-        this.showToast(enqueueError ?? 'Não foi possível iniciar a atualização agora.');
-        return;
-      }
+      if (!jobId) return;
 
       const job = await this.pollJobStatus(jobId);
+      if (!job || job.status === 'error' || job.preco === null) return;
 
       await this.ngZone.run(async () => {
-        if (!job) {
-          this.showToast('A atualização está demorando mais que o normal. Tente novamente em instantes.');
-          return;
-        }
-
-        if (job.status === 'error' || job.preco === null) {
-          this.showToast(job.error ?? 'Não encontramos preços para esta rota agora.');
-          return;
-        }
-
         const [currentPrice, currentLink] = await Promise.all([
           this.supabase.getMinPriceForRoute(
             alert.origem, alert.destino, alert.data_ida,

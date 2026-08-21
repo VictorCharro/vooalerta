@@ -152,9 +152,9 @@ export class SupabaseService {
     return row?.link ?? null;
   }
 
-  async enqueueFlightRefresh(origem: string, destino: string, dataIda: string, dataVolta?: string | null): Promise<{ jobId: string | null; error?: string }> {
+  async enqueueFlightRefresh(origem: string, destino: string, dataIda: string, dataVolta?: string | null): Promise<{ jobId: string | null }> {
     const { data: { session } } = await this.client.auth.getSession();
-    if (!session) return { jobId: null, error: 'Sessão expirada. Faça login novamente.' };
+    if (!session) return { jobId: null };
 
     try {
       const res = await fetch('/api/scrape-flight', {
@@ -173,21 +173,16 @@ export class SupabaseService {
 
       const contentType = res.headers.get('content-type') ?? '';
       const data = contentType.includes('application/json') ? await res.json() : null;
-      const generic = 'Não foi possível iniciar a atualização agora. Tente novamente em instantes.';
 
       if (!contentType.includes('application/json') || !res.ok) {
         console.warn('scrape-flight (enqueue) falhou', res.status, data?.error);
-        return { jobId: null, error: generic };
+        return { jobId: null };
       }
 
-      if (data?.error || !data?.job_id) {
-        return { jobId: null, error: data?.error ?? generic };
-      }
-
-      return { jobId: data.job_id };
+      return { jobId: data?.job_id ?? null };
     } catch (err) {
       console.warn('scrape-flight (enqueue) falhou:', err);
-      return { jobId: null, error: 'Não foi possível iniciar a atualização agora. Tente novamente em instantes.' };
+      return { jobId: null };
     }
   }
 
