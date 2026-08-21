@@ -1,7 +1,9 @@
 const {
-  refreshFlightPrice,
+  supabase,
   verifyUserToken
 } = require('../backend/flight_scraper');
+
+const JOB_REUSE_WINDOW_MS = 2 * 60 * 1000; // evita criar job duplicado pra mesma rota em cliques repetidos
 
 async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -34,30 +36,36 @@ async function handler(req, res) {
       return;
     }
 
-    const result = await refreshFlightPrice({ origem, destino, data_ida, data_volta });
-    res.status(200).json(result);
-  } catch (err) {
-    console.error('scrape-flight failed', err);
-    const message = err.message || String(err);
-    let userMessage = 'Nao foi possivel atualizar o preco agora. Tente novamente em instantes.';
-    if (/Target page, context or browser has been closed|page\.goto/i.test(message)) {
-      userMessage = 'Google Flights fechou a pagina durante a coleta. Tente novamente em alguns segundos.';
-    } else if (/ETXTBSY|browserType\.launch: spawn/i.test(message)) {
-      userMessage = 'O navegador de coleta ainda estava sendo preparado pelo servidor. Tente novamente em alguns segundos.';
-    } else if (/Muitas coletas simultaneas/i.test(message)) {
-      userMessage = message;
+    const dataVoltaFilter = data_volta ? `&data_volta=eq.${data_volta}` : '&data_volta=is.null';
+    const janela = new Date(Date.now() - JOB_REUSE_WINDOW_MS).toISOString();
+
+    const existentes = await supabase(
+      'GET',
+      `refresh_jobs?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${data_ida}${dataVoltaFilter}&status=in.(pending,processing)&criado_em=gte.${janela}&order=criado_em.desc&limit=1`
+    );
+
+    let job = existentes[0];
+    if (!job) {
+      const criados = await supabase('POST', 'refresh_jobs', {
+        origem,
+        destino,
+        data_ida,
+        data_volta: data_volta || null
+      });
+      job = criados[0];
     }
 
+    res.status(200).json({ job_id: job.id, status: job.status });
+  } catch (err) {
+    console.error('scrape-flight (enqueue) failed', err);
     res.status(200).json({
-      preco: null,
-      quantidade: 0,
-      error: userMessage,
-      error_stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      job_id: null,
+      error: 'Nao foi possivel iniciar a atualizacao agora. Tente novamente em instantes.'
     });
   }
 }
 
 module.exports = handler;
 module.exports.config = {
-  maxDuration: 60
+  maxDuration: 15
 };

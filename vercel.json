@@ -4,11 +4,12 @@
   "outputDirectory": "dist/vooalerta/browser",
   "installCommand": "npm install",
   "framework": "angular",
-  "regions": ["gru1"],
   "functions": {
     "api/scrape-flight.js": {
-      "maxDuration": 60,
-      "memory": 1024
+      "maxDuration": 15
+    },
+    "api/job-status.js": {
+      "maxDuration": 10
     }
   }
 }

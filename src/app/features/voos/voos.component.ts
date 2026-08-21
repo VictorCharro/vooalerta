@@ -635,41 +635,75 @@ export class VoosComponent implements OnInit, OnDestroy {
     return this.minLinks[this.priceKey(alert)] ?? this.buildGoogleFlightsUrl(alert);
   }
 
+  private readonly JOB_POLL_INTERVAL_MS = 3000;
+  private readonly JOB_POLL_MAX_ATTEMPTS = 40; // ~2 minutos de espera no total
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   async refreshPrice(alert: Alert) {
     if (!alert.id || this.isRefreshing(alert) || this.getCooldownSeconds(alert) > 0) return;
 
     this.refreshing = { ...this.refreshing, [alert.id]: true };
     try {
       const key = this.refreshKey(alert);
-      const result = await this.supabase.scrapeFlightPrice(alert.origem, alert.destino, alert.data_ida, alert.data_volta);
+      const { jobId, error: enqueueError } = await this.supabase.enqueueFlightRefresh(
+        alert.origem, alert.destino, alert.data_ida, alert.data_volta
+      );
 
-      if (result.preco !== null) {
-        const [currentPrice, currentLink] = await Promise.all([
-          this.supabase.getMinPriceForRoute(
-            alert.origem, alert.destino, alert.data_ida,
-            alert.data_volta ?? null,
-            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-          ),
-          this.supabase.getMinPriceLinkForRoute(
-            alert.origem, alert.destino, alert.data_ida,
-            alert.data_volta ?? null,
-            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-          )
-        ]);
+      if (!jobId) {
+        this.showToast(enqueueError ?? 'Não foi possível iniciar a atualização agora.');
+        return;
+      }
 
-        localStorage.setItem(key, String(Date.now()));
-        if (currentPrice !== null) {
-          this.minPrices = { ...this.minPrices, [this.priceKey(alert)]: currentPrice };
-          if (currentLink !== null) {
-            this.minLinks = { ...this.minLinks, [this.priceKey(alert)]: currentLink };
-          }
-          this.showToast(`Preço atualizado: R$ ${currentPrice}`);
-        } else {
-          await this.loadMinPrices();
-          this.showToast(`Coleta atualizada: menor preço encontrado R$ ${result.preco}, mas nenhum voo passou nos filtros deste alerta.`);
+      let job: { status: string; preco: number | null; link?: string; warning?: string; error?: string } = { status: 'pending', preco: null };
+      let tentativas = 0;
+      let concluido = false;
+
+      while (tentativas < this.JOB_POLL_MAX_ATTEMPTS) {
+        await this.sleep(this.JOB_POLL_INTERVAL_MS);
+        job = await this.supabase.getJobStatus(jobId);
+        if (job.status === 'done' || job.status === 'error') {
+          concluido = true;
+          break;
         }
+        tentativas++;
+      }
+
+      if (!concluido) {
+        this.showToast('A atualização está demorando mais que o normal. Tente novamente em instantes.');
+        return;
+      }
+
+      if (job.status === 'error' || job.preco === null) {
+        this.showToast(job.error ?? 'Não encontramos preços para esta rota agora.');
+        return;
+      }
+
+      const [currentPrice, currentLink] = await Promise.all([
+        this.supabase.getMinPriceForRoute(
+          alert.origem, alert.destino, alert.data_ida,
+          alert.data_volta ?? null,
+          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+        ),
+        this.supabase.getMinPriceLinkForRoute(
+          alert.origem, alert.destino, alert.data_ida,
+          alert.data_volta ?? null,
+          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+        )
+      ]);
+
+      localStorage.setItem(key, String(Date.now()));
+      if (currentPrice !== null) {
+        this.minPrices = { ...this.minPrices, [this.priceKey(alert)]: currentPrice };
+        if (currentLink !== null) {
+          this.minLinks = { ...this.minLinks, [this.priceKey(alert)]: currentLink };
+        }
+        this.showToast(`Preço atualizado: R$ ${currentPrice}`);
       } else {
-        this.showToast(result.error ? `Nao foi possivel atualizar: ${result.error}` : 'Nao encontramos precos para esta rota agora.');
+        await this.loadMinPrices();
+        this.showToast(`Coleta atualizada: menor preço encontrado R$ ${job.preco}, mas nenhum voo passou nos filtros deste alerta.`);
       }
     } finally {
       this.refreshing = { ...this.refreshing, [alert.id]: false };

@@ -57,11 +57,14 @@ vooalerta/
 │           │   └── sidebar/               # Sidebar + modal de perfil (compartilhado)
 │           └── data/airports.ts           # Lista de aeroportos (IATA)
 ├── api/
-│   └── scrape-flight.js   # Vercel Function — atualização manual de voos via Playwright
+│   ├── scrape-flight.js   # Vercel Function — so enfileira um job de refresh (nao raspa mais nada)
+│   └── job-status.js      # Vercel Function — consulta o status/resultado de um job
 ├── backend/
-│   ├── flight_scraper.js   # Coleta Google Flights via Playwright + SerpAPI + cache Supabase
-│   ├── monitor.js          # Monitor de VOOS — Playwright/SerpAPI → Supabase → CallMeBot
+│   ├── flight_scraper.js   # Coleta Google Flights (Playwright + SerpAPI) e MaxMilhas (Playwright) + cache Supabase
+│   ├── monitor.js          # Monitor de VOOS — cron → Supabase → CallMeBot
 │   └── monitor_onibus.js   # Monitor de ÔNIBUS — scraping Buser → Supabase → CallMeBot
+├── worker/
+│   └── index.js            # Worker sempre ligado (Render) — processa a fila refresh_jobs, sem limite de 60s
 ├── .github/workflows/
 │   ├── monitor.yml         # Cron voos: a cada 3h
 │   └── monitor_onibus.yml  # Cron ônibus: 9h30, 13h30, 17h30, 21h30 BRT
@@ -75,7 +78,9 @@ vooalerta/
         ├── 004_bus_alerts.sql                    # bus_alerts, bus_price_cache, bus_notifications, views
         ├── 005_grants_service_role.sql           # grants select/insert/update/delete para service_role
         ├── 006_fix_flight_cache_service_role_grants.sql  # reforço de grants do price_cache para service_role
-        └── 007_price_cache_rls.sql               # habilita RLS em price_cache e bus_price_cache (select público, escrita só via service_role)
+        ├── 007_price_cache_rls.sql               # habilita RLS em price_cache e bus_price_cache (select público, escrita só via service_role)
+        ├── 008_scrape_lock.sql / 009_scrape_lock_rename_column.sql / 010_maxmilhas_lock.sql  # OBSOLETAS — criavam a tabela scrape_lock (lock por linha única). Substituídas pela fila em refresh_jobs (011). Podem ficar órfãs no banco, sem problema; o código não usa mais scrape_lock.
+        └── 011_refresh_jobs.sql                  # fila de atualização manual de preços — processada pelo worker (Render), não mais dentro da function da Vercel
 ```
 
 ---
@@ -122,10 +127,17 @@ vooalerta/
 ### Variáveis Vercel necessárias
 - `SUPABASE_URL`
 - `SUPABASE_KEY` — anon/public key usada no build do Angular
-- `SUPABASE_SERVICE_KEY` ou `SUPABASE_SERVICE_ROLE_KEY` — service_role key usada pela function `/api/scrape-flight` para gravar `price_cache`
-- `SERPAPI_KEY` — chave usada somente no servidor para consultar a segunda fonte de preços
+- `SUPABASE_SERVICE_KEY` ou `SUPABASE_SERVICE_ROLE_KEY` — service_role key usada por `/api/scrape-flight` e `/api/job-status` pra ler/escrever `refresh_jobs`
 - Aliases aceitos pela API: `NEXT_PUBLIC_SUPABASE_URL`, `VITE_SUPABASE_URL`, `SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `VITE_SUPABASE_ANON_KEY`
-- `vercel.json` define `"regions": ["gru1"]` (São Paulo) — tentativa de reduzir a diferença de preço por país de origem da requisição. **Testado e não resolveu**: mesmo rodando fisicamente no Brasil, o preço coletado (R$ 830) continuou mais alto que o visto num navegador residencial comum (R$ 684) para a mesma rota/data. Conclusão: a diferença não é por região geográfica, e sim por o Google Flights tratar IP de datacenter/nuvem diferente de IP residencial — algo que só proxy residencial resolveria (custo recorrente, não contratado). Decisão do time: aceitar essa diferença; o preço coletado ainda é válido pra acompanhar tendência e disparar alerta, só não bate exatamente com o valor visto numa sessão pessoal logada. O cron via GitHub Actions (`monitor.yml`) tem a mesma limitação.
+- Desde a fila (worker no Render), as functions da Vercel **não abrem mais navegador nenhum** — só leem/escrevem `refresh_jobs`. `SERPAPI_KEY` e Playwright deixaram de ser necessários na Vercel (continuam necessários no worker e no cron). `vercel.json` não define mais `regions` nem `memory` nessas functions — não fazem mais sentido sem scraping ali.
+- **Histórico:** chegamos a testar `"regions": ["gru1"]` (São Paulo) na Vercel pra tentar aproximar o preço coletado do visto numa sessão residencial — não resolveu (o preço de datacenter continuou mais alto que o de IP residencial, mesmo rodando fisicamente no Brasil). Isso é uma limitação de IP datacenter vs. residencial, não de região geográfica; só proxy residencial resolveria, e não foi contratado. Aceito como está — o preço coletado (Google e MaxMilhas) ainda serve pra acompanhar tendência e disparar alerta, só não bate exatamente com uma sessão pessoal logada.
+
+### Variáveis do worker (Render)
+- `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` — mesmas do resto do backend
+- `SERPAPI_KEY` — fallback do Google Flights
+- `WORKER_POLL_INTERVAL_MS` (padrão 4000) — intervalo entre checagens da fila
+- `WORKER_JOB_STALE_MS` (padrão 600000 = 10min) — depois de quanto tempo um job `done`/`error` é apagado
+- `PORT` — porta do health check (o Render define automaticamente)
 
 ### Rodando local
 `src/environments/environment.ts` (e `environment.prod.ts`) não existem no repo (gitignored). Pra rodar `npm start` local, criar esses dois arquivos manualmente com `supabaseUrl`/`supabaseKey` reais do projeto (Supabase → Settings → API). Nunca commitar esses arquivos — o `.gitignore` já bloqueia, mas vale checar `git status` depois de criar/editar.
@@ -135,22 +147,27 @@ vooalerta/
 ## Monitores (backend)
 
 ### `monitor.js` — Voos
-- Fontes combinadas em `buscarTodasFontes` (`backend/flight_scraper.js`): **MaxMilhas** primeiro, depois **Google Flights** (Playwright, com SerpAPI como fallback), sempre em sequência (não em paralelo — dois Chromium abertos ao mesmo tempo estouram fácil o limite de memória/tempo da function na Vercel). O menor preço entre as fontes que responderam é o que vai pro cache/alerta; o `link` salvo aponta pro site de origem do preço vencedor (Google ou MaxMilhas). Tempo total observado localmente: ~35-45s — dentro do `maxDuration: 60` da function, com pouca margem.
+- Fontes combinadas em `buscarTodasFontes` (`backend/flight_scraper.js`): **MaxMilhas** primeiro, depois **Google Flights** (Playwright, com SerpAPI como fallback), sempre em sequência. O menor preço entre as fontes que responderam é o que vai pro cache/alerta; o `link` salvo aponta pro site de origem do preço vencedor (Google ou MaxMilhas).
 - Agendamento: controlado **só pelo cron** (`monitor.yml`, atualmente a cada 3h). O script coleta sempre que é executado — não há gate de orçamento interno.
-- **Google Flights**: SerpAPI (`deep_search=true`, `show_hidden=true`) é usada **só como fallback** quando o Playwright falha ou não retorna nenhum voo — não é combinada com ele. O preço do Playwright vem da aba "Menores preços" real do Google; o preço da SerpAPI (`best_flights` + `other_flights`) equivale à aba "Melhor opção" e não deve substituir um resultado válido do Playwright.
-- **MaxMilhas** (`buscarMaxMilhas`): navega direto pra URL de busca (`https://www.maxmilhas.com.br/busca-passagens-aereas/{RT|OW}/{origem}/{destino}/{data_ida}[/{data_volta}]/1/0/0/EC`), sem precisar clicar em aba — os resultados já vêm ordenados "Mais baratos primeiro" por padrão. Lê o preço total (com taxas) do primeiro `<strong>` com `R$` no painel de resumo, e a companhia da linha "Na {companhia} R$ ...". Sem voos detalhados (horário/escalas), só o resumo do menor preço.
-- Se uma fonte falhar ou não achar nada, a outra ainda atualiza o cache; a falha fica registrada como aviso em `fontes`/`warning`.
-- **Fila por fonte** (`scrape_lock`, migrations `008`/`009`/`010`): cada fonte tem seu próprio cadeado de linha única — `busy_until` pro Google, `maxmilhas_busy_until` pra MaxMilhas. Antes de raspar cada fonte, `buscarTodasFontes` tenta adquirir o lock dela; se estiver ocupado, tenta de novo com uma espera curta (MaxMilhas: `MAXMILHAS_LOCK_RETRY_ATTEMPTS`=2 tentativas / `MAXMILHAS_LOCK_RETRY_WAIT_MS`=3000ms; Google: `GOOGLE_LOCK_RETRY_ATTEMPTS`=2 / `GOOGLE_LOCK_RETRY_WAIT_MS`=5000ms) antes de desistir e pular essa fonte só pra essa resposta — sem erro visível. A MaxMilhas não fica mais bloqueada pelo lock do Google (antes era um lock global único). "Tentar de novo depois" não é um retry automático em segundo plano — é a próxima coleta que alguém disparar pra essa rota (outro clique, ou o cron) que tenta de novo; não há worker persistente nessa arquitetura serverless. TTL de cada lock: `GOOGLE_LOCK_TTL_MS`=45000ms, `MAXMILHAS_LOCK_TTL_MS`=20000ms — liberado antes disso assim que a coleta termina, o TTL é só rede de segurança caso o processo caia sem liberar. Se a tabela/coluna não existir (migration não aplicada) ou o Supabase falhar, a coleta segue normalmente sem fila (fail-open). Se as duas fontes falharem/estiverem na fila na mesma chamada, `refreshFlightPrice` cai pro último preço salvo em `price_cache` pra rota, em vez de propagar erro. Nenhuma mensagem técnica (nome de fonte, stack, erro de rede) chega ao toast do usuário — `api/scrape-flight.js` e `supabase.service.ts` sempre traduzem falhas pra uma mensagem genérica.
-- Seleciona a aba "Menores preços" no Google Flights antes de coletar.
-- Confirma que a aba ficou selecionada e só aceita a lista quando o menor voo coincide com o preço anunciado nela; uma lista antiga nunca substitui o cache.
-- Após clicar, monitora diretamente o valor exibido na aba "Menores preços"; espera mínima `FLIGHT_PRICE_SETTLE_MS=20000`, estabilidade `FLIGHT_PRICE_STABLE_MS=5000` e limite `FLIGHT_PRICE_TIMEOUT_MS=30000`.
-- O valor da aba é salvo como uma linha-resumo em `price_cache`, com detalhes de voo nulos, e é sempre a referência principal exibida no card.
-- A linha-resumo e os voos detalhados são inseridos no Supabase em um único lote para preservar o tempo da função Vercel.
-- Reabre o Chromium e tenta novamente se o Google fechar a página durante a navegação; padrão `FLIGHT_NAVIGATION_ATTEMPTS=2`.
-- Na Vercel, compartilha a extração de `/tmp/chromium`, aguarda o executável estabilizar e repete apenas o launch em caso de `ETXTBSY`; padrão `CHROMIUM_LAUNCH_ATTEMPTS=4`.
+- **Google Flights**: SerpAPI (`deep_search=true`, `show_hidden=true`) é usada **só como fallback** quando o Playwright falha ou não retorna nenhum voo — não é combinada com ele. O preço do Playwright vem da aba "Menores preços" real do Google; o preço da SerpAPI (`best_flights` + `other_flights`) equivale à aba "Melhor opção" e não deve substituir um resultado válido do Playwright. Seleciona a aba "Menores preços" antes de coletar e só aceita a lista quando o menor voo coincide com o preço anunciado nela; espera mínima `FLIGHT_PRICE_SETTLE_MS=20000`, estabilidade `FLIGHT_PRICE_STABLE_MS=5000`, limite `FLIGHT_PRICE_TIMEOUT_MS=30000`. Reabre o Chromium se o Google fechar a página durante a navegação (`FLIGHT_NAVIGATION_ATTEMPTS=2`).
+- **MaxMilhas** (`buscarMaxMilhas`): navega direto pra URL de busca (`https://www.maxmilhas.com.br/busca-passagens-aereas/{RT|OW}/{origem}/{destino}/{data_ida}[/{data_volta}]/1/0/0/EC`), sem precisar clicar em aba — os resultados já vêm ordenados "Mais baratos primeiro" por padrão. Lê o preço no primeiro `<strong>` com `R$` no painel de resumo, esperando ele **estabilizar** (mesma ideia do Google: fica lendo até o valor parar de mudar) — `MAXMILHAS_PRICE_SETTLE_MS=8000`, `MAXMILHAS_PRICE_STABLE_MS=3000`, `MAXMILHAS_PRICE_TIMEOUT_MS=25000`. Antes disso era só um `waitForTimeout` fixo de 3-4s, que sob concorrência (ou até sem ela, se a página demorasse a carregar) podia capturar um preço incompleto/errado.
+- Se uma fonte falhar ou não achar nada, a outra ainda atualiza o cache; a falha fica registrada como aviso em `fontes`/`warning`. Se as duas falharem, `refreshFlightPrice` cai pro último preço salvo em `price_cache` pra rota em vez de propagar erro.
 - Cache: reutiliza dados com menos de 3h30 de idade (evita duplicar em disparo manual logo após o cron)
 - Filtros por alerta: `horario_minimo`, `so_direto`
 - Rodar manualmente: ver seção "Rodando local" acima — precisa de `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SERPAPI_KEY` como variáveis de ambiente, depois `npx playwright install chromium && node backend/monitor.js`
+
+### Fila de atualização manual (`refresh_jobs` + worker no Render)
+Histórico do problema: o botão de atualizar rodava a coleta dentro da function da Vercel, que tem 60s de limite total. Sob refresh simultâneo (vários alertas/usuários ao mesmo tempo), isso causava dois problemas: (1) a MaxMilhas não tinha tempo de estabilizar o preço direito e coletava valores errados; (2) a própria function da Vercel podia travar por timeout/memória, retornando uma página de erro não-JSON que vazava como mensagem técnica pro usuário. Tentamos consertar com locks (`scrape_lock`, migrations 008-010) pra evitar coletas simultâneas, mas isso só limitava o problema, não dava tempo de verdade pra cada fonte — e ainda tinha o teto de 60s como parede.
+
+**Solução:** tirar o scraping de dentro da function da Vercel e mover pra um worker sempre ligado, sem limite de tempo:
+
+1. **`api/scrape-flight.js`** (Vercel, rápido, sem Playwright): recebe o clique do botão, cria uma linha em `refresh_jobs` com `status='pending'` (ou reaproveita um job pendente/em andamento recente pra mesma rota, pra não duplicar em cliques repetidos) e devolve o `job_id` na hora.
+2. **`worker/index.js`** (Render, processo sempre ligado): fica em loop (`WORKER_POLL_INTERVAL_MS`, padrão 4s) pegando o job `pending` mais antigo, marcando como `processing`, chamando `refreshFlightPrice` (mesma função do cron — MaxMilhas + Google, com calma, sem pressa de tempo) e salvando o resultado como `done` (ou `error`). Processa **um job por vez** — não precisa mais de lock/fila no banco, porque só existe um worker rodando. Expõe um endpoint HTTP simples (`/health`) só pra responder "ok" a quem pingar.
+3. **UptimeRobot** pinga esse `/health` a cada poucos minutos pra não deixar o serviço gratuito do Render dormir por inatividade.
+4. **`api/job-status.js`** (Vercel): consulta o status/resultado de um `job_id`.
+5. **Frontend** (`voos.component.ts`): clique no botão → enfileira → fica consultando o status a cada 3s (até ~2min) → atualiza o card quando o job terminar. Nenhuma mensagem técnica chega ao toast — sempre um texto genérico em caso de erro/timeout.
+
+Isso elimina de vez o teto de 60s pro scraping em si (o worker não tem esse limite) e a necessidade de lock (só um processo raspa por vez, por natureza). O cron (`monitor.js`, GitHub Actions) continua funcionando à parte, sem depender da fila — ele já é sequencial por conta própria.
 
 ### `monitor_onibus.js` — Ônibus
 - Fonte: scraping da página `buser.com.br/onibus/{origem-slug}/{destino-slug}?ida={data}`
@@ -167,15 +184,11 @@ vooalerta/
 - Deploy: `supabase functions deploy scrape-buser`
 - **Cooldown:** 10 minutos por rota, rastreado em `localStorage` com chave `bus_refresh_{orig}_{dest}_{data}`; o botão exibe contagem regressiva "M:SS" enquanto não disponível
 
-### `api/scrape-flight.js` — Vercel Function (on-demand)
-- Chamada pelo botão ↻ na página de Voos para atualizar o preço manualmente
-- Roda server-side para executar Playwright e SerpAPI em paralelo fora do browser Angular
-- Recebe `{ origem, destino, data_ida, data_volta }`, salva em `price_cache`
-- Retorna o menor preço global e um resumo por fonte em `fontes`
-- Clica na aba "Menores preços" do Google Flights antes de ler a lista
-- Valida a seleção e a sincronização da lista com o preço anunciado na aba antes de gravar no Supabase
-- Antes de ler os voos, espera o valor da aba "Menores preços" permanecer estável e grava esse valor diretamente no cache
-- Trata a corrida de extração do Chromium na Vercel sem expor o log técnico completo ao usuário
+### `api/scrape-flight.js` / `api/job-status.js` — Vercel Functions (on-demand)
+- Chamadas pelo botão ↻ na página de Voos pra atualizar o preço manualmente. Ver seção "Fila de atualização manual" acima pra arquitetura completa.
+- `POST /api/scrape-flight`: recebe `{ origem, destino, data_ida, data_volta }`, cria (ou reaproveita) um job em `refresh_jobs`, devolve `{ job_id }` na hora — **não** raspa nada, não abre Playwright.
+- `GET /api/job-status?job_id=...`: devolve `{ status, preco, link, fontes, warning, error }` do job.
+- Quem processa de fato é o worker (`worker/index.js`, Render) — ver seção acima.
 - **Cooldown:** 10 minutos por rota, rastreado em `localStorage` com chave `flight_refresh_{orig}_{dest}_{data}_{volta}`
 
 ---

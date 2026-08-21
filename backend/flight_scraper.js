@@ -5,12 +5,9 @@ const PRICE_STABLE_MS = Number(process.env.FLIGHT_PRICE_STABLE_MS || 5000);
 const PRICE_TIMEOUT_MS = Number(process.env.FLIGHT_PRICE_TIMEOUT_MS || 30000);
 const CHROMIUM_LAUNCH_ATTEMPTS = Number(process.env.CHROMIUM_LAUNCH_ATTEMPTS || 4);
 const SERPAPI_TIMEOUT_MS = Number(process.env.SERPAPI_TIMEOUT_MS || 25000);
-const GOOGLE_LOCK_TTL_MS = Number(process.env.GOOGLE_LOCK_TTL_MS || 45000);
-const GOOGLE_LOCK_RETRY_ATTEMPTS = Number(process.env.GOOGLE_LOCK_RETRY_ATTEMPTS || 2);
-const GOOGLE_LOCK_RETRY_WAIT_MS = Number(process.env.GOOGLE_LOCK_RETRY_WAIT_MS || 5000);
-const MAXMILHAS_LOCK_TTL_MS = Number(process.env.MAXMILHAS_LOCK_TTL_MS || 20000);
-const MAXMILHAS_LOCK_RETRY_ATTEMPTS = Number(process.env.MAXMILHAS_LOCK_RETRY_ATTEMPTS || 2);
-const MAXMILHAS_LOCK_RETRY_WAIT_MS = Number(process.env.MAXMILHAS_LOCK_RETRY_WAIT_MS || 3000);
+const MAXMILHAS_PRICE_SETTLE_MS = Number(process.env.MAXMILHAS_PRICE_SETTLE_MS || 8000);
+const MAXMILHAS_PRICE_STABLE_MS = Number(process.env.MAXMILHAS_PRICE_STABLE_MS || 3000);
+const MAXMILHAS_PRICE_TIMEOUT_MS = Number(process.env.MAXMILHAS_PRICE_TIMEOUT_MS || 25000);
 const IS_VERCEL = !!process.env.VERCEL;
 let vercelChromiumPathPromise;
 
@@ -512,6 +509,60 @@ function buildMaxMilhasUrl(origem, destino, dataIda, dataVolta) {
     : `https://www.maxmilhas.com.br/busca-passagens-aereas/OW/${origem}/${destino}/${dataIda}/1/0/0/EC`;
 }
 
+async function lerPrecoMaxMilhas(page) {
+  return page.evaluate((nbsp) => {
+    const normalize = value => (value || '')
+      .split(nbsp).join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const parsePrice = value => {
+      const match = normalize(value).match(/R\$\s*([\d.]+)(?:,\d{2})?/);
+      return match ? Number(match[1].replace(/\./g, '')) : null;
+    };
+
+    const strong = Array.from(document.querySelectorAll('strong'))
+      .find(el => /R\$/.test(el.textContent || ''));
+    const preco = strong ? parsePrice(strong.textContent) : null;
+
+    const airlineLabel = Array.from(document.querySelectorAll('p'))
+      .find(el => /^Na\s+\S+/i.test(normalize(el.textContent)));
+    const companhiaMatch = airlineLabel
+      ? normalize(airlineLabel.textContent).match(/^Na\s+(\S+)/i)
+      : null;
+
+    return { preco, companhia: companhiaMatch ? companhiaMatch[1] : null };
+  }, " ");
+}
+
+async function waitForMaxMilhasPriceToSettle(page) {
+  const startedAt = Date.now();
+  let stableSince = null;
+  let previousPreco = null;
+  let last = { preco: null, companhia: null };
+
+  while (Date.now() - startedAt < MAXMILHAS_PRICE_TIMEOUT_MS) {
+    const snapshot = await lerPrecoMaxMilhas(page);
+    last = snapshot;
+
+    if (snapshot.preco !== null && snapshot.preco === previousPreco) {
+      stableSince ??= Date.now();
+    } else {
+      stableSince = snapshot.preco !== null ? Date.now() : null;
+      previousPreco = snapshot.preco;
+    }
+
+    const minimumDelayPassed = Date.now() - startedAt >= MAXMILHAS_PRICE_SETTLE_MS;
+    const stableLongEnough = stableSince !== null && Date.now() - stableSince >= MAXMILHAS_PRICE_STABLE_MS;
+    if (minimumDelayPassed && stableLongEnough) {
+      return last;
+    }
+
+    await page.waitForTimeout(700);
+  }
+
+  return last;
+}
+
 async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
   const url = buildMaxMilhasUrl(origem, destino, dataIda, dataVolta);
   const browser = await launchBrowser();
@@ -520,30 +571,8 @@ async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
     const page = await createStealthPage(browser);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: IS_VERCEL ? 30000 : DEFAULT_TIMEOUT_MS });
     await page.waitForSelector('strong', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(IS_VERCEL ? 3000 : 4000);
 
-    const result = await page.evaluate(() => {
-      const normalize = value => (value || '')
-        .replace(/ /g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      const parsePrice = value => {
-        const match = normalize(value).match(/R\$\s*([\d.]+)(?:,\d{2})?/);
-        return match ? Number(match[1].replace(/\./g, '')) : null;
-      };
-
-      const strong = Array.from(document.querySelectorAll('strong'))
-        .find(el => /R\$/.test(el.textContent || ''));
-      const preco = strong ? parsePrice(strong.textContent) : null;
-
-      const airlineLabel = Array.from(document.querySelectorAll('p'))
-        .find(el => /^Na\s+\S+/i.test(normalize(el.textContent)));
-      const companhiaMatch = airlineLabel
-        ? normalize(airlineLabel.textContent).match(/^Na\s+(\S+)/i)
-        : null;
-
-      return { preco, companhia: companhiaMatch ? companhiaMatch[1] : null };
-    });
+    const result = await waitForMaxMilhasPriceToSettle(page);
 
     if (!result.preco) {
       throw new Error('Nao foi possivel ler o preco na Maxmilhas.');
@@ -563,38 +592,6 @@ async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
   }
 }
 
-async function tentarAdquirirLock(coluna, ttlMs) {
-  const agora = new Date();
-  const novoLimite = new Date(agora.getTime() + ttlMs).toISOString();
-
-  try {
-    const rows = await supabase(
-      'PATCH',
-      `scrape_lock?id=eq.1&${coluna}=lt.${agora.toISOString()}`,
-      { [coluna]: novoLimite }
-    );
-    return rows.length > 0;
-  } catch (err) {
-    // Se a tabela/lock nao existir ainda (migration nao aplicada) ou o
-    // Supabase falhar, nao bloqueia a coleta: segue sem fila.
-    console.warn(`Lock (${coluna}) indisponivel, seguindo sem fila: ${err.message}`);
-    return true;
-  }
-}
-
-async function liberarLock(coluna) {
-  await supabase('PATCH', 'scrape_lock?id=eq.1', { [coluna]: new Date().toISOString() });
-}
-
-async function adquirirLockComEspera(coluna, { ttlMs, tentativas, esperaMs }) {
-  for (let tentativa = 1; tentativa <= tentativas; tentativa++) {
-    const ok = await tentarAdquirirLock(coluna, ttlMs);
-    if (ok) return true;
-    if (tentativa < tentativas) await sleep(esperaMs);
-  }
-  return false;
-}
-
 async function buscarCacheExistente(origem, destino, dataIda, dataVolta) {
   const dataVoltaFilter = dataVolta ? `&data_volta=eq.${dataVolta}` : '&data_volta=is.null';
   return supabase(
@@ -604,61 +601,37 @@ async function buscarCacheExistente(origem, destino, dataIda, dataVolta) {
 }
 
 async function buscarTodasFontes(origem, destino, dataIda, dataVolta) {
-  // Cada fonte tem seu proprio cadeado: a Maxmilhas e rapida e raramente
-  // colide, entao so espera um pouco. O Google e mais lento e instavel sob
-  // concorrencia, entao tenta de novo antes de desistir - mas sem exagerar
-  // no tempo de espera, porque a function inteira tem 60s de limite na
-  // Vercel e uma coleta do Google sozinha ja consome ~30-35s disso.
+  // Sem lock: quem chama essa funcao agora e sempre um worker que processa
+  // um job por vez (fila em refresh_jobs), entao nao ha mais concorrencia
+  // pra evitar aqui. O cron (monitor.js) tambem ja e sequencial por conta
+  // propria. MaxMilhas primeiro (mais rapida), depois Google.
   const voos = [];
   const fontes = {};
   const warnings = [];
 
-  const maxmilhasLock = await adquirirLockComEspera('maxmilhas_busy_until', {
-    ttlMs: MAXMILHAS_LOCK_TTL_MS,
-    tentativas: MAXMILHAS_LOCK_RETRY_ATTEMPTS,
-    esperaMs: MAXMILHAS_LOCK_RETRY_WAIT_MS
-  });
-  if (maxmilhasLock) {
-    try {
-      const maxmilhasFlights = await buscarMaxMilhas(origem, destino, dataIda, dataVolta);
-      if (maxmilhasFlights.length > 0) {
-        voos.push(...maxmilhasFlights);
-        fontes.maxmilhas = {
-          preco: maxmilhasFlights[0]?.preco ?? null,
-          quantidade: maxmilhasFlights.length
-        };
-      } else {
-        warnings.push('maxmilhas: nenhum preco encontrado');
-      }
-    } catch (err) {
-      warnings.push(`maxmilhas: ${String(err?.message || err).split('\n')[0]}`);
-    } finally {
-      await liberarLock('maxmilhas_busy_until').catch(() => {});
+  try {
+    const maxmilhasFlights = await buscarMaxMilhas(origem, destino, dataIda, dataVolta);
+    if (maxmilhasFlights.length > 0) {
+      voos.push(...maxmilhasFlights);
+      fontes.maxmilhas = {
+        preco: maxmilhasFlights[0]?.preco ?? null,
+        quantidade: maxmilhasFlights.length
+      };
+    } else {
+      warnings.push('maxmilhas: nenhum preco encontrado');
     }
-  } else {
-    warnings.push('maxmilhas: fila ocupada, pulando por agora');
+  } catch (err) {
+    warnings.push(`maxmilhas: ${String(err?.message || err).split('\n')[0]}`);
   }
 
-  const googleLock = await adquirirLockComEspera('busy_until', {
-    ttlMs: GOOGLE_LOCK_TTL_MS,
-    tentativas: GOOGLE_LOCK_RETRY_ATTEMPTS,
-    esperaMs: GOOGLE_LOCK_RETRY_WAIT_MS
-  });
-  if (googleLock) {
-    try {
-      const googleResult = await buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolta);
-      voos.push(...googleResult.voos);
-      Object.assign(fontes, googleResult.fontes);
-      if (googleResult.warning) warnings.push(googleResult.warning);
-    } catch (err) {
-      warnings.push(`google: ${String(err?.message || err).split('\n')[0]}`);
-    } finally {
-      await liberarLock('busy_until').catch(() => {});
-    }
-  } else {
-    warnings.push('google: fila ocupada, tenta de novo na proxima coleta');
+  try {
+    const googleResult = await buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolta);
+    voos.push(...googleResult.voos);
+    Object.assign(fontes, googleResult.fontes);
+    if (googleResult.warning) warnings.push(googleResult.warning);
+  } catch (err) {
+    warnings.push(`google: ${String(err?.message || err).split('\n')[0]}`);
   }
-
   if (voos.length === 0) {
     throw new Error(`Nenhuma fonte retornou precos. ${warnings.join(' | ')}`);
   }
@@ -808,7 +781,7 @@ function cacheRowParaResposta(row) {
     quantidade: 1,
     link: row.link ?? undefined,
     fontes: {},
-    warning: 'fila ocupada: retornado o ultimo preco coletado'
+    warning: 'as fontes falharam nessa tentativa: retornado o ultimo preco coletado'
   };
 }
 
@@ -832,8 +805,8 @@ async function refreshFlightPrice({ origem, destino, data_ida, data_volta }) {
       warning: result.warning
     };
   } catch (err) {
-    // Se as duas fontes falharem/estiverem na fila, cai pro ultimo preco em
-    // cache em vez de propagar um erro tecnico pro usuario.
+    // Se as duas fontes falharem de vez, cai pro ultimo preco em cache em
+    // vez de propagar um erro tecnico pro usuario.
     const cache = await buscarCacheExistente(origem, destino, data_ida, data_volta).catch(() => []);
     if (cache.length > 0) return cacheRowParaResposta(cache[0]);
     throw err;
@@ -855,15 +828,12 @@ module.exports = {
   getLowestPricesSnapshot,
   launchBrowser,
   getVercelChromiumPath,
-  liberarLock,
   parseFlightRow,
   parsePrice,
   parseSerpApiTime,
   refreshFlightPrice,
   selectLowestPricesTab,
   salvarCache,
-  tentarAdquirirLock,
-  adquirirLockComEspera,
   sleep,
   supabase,
   waitForLowestPricesToSettle,

@@ -152,9 +152,9 @@ export class SupabaseService {
     return row?.link ?? null;
   }
 
-  async scrapeFlightPrice(origem: string, destino: string, dataIda: string, dataVolta?: string | null): Promise<{ preco: number | null; error?: string; warning?: string }> {
+  async enqueueFlightRefresh(origem: string, destino: string, dataIda: string, dataVolta?: string | null): Promise<{ jobId: string | null; error?: string }> {
     const { data: { session } } = await this.client.auth.getSession();
-    if (!session) return { preco: null, error: 'Sessão expirada. Faça login novamente.' };
+    if (!session) return { jobId: null, error: 'Sessão expirada. Faça login novamente.' };
 
     try {
       const res = await fetch('/api/scrape-flight', {
@@ -173,25 +173,52 @@ export class SupabaseService {
 
       const contentType = res.headers.get('content-type') ?? '';
       const data = contentType.includes('application/json') ? await res.json() : null;
+      const generic = 'Não foi possível iniciar a atualização agora. Tente novamente em instantes.';
 
-      if (!contentType.includes('application/json')) {
-        console.warn('scrape-flight nao retornou JSON (dev local sem proxy, ou a function travou por timeout/sobrecarga)');
-        return { preco: null, error: 'Não foi possível atualizar o preço agora. Tente novamente em instantes.' };
+      if (!contentType.includes('application/json') || !res.ok) {
+        console.warn('scrape-flight (enqueue) falhou', res.status, data?.error);
+        return { jobId: null, error: generic };
       }
 
-      if (!res.ok) {
-        console.warn(`scrape-flight respondeu ${res.status}:`, data?.error);
-        return { preco: null, error: 'Não foi possível atualizar o preço agora. Tente novamente em instantes.' };
+      if (data?.error || !data?.job_id) {
+        return { jobId: null, error: data?.error ?? generic };
+      }
+
+      return { jobId: data.job_id };
+    } catch (err) {
+      console.warn('scrape-flight (enqueue) falhou:', err);
+      return { jobId: null, error: 'Não foi possível iniciar a atualização agora. Tente novamente em instantes.' };
+    }
+  }
+
+  async getJobStatus(jobId: string): Promise<{ status: string; preco: number | null; link?: string; warning?: string; error?: string }> {
+    const { data: { session } } = await this.client.auth.getSession();
+    if (!session) return { status: 'error', preco: null, error: 'Sessão expirada. Faça login novamente.' };
+
+    try {
+      const res = await fetch(`/api/job-status?job_id=${encodeURIComponent(jobId)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+
+      const contentType = res.headers.get('content-type') ?? '';
+      const data = contentType.includes('application/json') ? await res.json() : null;
+      const generic = 'Não foi possível consultar a atualização agora.';
+
+      if (!contentType.includes('application/json') || !res.ok) {
+        console.warn('job-status falhou', res.status, data?.error);
+        return { status: 'error', preco: null, error: generic };
       }
 
       return {
+        status: data?.status ?? 'error',
         preco: data?.preco ?? null,
-        error: data?.error ?? undefined,
-        warning: data?.warning ?? undefined
+        link: data?.link ?? undefined,
+        warning: data?.warning ?? undefined,
+        error: data?.error ?? undefined
       };
     } catch (err) {
-      console.warn('scrape-flight falhou:', err);
-      return { preco: null, error: 'Não foi possível atualizar o preço agora. Tente novamente em instantes.' };
+      console.warn('job-status falhou:', err);
+      return { status: 'error', preco: null, error: 'Não foi possível consultar a atualização agora.' };
     }
   }
 
