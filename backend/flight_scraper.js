@@ -44,7 +44,7 @@ async function supabase(method, path, body = null) {
     'Content-Type': 'application/json'
   };
 
-  if (method === 'POST') headers.Prefer = 'resolution=merge-duplicates';
+  if (method === 'POST') headers.Prefer = 'resolution=merge-duplicates,return=representation';
   if (method === 'PATCH') headers.Prefer = 'return=representation';
 
   const res = await fetch(`${url}/rest/v1/${path}`, {

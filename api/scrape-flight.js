@@ -55,6 +55,10 @@ async function handler(req, res) {
       job = criados[0];
     }
 
+    if (!job) {
+      throw new Error('Insercao em refresh_jobs nao retornou a linha criada.');
+    }
+
     res.status(200).json({ job_id: job.id, status: job.status });
   } catch (err) {
     console.error('scrape-flight (enqueue) failed', err);
