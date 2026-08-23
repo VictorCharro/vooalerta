@@ -192,7 +192,8 @@ export class SupabaseService {
 
     try {
       const res = await fetch(`/api/job-status?job_id=${encodeURIComponent(jobId)}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` }
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store'
       });
 
       const contentType = res.headers.get('content-type') ?? '';
