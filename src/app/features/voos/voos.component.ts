@@ -638,8 +638,8 @@ export class VoosComponent implements OnInit, OnDestroy {
     return this.minLinks[this.priceKey(alert)] ?? this.buildGoogleFlightsUrl(alert);
   }
 
-  private readonly JOB_POLL_INTERVAL_MS = 3000;
-  private readonly JOB_POLL_MAX_ATTEMPTS = 40; // ~2 minutos de espera no total
+  private readonly JOB_POLL_INTERVAL_MS = 4000;
+  private readonly JOB_POLL_MAX_ATTEMPTS = 150; // ~10 minutos - o worker processa 1 job por vez, entao varios refreshes simultaneos ficam na fila
 
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
