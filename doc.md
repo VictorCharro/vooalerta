@@ -189,7 +189,7 @@ Isso elimina de vez o teto de 60s pro scraping em si (o worker não tem esse lim
 - `POST /api/scrape-flight`: recebe `{ origem, destino, data_ida, data_volta }`, cria (ou reaproveita) um job em `refresh_jobs`, devolve `{ job_id }` na hora — **não** raspa nada, não abre Playwright.
 - `GET /api/job-status?job_id=...`: devolve `{ status, preco, link, fontes, warning, error }` do job.
 - Quem processa de fato é o worker (`worker/index.js`, Render) — ver seção acima.
-- **Cooldown:** 10 minutos por rota, rastreado em `localStorage` com chave `flight_refresh_{orig}_{dest}_{data}_{volta}`
+- **Cooldown:** 30 minutos por rota, rastreado em `localStorage` com chave `flight_refresh_{orig}_{dest}_{data}_{volta}`. Clicar em ↻ **dentro** da janela de cooldown não enfileira coleta nova — só relê o preço já salvo em `price_cache` (via `getMinPriceForRoute`) e atualiza a tela na hora, sem gastar coleta à toa.
 
 ---
 

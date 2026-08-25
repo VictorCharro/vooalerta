@@ -522,7 +522,7 @@ export class VoosComponent implements OnInit, OnDestroy {
   private realtimeChannel: any;
   private cooldownTick: any;
   private cooldownNow = Date.now();
-  private readonly COOLDOWN_MS = 10 * 60 * 1000;
+  private readonly COOLDOWN_MS = 30 * 60 * 1000;
 
   isDark = true;
 
@@ -661,7 +661,32 @@ export class VoosComponent implements OnInit, OnDestroy {
   }
 
   async refreshPrice(alert: Alert) {
-    if (!alert.id || this.isRefreshing(alert) || this.getCooldownSeconds(alert) > 0) return;
+    if (!alert.id || this.isRefreshing(alert)) return;
+
+    // Dentro da janela de cooldown, nao enfileira coleta nova - so mostra
+    // de novo o preco que ja esta em cache (evita gastar coleta a toa
+    // quando o preco provavelmente ainda nao mudou).
+    if (this.getCooldownSeconds(alert) > 0) {
+      const [currentPrice, currentLink] = await Promise.all([
+        this.supabase.getMinPriceForRoute(
+          alert.origem, alert.destino, alert.data_ida,
+          alert.data_volta ?? null,
+          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+        ),
+        this.supabase.getMinPriceLinkForRoute(
+          alert.origem, alert.destino, alert.data_ida,
+          alert.data_volta ?? null,
+          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+        )
+      ]);
+      if (currentPrice !== null) {
+        this.minPrices = { ...this.minPrices, [this.priceKey(alert)]: currentPrice };
+        if (currentLink !== null) {
+          this.minLinks = { ...this.minLinks, [this.priceKey(alert)]: currentLink };
+        }
+      }
+      return;
+    }
 
     this.refreshing = { ...this.refreshing, [alert.id]: true };
     try {
