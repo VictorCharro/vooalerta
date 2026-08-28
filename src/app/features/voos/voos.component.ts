@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -10,6 +10,8 @@ import { TimePickerComponent } from '@shared/components/time-picker/time-picker.
 import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
 import { ButtonDirective } from 'primeng/button';
 import { InputNumber } from 'primeng/inputnumber';
+
+type JobStatus = { status: string; preco: number | null; link?: string; warning?: string; error?: string };
 
 @Component({
     selector: 'app-voos',
@@ -152,7 +154,7 @@ import { InputNumber } from 'primeng/inputnumber';
                       <span class="track"></span>
                       <span class="thumb"></span>
                     </label>
-                    <a [href]="buildGoogleFlightsUrl(alert)" target="_blank" class="open-btn" title="Abrir no Google Flights">
+                    <a [href]="getMinLink(alert)" target="_blank" class="open-btn" title="Abrir oferta">
                       <img src="assets/icons/icon_copy.png" alt="" />
                     </a>
                     <button class="refresh-btn"
@@ -339,8 +341,8 @@ import { InputNumber } from 'primeng/inputnumber';
                           </label>
                         </div>
                         <div class="info-row" style="border-bottom:none;padding-bottom:0">
-                          <span class="info-label">Abrir no Google Flights</span>
-                          <a class="open-btn" [href]="buildGoogleFlightsUrl(selectedAlert)" target="_blank" rel="noopener" title="Abrir no Google Flights">↗</a>
+                          <span class="info-label">Abrir oferta</span>
+                          <a class="open-btn" [href]="getMinLink(selectedAlert)" target="_blank" rel="noopener" title="Abrir oferta">↗</a>
                         </div>
                       </div>
                       <div class="info-section">
@@ -527,13 +529,14 @@ export class VoosComponent implements OnInit, OnDestroy {
   profileNome         = '';
 
   minPrices:        Record<string, number> = {};
+  minLinks:         Record<string, string> = {};
   minPricesLoading  = false;
   refreshing:       Record<string, boolean> = {};
   toasts:           string[] = [];
   private realtimeChannel: any;
   private cooldownTick: any;
   private cooldownNow = Date.now();
-  private readonly COOLDOWN_MS = 10 * 60 * 1000;
+  private readonly COOLDOWN_MS = 30 * 60 * 1000;
 
   isDark = true;
 
@@ -560,7 +563,8 @@ export class VoosComponent implements OnInit, OnDestroy {
 
   constructor(
       private supabase: SupabaseService,
-      public router: Router
+      public router: Router,
+      private ngZone: NgZone
   ) {}
 
   async ngOnInit() {
@@ -613,20 +617,30 @@ export class VoosComponent implements OnInit, OnDestroy {
     if (!this.alerts.length) return;
     this.minPricesLoading = true;
     const prices: Record<string, number> = {};
+    const links: Record<string, string> = {};
     await Promise.all(
       this.alerts.map(async (alert) => {
         const key = this.priceKey(alert);
         if (prices[key] === undefined) {
-          const price = await this.supabase.getMinPriceForRoute(
-            alert.origem, alert.destino, alert.data_ida,
-            alert.data_volta ?? null,
-            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-          );
+          const [price, link] = await Promise.all([
+            this.supabase.getMinPriceForRoute(
+              alert.origem, alert.destino, alert.data_ida,
+              alert.data_volta ?? null,
+              { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+            ),
+            this.supabase.getMinPriceLinkForRoute(
+              alert.origem, alert.destino, alert.data_ida,
+              alert.data_volta ?? null,
+              { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+            )
+          ]);
           if (price !== null) prices[key] = price;
+          if (link !== null) links[key] = link;
         }
       })
     );
     this.minPrices = prices;
+    this.minLinks = links;
     this.minPricesLoading = false;
   }
 
@@ -643,32 +657,103 @@ export class VoosComponent implements OnInit, OnDestroy {
     return val !== undefined ? val : null;
   }
 
+  getMinLink(alert: Alert | null): string {
+    if (!alert) return this.buildGoogleFlightsUrl(alert);
+    return this.minLinks[this.priceKey(alert)] ?? this.buildGoogleFlightsUrl(alert);
+  }
+
+  private readonly JOB_POLL_INTERVAL_MS = 4000;
+  private readonly JOB_POLL_MAX_ATTEMPTS = 150; // ~10 minutos - o worker processa 1 job por vez, entao varios refreshes simultaneos ficam na fila
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Roda fora da zone do Angular: o polling faz varios ciclos de espera/fetch
+  // (ate ~2min) e, sem isso, cada tick disparava change detection na tela
+  // inteira (todos os cards recalculando classes/valores), causando um
+  // "piscar" visivel em todos os alertas enquanto um so estava atualizando.
+  private pollJobStatus(jobId: string): Promise<JobStatus | null> {
+    return this.ngZone.runOutsideAngular(async () => {
+      for (let tentativa = 0; tentativa < this.JOB_POLL_MAX_ATTEMPTS; tentativa++) {
+        await this.sleep(this.JOB_POLL_INTERVAL_MS);
+        const job = await this.supabase.getJobStatus(jobId);
+        if (job.status === 'done' || job.status === 'error') return job;
+      }
+      return null;
+    });
+  }
+
   async refreshPrice(alert: Alert) {
-    if (!alert.id || this.isRefreshing(alert) || this.getCooldownSeconds(alert) > 0) return;
+    if (!alert.id || this.isRefreshing(alert)) return;
 
-    this.refreshing = { ...this.refreshing, [alert.id]: true };
-    try {
-      const key = this.refreshKey(alert);
-      const result = await this.supabase.scrapeFlightPrice(alert.origem, alert.destino, alert.data_ida, alert.data_volta);
-
-      if (result.preco !== null) {
-        const currentPrice = await this.supabase.getMinPriceForRoute(
+    // Dentro da janela de cooldown, nao enfileira coleta nova - so mostra
+    // de novo o preco que ja esta em cache (evita gastar coleta a toa
+    // quando o preco provavelmente ainda nao mudou).
+    if (this.getCooldownSeconds(alert) > 0) {
+      const [currentPrice, currentLink] = await Promise.all([
+        this.supabase.getMinPriceForRoute(
           alert.origem, alert.destino, alert.data_ida,
           alert.data_volta ?? null,
           { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-        );
+        ),
+        this.supabase.getMinPriceLinkForRoute(
+          alert.origem, alert.destino, alert.data_ida,
+          alert.data_volta ?? null,
+          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+        )
+      ]);
+      if (currentPrice !== null) {
+        this.minPrices = { ...this.minPrices, [this.priceKey(alert)]: currentPrice };
+        if (currentLink !== null) {
+          this.minLinks = { ...this.minLinks, [this.priceKey(alert)]: currentLink };
+        }
+      }
+      return;
+    }
+
+    this.refreshing = { ...this.refreshing, [alert.id]: true };
+    try {
+      // Se algo falhar daqui pra frente (nao enfileirou, demorou demais,
+      // job deu erro), nao mostramos toast nenhum: o preco que ja estava
+      // na tela (do carregamento anterior) continua valendo. O usuario
+      // nunca fica olhando pra uma mensagem de erro tecnica.
+      const key = this.refreshKey(alert);
+      const { jobId } = await this.supabase.enqueueFlightRefresh(
+        alert.origem, alert.destino, alert.data_ida, alert.data_volta
+      );
+
+      if (!jobId) return;
+
+      const job = await this.pollJobStatus(jobId);
+      if (!job || job.status === 'error' || job.preco === null) return;
+
+      await this.ngZone.run(async () => {
+        const [currentPrice, currentLink] = await Promise.all([
+          this.supabase.getMinPriceForRoute(
+            alert.origem, alert.destino, alert.data_ida,
+            alert.data_volta ?? null,
+            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+          ),
+          this.supabase.getMinPriceLinkForRoute(
+            alert.origem, alert.destino, alert.data_ida,
+            alert.data_volta ?? null,
+            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+          )
+        ]);
 
         localStorage.setItem(key, String(Date.now()));
         if (currentPrice !== null) {
           this.minPrices = { ...this.minPrices, [this.priceKey(alert)]: currentPrice };
+          if (currentLink !== null) {
+            this.minLinks = { ...this.minLinks, [this.priceKey(alert)]: currentLink };
+          }
           this.showToast(`Preço atualizado: R$ ${currentPrice}`);
         } else {
           await this.loadMinPrices();
-          this.showToast(`Coleta atualizada: menor preço encontrado R$ ${result.preco}, mas nenhum voo passou nos filtros deste alerta.`);
+          this.showToast(`Coleta atualizada: menor preço encontrado R$ ${job.preco}, mas nenhum voo passou nos filtros deste alerta.`);
         }
-      } else {
-        this.showToast(result.error ? `Nao foi possivel atualizar: ${result.error}` : 'Nao encontramos precos para esta rota agora.');
-      }
+      });
     } finally {
       this.refreshing = { ...this.refreshing, [alert.id]: false };
     }

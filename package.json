@@ -6,7 +6,8 @@
     "build": "npx ng build",
     "build:prod": "node node_modules/@angular/cli/bin/ng build --configuration production",
     "watch": "ng build --watch --configuration development",
-    "lint": "ng lint"
+    "lint": "ng lint",
+    "worker": "node worker/index.js"
   },
   "dependencies": {
     "@angular/animations": "^21.2.18",

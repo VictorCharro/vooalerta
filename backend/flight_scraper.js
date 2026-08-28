@@ -5,6 +5,9 @@ const PRICE_STABLE_MS = Number(process.env.FLIGHT_PRICE_STABLE_MS || 5000);
 const PRICE_TIMEOUT_MS = Number(process.env.FLIGHT_PRICE_TIMEOUT_MS || 30000);
 const CHROMIUM_LAUNCH_ATTEMPTS = Number(process.env.CHROMIUM_LAUNCH_ATTEMPTS || 4);
 const SERPAPI_TIMEOUT_MS = Number(process.env.SERPAPI_TIMEOUT_MS || 25000);
+const MAXMILHAS_PRICE_SETTLE_MS = Number(process.env.MAXMILHAS_PRICE_SETTLE_MS || 8000);
+const MAXMILHAS_PRICE_STABLE_MS = Number(process.env.MAXMILHAS_PRICE_STABLE_MS || 3000);
+const MAXMILHAS_PRICE_TIMEOUT_MS = Number(process.env.MAXMILHAS_PRICE_TIMEOUT_MS || 25000);
 const IS_VERCEL = !!process.env.VERCEL;
 let vercelChromiumPathPromise;
 
@@ -41,7 +44,8 @@ async function supabase(method, path, body = null) {
     'Content-Type': 'application/json'
   };
 
-  if (method === 'POST') headers.Prefer = 'resolution=merge-duplicates';
+  if (method === 'POST') headers.Prefer = 'resolution=merge-duplicates,return=representation';
+  if (method === 'PATCH') headers.Prefer = 'return=representation';
 
   const res = await fetch(`${url}/rest/v1/${path}`, {
     method,
@@ -405,39 +409,235 @@ async function buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta
 }
 
 async function buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolta) {
-  const sourceNames = ['playwright', 'serpapi'];
-  const settled = await Promise.allSettled([
-    buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta),
-    buscarGoogleFlightsSerpApi(origem, destino, dataIda, dataVolta)
-  ]);
-  const flights = [];
   const fontes = {};
   const warnings = [];
 
-  settled.forEach((result, index) => {
-    const source = sourceNames[index];
-    if (result.status === 'fulfilled' && result.value.length > 0) {
-      flights.push(...result.value);
-      fontes[source] = {
-        preco: result.value[0]?.preco ?? null,
-        quantidade: result.value.length
+  try {
+    const playwrightFlights = await buscarGoogleFlightsPlaywright(origem, destino, dataIda, dataVolta);
+    if (playwrightFlights.length > 0) {
+      fontes.playwright = {
+        preco: playwrightFlights[0]?.preco ?? null,
+        quantidade: playwrightFlights.length
       };
-      return;
+      return {
+        voos: playwrightFlights.sort((a, b) => a.preco - b.preco),
+        fontes,
+        warning: undefined
+      };
     }
+    warnings.push('playwright: nenhum preco encontrado');
+    console.warn('Coleta playwright indisponivel: nenhum preco encontrado');
+  } catch (err) {
+    const reason = String(err?.message || err).split('\n')[0];
+    warnings.push(`playwright: ${reason}`);
+    console.warn(`Coleta playwright indisponivel: ${reason}`);
+  }
 
-    const reason = result.status === 'rejected'
-      ? String(result.reason?.message || result.reason).split('\n')[0]
-      : 'nenhum preco encontrado';
-    warnings.push(`${source}: ${reason}`);
-    console.warn(`Coleta ${source} indisponivel: ${reason}`);
+  // SerpAPI so entra como fallback: a aba "Menores precos" do Playwright e a
+  // referencia real do preco anunciado pelo Google; o SerpAPI (best_flights +
+  // other_flights) equivale a "Melhor opcao" e nao deve substituir esse valor
+  // quando o Playwright funciona.
+  try {
+    const serpApiFlights = await buscarGoogleFlightsSerpApi(origem, destino, dataIda, dataVolta);
+    if (serpApiFlights.length > 0) {
+      fontes.serpapi = {
+        preco: serpApiFlights[0]?.preco ?? null,
+        quantidade: serpApiFlights.length
+      };
+      return {
+        voos: serpApiFlights.sort((a, b) => a.preco - b.preco),
+        fontes,
+        warning: warnings.length ? warnings.join(' | ') : undefined
+      };
+    }
+    warnings.push('serpapi: nenhum preco encontrado');
+    console.warn('Coleta serpapi indisponivel: nenhum preco encontrado');
+  } catch (err) {
+    const reason = String(err?.message || err).split('\n')[0];
+    warnings.push(`serpapi: ${reason}`);
+    console.warn(`Coleta serpapi indisponivel: ${reason}`);
+  }
+
+  throw new Error(`Nenhuma fonte retornou precos. ${warnings.join(' | ')}`);
+}
+
+async function createStealthPage(browser) {
+  const page = await browser.newPage({
+    locale: 'pt-BR',
+    timezoneId: 'America/Sao_Paulo',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    viewport: { width: 1366, height: 900 },
+    geolocation: { latitude: -23.5505, longitude: -46.6333 },
+    permissions: ['geolocation'],
+    extraHTTPHeaders: {
+      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+    }
   });
 
-  if (flights.length === 0) {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt', 'en-US', 'en'] });
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+    window.chrome = { runtime: {} };
+    const originalQuery = window.navigator.permissions?.query;
+    if (originalQuery) {
+      window.navigator.permissions.query = parameters => (
+        parameters.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission })
+          : originalQuery(parameters)
+      );
+    }
+  });
+
+  if (IS_VERCEL) {
+    await page.route('**/*', route => {
+      const type = route.request().resourceType();
+      if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
+        route.abort();
+        return;
+      }
+      route.continue();
+    });
+  }
+
+  return page;
+}
+
+function buildMaxMilhasUrl(origem, destino, dataIda, dataVolta) {
+  return dataVolta
+    ? `https://www.maxmilhas.com.br/busca-passagens-aereas/RT/${origem}/${destino}/${dataIda}/${dataVolta}/1/0/0/EC`
+    : `https://www.maxmilhas.com.br/busca-passagens-aereas/OW/${origem}/${destino}/${dataIda}/1/0/0/EC`;
+}
+
+async function lerPrecoMaxMilhas(page) {
+  return page.evaluate((nbsp) => {
+    const normalize = value => (value || '')
+      .split(nbsp).join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const parsePrice = value => {
+      const match = normalize(value).match(/R\$\s*([\d.]+)(?:,\d{2})?/);
+      return match ? Number(match[1].replace(/\./g, '')) : null;
+    };
+
+    const strong = Array.from(document.querySelectorAll('strong'))
+      .find(el => /R\$/.test(el.textContent || ''));
+    const preco = strong ? parsePrice(strong.textContent) : null;
+
+    const airlineLabel = Array.from(document.querySelectorAll('p'))
+      .find(el => /^Na\s+\S+/i.test(normalize(el.textContent)));
+    const companhiaMatch = airlineLabel
+      ? normalize(airlineLabel.textContent).match(/^Na\s+(\S+)/i)
+      : null;
+
+    return { preco, companhia: companhiaMatch ? companhiaMatch[1] : null };
+  }, " ");
+}
+
+async function waitForMaxMilhasPriceToSettle(page) {
+  const startedAt = Date.now();
+  let stableSince = null;
+  let previousPreco = null;
+  let last = { preco: null, companhia: null };
+
+  while (Date.now() - startedAt < MAXMILHAS_PRICE_TIMEOUT_MS) {
+    const snapshot = await lerPrecoMaxMilhas(page);
+    last = snapshot;
+
+    if (snapshot.preco !== null && snapshot.preco === previousPreco) {
+      stableSince ??= Date.now();
+    } else {
+      stableSince = snapshot.preco !== null ? Date.now() : null;
+      previousPreco = snapshot.preco;
+    }
+
+    const minimumDelayPassed = Date.now() - startedAt >= MAXMILHAS_PRICE_SETTLE_MS;
+    const stableLongEnough = stableSince !== null && Date.now() - stableSince >= MAXMILHAS_PRICE_STABLE_MS;
+    if (minimumDelayPassed && stableLongEnough) {
+      return last;
+    }
+
+    await page.waitForTimeout(700);
+  }
+
+  return last;
+}
+
+async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
+  const url = buildMaxMilhasUrl(origem, destino, dataIda, dataVolta);
+  const browser = await launchBrowser();
+
+  try {
+    const page = await createStealthPage(browser);
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: IS_VERCEL ? 30000 : DEFAULT_TIMEOUT_MS });
+    await page.waitForSelector('strong', { timeout: 15000 }).catch(() => {});
+
+    const result = await waitForMaxMilhasPriceToSettle(page);
+
+    if (!result.preco) {
+      throw new Error('Nao foi possivel ler o preco na Maxmilhas.');
+    }
+
+    return [{
+      preco: result.preco,
+      companhia: result.companhia,
+      horario_partida: null,
+      horario_chegada: null,
+      duracao_min: null,
+      escalas: null,
+      link: url
+    }];
+  } finally {
+    await browser.close().catch(() => {});
+  }
+}
+
+async function buscarCacheExistente(origem, destino, dataIda, dataVolta) {
+  const dataVoltaFilter = dataVolta ? `&data_volta=eq.${dataVolta}` : '&data_volta=is.null';
+  return supabase(
+    'GET',
+    `price_cache?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${dataIda}${dataVoltaFilter}&preco=not.is.null&order=preco.asc&limit=1`
+  );
+}
+
+async function buscarTodasFontes(origem, destino, dataIda, dataVolta) {
+  // Sem lock: quem chama essa funcao agora e sempre um worker que processa
+  // um job por vez (fila em refresh_jobs), entao nao ha mais concorrencia
+  // pra evitar aqui. O cron (monitor.js) tambem ja e sequencial por conta
+  // propria. MaxMilhas primeiro (mais rapida), depois Google.
+  const voos = [];
+  const fontes = {};
+  const warnings = [];
+
+  try {
+    const maxmilhasFlights = await buscarMaxMilhas(origem, destino, dataIda, dataVolta);
+    if (maxmilhasFlights.length > 0) {
+      voos.push(...maxmilhasFlights);
+      fontes.maxmilhas = {
+        preco: maxmilhasFlights[0]?.preco ?? null,
+        quantidade: maxmilhasFlights.length
+      };
+    } else {
+      warnings.push('maxmilhas: nenhum preco encontrado');
+    }
+  } catch (err) {
+    warnings.push(`maxmilhas: ${String(err?.message || err).split('\n')[0]}`);
+  }
+
+  try {
+    const googleResult = await buscarGoogleFlightsTodasFontes(origem, destino, dataIda, dataVolta);
+    voos.push(...googleResult.voos);
+    Object.assign(fontes, googleResult.fontes);
+    if (googleResult.warning) warnings.push(googleResult.warning);
+  } catch (err) {
+    warnings.push(`google: ${String(err?.message || err).split('\n')[0]}`);
+  }
+  if (voos.length === 0) {
     throw new Error(`Nenhuma fonte retornou precos. ${warnings.join(' | ')}`);
   }
 
   return {
-    voos: flights.sort((a, b) => a.preco - b.preco),
+    voos: voos.sort((a, b) => a.preco - b.preco),
     fontes,
     warning: warnings.length ? warnings.join(' | ') : undefined
   };
@@ -447,23 +647,7 @@ async function buscarGoogleFlightsPlaywrightOnce(url, origem, destino) {
   const browser = await launchBrowser();
 
   try {
-    const page = await browser.newPage({
-      locale: 'pt-BR',
-      timezoneId: 'America/Sao_Paulo',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-    });
-
-    if (IS_VERCEL) {
-      await page.route('**/*', route => {
-        const type = route.request().resourceType();
-        if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
-          route.abort();
-          return;
-        }
-        route.continue();
-      });
-    }
-
+    const page = await createStealthPage(browser);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: IS_VERCEL ? 30000 : DEFAULT_TIMEOUT_MS });
     if (!IS_VERCEL) {
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -591,33 +775,56 @@ async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
   await supabase('POST', 'price_cache', rows);
 }
 
+function cacheRowParaResposta(row) {
+  return {
+    preco: row.preco,
+    quantidade: 1,
+    link: row.link ?? undefined,
+    fontes: {},
+    warning: 'as fontes falharam nessa tentativa: retornado o ultimo preco coletado'
+  };
+}
+
 async function refreshFlightPrice({ origem, destino, data_ida, data_volta }) {
   if (!origem || !destino || !data_ida) {
     throw new Error('origem, destino e data_ida sao obrigatorios');
   }
 
-  const result = await buscarGoogleFlightsTodasFontes(origem, destino, data_ida, data_volta);
-  const voos = result.voos;
-  if (voos.length > 0) {
-    await salvarCache(voos, origem, destino, data_ida, data_volta);
-  }
+  try {
+    const result = await buscarTodasFontes(origem, destino, data_ida, data_volta);
+    const voos = result.voos;
+    if (voos.length > 0) {
+      await salvarCache(voos, origem, destino, data_ida, data_volta);
+    }
 
-  return {
-    preco: voos[0]?.preco ?? null,
-    quantidade: voos.length,
-    link: buildGoogleFlightsUrl(origem, destino, data_ida, data_volta),
-    fontes: result.fontes,
-    warning: result.warning
-  };
+    return {
+      preco: voos[0]?.preco ?? null,
+      quantidade: voos.length,
+      link: voos[0]?.link ?? buildGoogleFlightsUrl(origem, destino, data_ida, data_volta),
+      fontes: result.fontes,
+      warning: result.warning
+    };
+  } catch (err) {
+    // Se as duas fontes falharem de vez, cai pro ultimo preco em cache em
+    // vez de propagar um erro tecnico pro usuario.
+    const cache = await buscarCacheExistente(origem, destino, data_ida, data_volta).catch(() => []);
+    if (cache.length > 0) return cacheRowParaResposta(cache[0]);
+    throw err;
+  }
 }
 
 module.exports = {
   buildGoogleFlightsUrl,
+  buildMaxMilhasUrl,
   buscarGoogleFlightsPlaywright,
   buscarGoogleFlightsSerpApi,
   buscarGoogleFlightsTodasFontes,
+  buscarMaxMilhas,
+  buscarTodasFontes,
   collectFlightRows,
+  buscarCacheExistente,
   createAdvertisedPriceFlight,
+  createStealthPage,
   getLowestPricesSnapshot,
   launchBrowser,
   getVercelChromiumPath,

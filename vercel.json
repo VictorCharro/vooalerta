@@ -6,8 +6,10 @@
   "framework": "angular",
   "functions": {
     "api/scrape-flight.js": {
-      "maxDuration": 60,
-      "memory": 1024
+      "maxDuration": 15
+    },
+    "api/job-status.js": {
+      "maxDuration": 10
     }
   }
 }

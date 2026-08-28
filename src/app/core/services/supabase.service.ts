@@ -120,9 +120,41 @@ export class SupabaseService {
     return prices.length ? Math.min(...prices) : null;
   }
 
-  async scrapeFlightPrice(origem: string, destino: string, dataIda: string, dataVolta?: string | null): Promise<{ preco: number | null; error?: string; warning?: string }> {
+  async getMinPriceLinkForRoute(
+    origem: string,
+    destino: string,
+    dataIda: string,
+    dataVolta: string | null = null,
+    options: { horarioMinimo?: string | null; soDireto?: boolean } = {}
+  ): Promise<string | null> {
+    let query = this.client
+        .from('price_cache')
+        .select('preco, link, horario_partida, escalas')
+        .eq('origem', origem)
+        .eq('destino', destino)
+        .eq('data_ida', dataIda)
+        .not('preco', 'is', null);
+
+    query = dataVolta ? query.eq('data_volta', dataVolta) : query.is('data_volta', null);
+
+    const { data } = await query
+        .order('preco', { ascending: true })
+        .limit(200);
+
+    const horarioMinimo = options.horarioMinimo && options.horarioMinimo !== '00:00'
+      ? options.horarioMinimo
+      : null;
+    const row = (data ?? [])
+      .filter(row => !horarioMinimo || row.horario_partida === null || row.horario_partida >= horarioMinimo)
+      .filter(row => !options.soDireto || row.escalas === null || row.escalas === 0)
+      .find(row => typeof row.preco === 'number' && row.link);
+
+    return row?.link ?? null;
+  }
+
+  async enqueueFlightRefresh(origem: string, destino: string, dataIda: string, dataVolta?: string | null): Promise<{ jobId: string | null }> {
     const { data: { session } } = await this.client.auth.getSession();
-    if (!session) return { preco: null, error: 'Sessão expirada. Faça login novamente.' };
+    if (!session) return { jobId: null };
 
     try {
       const res = await fetch('/api/scrape-flight', {
@@ -142,21 +174,47 @@ export class SupabaseService {
       const contentType = res.headers.get('content-type') ?? '';
       const data = contentType.includes('application/json') ? await res.json() : null;
 
-      if (!contentType.includes('application/json')) {
-        return { preco: null, error: 'A API /api/scrape-flight não retornou JSON. Em desenvolvimento local, rode pela Vercel ou configure um proxy para a API.' };
+      if (!contentType.includes('application/json') || !res.ok) {
+        console.warn('scrape-flight (enqueue) falhou', res.status, data?.error);
+        return { jobId: null };
       }
 
-      if (!res.ok) {
-        return { preco: null, error: data?.error ?? `Erro ${res.status} ao chamar /api/scrape-flight` };
+      return { jobId: data?.job_id ?? null };
+    } catch (err) {
+      console.warn('scrape-flight (enqueue) falhou:', err);
+      return { jobId: null };
+    }
+  }
+
+  async getJobStatus(jobId: string): Promise<{ status: string; preco: number | null; link?: string; warning?: string; error?: string }> {
+    const { data: { session } } = await this.client.auth.getSession();
+    if (!session) return { status: 'error', preco: null, error: 'Sessão expirada. Faça login novamente.' };
+
+    try {
+      const res = await fetch(`/api/job-status?job_id=${encodeURIComponent(jobId)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store'
+      });
+
+      const contentType = res.headers.get('content-type') ?? '';
+      const data = contentType.includes('application/json') ? await res.json() : null;
+      const generic = 'Não foi possível consultar a atualização agora.';
+
+      if (!contentType.includes('application/json') || !res.ok) {
+        console.warn('job-status falhou', res.status, data?.error);
+        return { status: 'error', preco: null, error: generic };
       }
 
       return {
+        status: data?.status ?? 'error',
         preco: data?.preco ?? null,
-        error: data?.error ?? undefined,
-        warning: data?.warning ?? undefined
+        link: data?.link ?? undefined,
+        warning: data?.warning ?? undefined,
+        error: data?.error ?? undefined
       };
     } catch (err) {
-      return { preco: null, error: (err as Error).message };
+      console.warn('job-status falhou:', err);
+      return { status: 'error', preco: null, error: 'Não foi possível consultar a atualização agora.' };
     }
   }
 
