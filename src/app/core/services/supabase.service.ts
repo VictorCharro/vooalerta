@@ -24,11 +24,11 @@ export class SupabaseService {
   }
 
   // ── Auth ──────────────────────────────────────────────────
-  async signUp(email: string, password: string, whatsapp: string) {
+  async signUp(email: string, password: string, whatsapp: string, nome: string) {
     return this.client.auth.signUp({
       email,
       password,
-      options: {data: {whatsapp}}
+      options: {data: {whatsapp, nome}}
     });
   }
 
@@ -77,7 +77,7 @@ export class SupabaseService {
     return { data, error };
   }
 
-  async updateProfile(changes: { whatsapp?: string; callmebot_key?: string }) {
+  async updateProfile(changes: { whatsapp?: string; callmebot_key?: string; nome?: string }) {
     const { data: { session } } = await this.client.auth.getSession();
     if (!session) return { data: null, error: new Error('Não autenticado') };
 

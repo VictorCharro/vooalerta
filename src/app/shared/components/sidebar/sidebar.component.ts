@@ -57,6 +57,11 @@ import { ButtonDirective } from 'primeng/button';
           @if (!profileLoading) {
             <form (ngSubmit)="saveProfile()">
               <div class="form-group">
+                <label for="p-nome">Nome</label>
+                <input id="p-nome" type="text" [(ngModel)]="profileForm.nome" name="nome"
+                  placeholder="Seu nome" />
+              </div>
+              <div class="form-group" style="margin-top:14px">
                 <label>E-mail</label>
                 <input type="email" [value]="userEmail" disabled style="opacity:.45;cursor:not-allowed" />
               </div>
@@ -91,7 +96,7 @@ import { ButtonDirective } from 'primeng/button';
                       <a class="btn-whatsapp"
                         href="https://wa.me/34644815878?text=I%20allow%20callmebot%20to%20send%20me%20messages"
                         target="_blank" rel="noopener">
-                        📲 Ativar CallMeBot
+                        Ativar CallMeBot
                       </a>
                     }
                     @if (profileForm.callmebot_key) {
@@ -121,14 +126,14 @@ export class SidebarComponent implements OnInit {
   @Input() userEmail = '';
   @Input() isDark = true;
   @Output() themeChange = new EventEmitter<boolean>();
-  @Output() profileSaved = new EventEmitter<{ whatsapp: string }>();
+  @Output() profileSaved = new EventEmitter<{ whatsapp: string; nome: string }>();
 
   showProfileModal = false;
   profileLoading   = false;
   profileSaving    = false;
   profileError     = '';
   profileSuccess   = false;
-  profileForm      = { whatsapp: '', callmebot_key: '' };
+  profileForm      = { nome: '', whatsapp: '', callmebot_key: '' };
 
   constructor(public router: Router, private supabase: SupabaseService) {}
 
@@ -154,6 +159,7 @@ export class SidebarComponent implements OnInit {
     this.profileLoading   = true;
     const { data } = await this.supabase.getProfile();
     this.profileForm = {
+      nome:          data?.nome ?? '',
       whatsapp:      this.stripPrefix(data?.whatsapp ?? ''),
       callmebot_key: data?.callmebot_key ?? ''
     };
@@ -178,6 +184,7 @@ export class SidebarComponent implements OnInit {
     }
 
     const { error } = await this.supabase.updateProfile({
+      nome:          this.profileForm.nome || undefined,
       whatsapp:      this.profileForm.whatsapp ? '55' + this.profileForm.whatsapp : undefined,
       callmebot_key: this.profileForm.callmebot_key || undefined
     });
@@ -188,7 +195,7 @@ export class SidebarComponent implements OnInit {
         : 'Erro ao salvar perfil. Tente novamente.';
     } else {
       this.profileSuccess = true;
-      this.profileSaved.emit({ whatsapp: this.profileForm.whatsapp });
+      this.profileSaved.emit({ whatsapp: this.profileForm.whatsapp, nome: this.profileForm.nome });
     }
     this.profileSaving = false;
   }

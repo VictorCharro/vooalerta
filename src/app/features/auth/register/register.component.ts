@@ -28,6 +28,18 @@ import { SupabaseService } from '@core/services/supabase.service';
         @if (!success) {
           <form (ngSubmit)="onSubmit()">
             <div class="form-group">
+              <label for="nome">Nome</label>
+              <input
+                id="nome"
+                type="text"
+                [(ngModel)]="nome"
+                name="nome"
+                placeholder="Seu nome"
+                autocomplete="name"
+                required
+                />
+              </div>
+              <div class="form-group" style="margin-top: 14px">
               <label for="email">E-mail</label>
               <input
                 id="email"
@@ -114,6 +126,7 @@ import { SupabaseService } from '@core/services/supabase.service';
   `]
 })
 export class RegisterComponent {
+  nome     = '';
   email    = '';
   password = '';
   whatsapp = '';
@@ -133,7 +146,7 @@ export class RegisterComponent {
       return;
     }
 
-    const { error } = await this.supabase.signUp(this.email, this.password, '55' + this.whatsapp);
+    const { error } = await this.supabase.signUp(this.email, this.password, '55' + this.whatsapp, this.nome);
     if (error) {
       this.error = error.message;
     } else {

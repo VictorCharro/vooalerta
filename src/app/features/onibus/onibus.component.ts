@@ -6,6 +6,7 @@ import { SupabaseService } from '@core/services/supabase.service';
 import { DatePickerComponent } from '@shared/components/date-picker/date-picker.component';
 import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
 import { ButtonDirective } from 'primeng/button';
+import { InputNumber } from 'primeng/inputnumber';
 
 interface BusAlert {
   id: string;
@@ -24,7 +25,7 @@ interface BusAlert {
 
 @Component({
     selector: 'app-onibus',
-    imports: [CommonModule, FormsModule, DatePickerComponent, SidebarComponent, ButtonDirective],
+    imports: [CommonModule, FormsModule, DatePickerComponent, SidebarComponent, ButtonDirective, InputNumber],
     styleUrls: ['./onibus.component.css'],
     template: `
     <div class="layout">
@@ -278,7 +279,7 @@ interface BusAlert {
                       <div class="form-row" style="margin-top:14px">
                         <div class="form-group">
                           <label for="d-meta">Meta de preço (R$)</label>
-                          <input id="d-meta" type="number" [(ngModel)]="detailForm.meta" name="d_meta" placeholder="150" min="1" required />
+                          <p-inputNumber inputId="d-meta" [(ngModel)]="detailForm.meta" name="d_meta" placeholder="150" [min]="1" [required]="true" [showButtons]="true" styleClass="meta-input" />
                         </div>
                         <div class="form-group">
                           <label for="d-whatsapp">WhatsApp</label>
@@ -396,8 +397,8 @@ interface BusAlert {
                             <div class="form-row" style="margin-top:14px">
                               <div class="form-group">
                                 <label for="bus-meta">Meta de preço (R$)</label>
-                                <input id="bus-meta" type="number" [(ngModel)]="form.meta" name="meta"
-                                  placeholder="150" min="1" required />
+                                <p-inputNumber inputId="bus-meta" [(ngModel)]="form.meta" name="meta"
+                                  placeholder="150" [min]="1" [required]="true" [showButtons]="true" styleClass="meta-input" />
                                 </div>
                                 <div class="form-group">
                                   <label for="bus-whatsapp">WhatsApp</label>
@@ -466,6 +467,7 @@ export class OnibusComponent implements OnInit, OnDestroy {
   refreshing:   Record<string, boolean> = {};
   selectedAlert: BusAlert | null = null;
   private profileWhatsapp = '';
+  private profileNome = '';
   private realtimeChannel: any;
   private cooldownTick: any;
   private cooldownNow = Date.now();
@@ -479,6 +481,7 @@ export class OnibusComponent implements OnInit, OnDestroy {
   readonly today = new Date().toISOString().split('T')[0];
 
   get firstName(): string {
+    if (this.profileNome) return this.profileNome.split(' ')[0];
     const local = this.userEmail.split('@')[0] || '';
     return local.charAt(0).toUpperCase() + local.slice(1);
   }
@@ -494,10 +497,14 @@ export class OnibusComponent implements OnInit, OnDestroy {
 
   async ngOnInit() {
     this.isDark = (localStorage.getItem('theme') ?? 'dark') === 'dark';
-    const user = await this.supabase.getUser();
-    this.userEmail = user?.email ?? '';
-    const { data: profile } = await this.supabase.getProfile();
+    const [user, profileResult] = await Promise.all([
+      this.supabase.getUser(),
+      this.supabase.getProfile()
+    ]);
+    const profile = profileResult.data;
+    this.userEmail       = user?.email ?? '';
     this.profileWhatsapp = this.stripPrefix(profile?.whatsapp ?? '');
+    this.profileNome     = profile?.nome ?? '';
     await this.loadAlerts();
     this.realtimeChannel = this.supabase.subscribeBusPriceCache(async () => {
       await this.loadCachedPrices();
@@ -771,8 +778,9 @@ export class OnibusComponent implements OnInit, OnDestroy {
 
   // ── Util ───────────────────────────────────────────────────
 
-  onProfileSaved(event: { whatsapp: string }) {
+  onProfileSaved(event: { whatsapp: string; nome: string }) {
     if (event.whatsapp) this.profileWhatsapp = event.whatsapp;
+    this.profileNome = event.nome;
   }
 
   showToast(msg: string) {

@@ -11,7 +11,7 @@ const DAYS   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
     <div class="dp-wrap">
       <button type="button" class="dp-input" (click)="toggle()" [class.dp-disabled]="disabled">
         <span [class.dp-placeholder]="!value">{{ displayValue || placeholder }}</span>
-        <span class="dp-icon">📅</span>
+        <img class="dp-icon" src="assets/icons/icon_data.png" alt="" />
       </button>
     
       @if (open) {
@@ -55,7 +55,7 @@ const DAYS   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
     .dp-input:hover:not(.dp-disabled) { border-color: var(--color-border-hover); }
     .dp-disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
     .dp-placeholder { color: var(--color-text-muted); }
-    .dp-icon { font-size: 13px; opacity: .5; }
+    .dp-icon { width: 16px; height: 16px; opacity: .5; }
     .dp-popup {
       position: absolute; top: calc(100% + 6px); z-index: 300;
       background: var(--color-bg-2); border: 1px solid var(--color-border);

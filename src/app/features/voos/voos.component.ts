@@ -9,10 +9,11 @@ import { DatePickerComponent } from '@shared/components/date-picker/date-picker.
 import { TimePickerComponent } from '@shared/components/time-picker/time-picker.component';
 import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
 import { ButtonDirective } from 'primeng/button';
+import { InputNumber } from 'primeng/inputnumber';
 
 @Component({
     selector: 'app-voos',
-    imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent, ButtonDirective],
+    imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent, ButtonDirective, InputNumber],
     styleUrls: ['./voos.component.css'],
     template: `
     <div class="layout">
@@ -152,7 +153,7 @@ import { ButtonDirective } from 'primeng/button';
                       <span class="thumb"></span>
                     </label>
                     <a [href]="buildGoogleFlightsUrl(alert)" target="_blank" class="open-btn" title="Abrir no Google Flights">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                      <img src="assets/icons/icon_copy.png" alt="" />
                     </a>
                     <button class="refresh-btn"
                       (click)="refreshPrice(alert)"
@@ -170,7 +171,12 @@ import { ButtonDirective } from 'primeng/button';
                         }
                       }
                     </button>
-                    <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">›</button>
+                    <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">
+                    <img src="assets/icons/icon_expandir.png" alt="" />
+                  </button>
+                  <button class="card-favorite-btn" disabled title="Em breve" aria-label="Favoritar">
+                    <img src="assets/icons/icon_favorito.png" alt="" />
+                  </button>
                   </div>
                 </div>
               }
@@ -285,8 +291,8 @@ import { ButtonDirective } from 'primeng/button';
                   <div class="form-row" style="margin-top:14px">
                     <div class="form-group">
                       <label for="d-meta">Meta de preço (R$)</label>
-                      <input id="d-meta" type="number" [(ngModel)]="form.meta" name="d_meta"
-                        placeholder="3000" min="1" required />
+                      <p-inputNumber inputId="d-meta" [(ngModel)]="form.meta" name="d_meta"
+                        placeholder="3000" [min]="1" [required]="true" [showButtons]="true" styleClass="meta-input" />
                       </div>
                       <div class="form-group">
                         <label for="d-horario">Horário a partir de <span class="form-optional">(opcional)</span></label>
@@ -449,8 +455,8 @@ import { ButtonDirective } from 'primeng/button';
                   <div class="form-row" style="margin-top:14px">
                     <div class="form-group">
                       <label for="m-meta">Meta de preço (R$)</label>
-                      <input id="m-meta" type="number" [(ngModel)]="form.meta" name="meta"
-                        placeholder="3000" min="1" required />
+                      <p-inputNumber inputId="m-meta" [(ngModel)]="form.meta" name="meta"
+                        placeholder="3000" [min]="1" [required]="true" [showButtons]="true" styleClass="meta-input" />
                       </div>
                       <div class="form-group">
                         <label for="m-horario">
@@ -518,6 +524,7 @@ export class VoosComponent implements OnInit, OnDestroy {
 
   missingCallmebotKey = false;
   profileWhatsapp     = '';
+  profileNome         = '';
 
   minPrices:        Record<string, number> = {};
   minPricesLoading  = false;
@@ -539,6 +546,7 @@ export class VoosComponent implements OnInit, OnDestroy {
   get activeCount() { return this.alerts.filter(a => a.ativo).length; }
 
   get firstName(): string {
+    if (this.profileNome) return this.profileNome.split(' ')[0];
     const local = this.userEmail.split('@')[0] || '';
     return local.charAt(0).toUpperCase() + local.slice(1);
   }
@@ -557,12 +565,16 @@ export class VoosComponent implements OnInit, OnDestroy {
 
   async ngOnInit() {
     this.isDark = (localStorage.getItem('theme') ?? 'dark') === 'dark';
-    const user = await this.supabase.getUser();
-    this.userEmail = user?.email ?? '';
-    await this.loadAlerts();
-    const { data: profile } = await this.supabase.getProfile();
+    const [user, profileResult] = await Promise.all([
+      this.supabase.getUser(),
+      this.supabase.getProfile()
+    ]);
+    const profile = profileResult.data;
+    this.userEmail           = user?.email ?? '';
     this.missingCallmebotKey = !profile?.callmebot_key;
     this.profileWhatsapp     = this.stripPrefix(profile?.whatsapp ?? '');
+    this.profileNome         = profile?.nome ?? '';
+    await this.loadAlerts();
 
     this.realtimeChannel = this.supabase.subscribePriceCache(async () => {
       const prevPrices = { ...this.minPrices };
@@ -686,8 +698,9 @@ export class VoosComponent implements OnInit, OnDestroy {
     return 'Atualizar preço agora';
   }
 
-  onProfileSaved(event: { whatsapp: string }) {
+  onProfileSaved(event: { whatsapp: string; nome: string }) {
     if (event.whatsapp) this.profileWhatsapp = event.whatsapp;
+    this.profileNome = event.nome;
   }
 
   openModal() {

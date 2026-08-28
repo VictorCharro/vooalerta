@@ -2,6 +2,10 @@
 .auth-password { width: 100%; display: block; }
 .auth-password .p-password-toggle-mask-icon { color: var(--color-text); }
 
+/* ── PrimeNG p-inputNumber (meta de preço) ────────────────── */
+.meta-input { width: 100%; display: flex; }
+.meta-input .p-inputtext { padding: 10px 14px; font-size: 14px; height: auto; }
+
 /* ── Inputs ─────────────────────────────────────────────── */
 input, select, textarea {
   font-family: var(--font-body);
