@@ -68,8 +68,9 @@ h1 { font-size: 26px; margin-bottom: 4px; }
 .alert-card.cdk-drag-preview { box-shadow: 0 8px 24px rgba(0,0,0,0.35); border-color: var(--color-accent); }
 .alert-card.cdk-drag-placeholder { opacity: 0.3; }
 .alerts-list.cdk-drop-list-dragging .alert-card:not(.cdk-drag-placeholder) { transition: transform var(--transition); }
-.drag-handle { display: flex; align-items: center; color: var(--color-text-dim); cursor: grab; flex-shrink: 0; touch-action: none; }
+.drag-handle { display: flex; align-items: center; color: var(--color-text-dim); cursor: grab; flex-shrink: 0; touch-action: none; -webkit-user-drag: none; user-select: none; }
 .drag-handle:active { cursor: grabbing; }
+.drag-handle svg { pointer-events: none; -webkit-user-drag: none; }
 .card-route { flex: 1; min-width: 0; }
 .route-iata { display: flex; align-items: center; gap: 8px; }
 .iata { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: 0.02em; }
