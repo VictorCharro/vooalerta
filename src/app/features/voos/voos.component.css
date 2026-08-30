@@ -61,7 +61,7 @@ h1 { font-size: 26px; margin-bottom: 4px; }
 .empty-state p { color: var(--color-text-muted); font-size: 14px; }
 
 /* ── Alert cards ─────────────────────────────────────────── */
-.alerts-list { display: grid; gap: 12px; }
+.alerts-list { display: grid; gap: 12px; position: relative; }
 .alert-card { display: flex; align-items: center; gap: 20px; padding: 18px 22px; background: var(--color-bg-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); transition: border-color var(--transition), opacity var(--transition); }
 .alert-card:hover { border-color: var(--color-border-hover); }
 .alert-card.card-inactive { opacity: 0.5; }

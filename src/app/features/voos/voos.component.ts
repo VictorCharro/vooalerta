@@ -83,6 +83,7 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
                 <div
                   class="alert-card fade-up"
                   cdkDrag
+                  cdkDragPreviewContainer="parent"
                   [style.animation-delay]="(i * 0.04) + 's'"
                   [class.card-inactive]="!alert.ativo"
                   >
