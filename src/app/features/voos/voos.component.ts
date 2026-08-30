@@ -2,7 +2,6 @@ import { Component, OnInit, OnDestroy, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { SupabaseService } from '@core/services/supabase.service';
 import { Alert, AlertCreate } from '@core/models/alert.model';
 import { AirportSearchComponent } from '@shared/components/airport-search/airport-search.component';
@@ -14,7 +13,7 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
 
 @Component({
     selector: 'app-voos',
-    imports: [CommonModule, FormsModule, DragDropModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent],
+    imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent],
     styleUrls: ['./voos.component.css'],
     template: `
     <div class="layout">
@@ -78,17 +77,23 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
           }
           <!-- Alert cards -->
           @if (!loading && alerts.length > 0) {
-            <div class="alerts-list" cdkDropList (cdkDropListDropped)="onAlertDrop($event)">
+            <div class="alerts-list">
               @for (alert of alerts; track alert; let i = $index) {
                 <div
                   class="alert-card fade-up"
-                  cdkDrag
-                  cdkDragPreviewContainer="parent"
+                  [draggable]="true"
+                  (dragstart)="onDragStart($event, i)"
+                  (dragover)="onDragOver($event, i)"
+                  (dragleave)="onDragLeave(i)"
+                  (drop)="onDrop($event, i)"
+                  (dragend)="onDragEnd()"
                   [style.animation-delay]="(i * 0.04) + 's'"
                   [class.card-inactive]="!alert.ativo"
+                  [class.is-dragging]="dragIndex === i"
+                  [class.is-drag-over]="dragOverIndex === i && dragIndex !== i"
                   >
-                  <span cdkDragHandle class="drag-handle" title="Arrastar pra reordenar">
-                    <svg draggable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.2" fill="currentColor" stroke="none"/></svg>
+                  <span class="drag-handle" title="Arrastar pra reordenar" (pointerdown)="onHandleGrab()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.2" fill="currentColor" stroke="none"/></svg>
                   </span>
                   <div class="card-route">
                     <div class="route-iata">
@@ -595,12 +600,64 @@ export class VoosComponent implements OnInit, OnDestroy {
     this.loadMinPrices();
   }
 
-  onAlertDrop(event: CdkDragDrop<Alert[]>) {
-    if (event.previousIndex === event.currentIndex) return;
-    moveItemInArray(this.alerts, event.previousIndex, event.currentIndex);
-    this.supabase.reorderAlerts(this.alerts.map(a => a.id!)).catch(err => {
+  // ── Reordenar cards (drag-and-drop nativo do HTML5) ──────────
+  // Sem Angular CDK: o proprio navegador desenha o "fantasma" do card
+  // enquanto arrasta, entao nao ha preview posicionado por CSS pra dar
+  // errado. So arrasta quem pegou pela alca (handleGrabbed) - assim os
+  // botoes e o link do card continuam clicaveis normalmente.
+  dragIndex: number | null = null;
+  dragOverIndex: number | null = null;
+  private handleGrabbed = false;
+
+  onHandleGrab() {
+    this.handleGrabbed = true;
+  }
+
+  onDragStart(event: DragEvent, index: number) {
+    if (!this.handleGrabbed) {
+      event.preventDefault();
+      return;
+    }
+    this.dragIndex = index;
+    event.dataTransfer?.setData('text/plain', String(index));
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  onDragOver(event: DragEvent, index: number) {
+    if (this.dragIndex === null) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    this.dragOverIndex = index;
+  }
+
+  onDragLeave(index: number) {
+    if (this.dragOverIndex === index) this.dragOverIndex = null;
+  }
+
+  onDrop(event: DragEvent, index: number) {
+    event.preventDefault();
+    const from = this.dragIndex;
+    this.resetDrag();
+    if (from === null || from === index) return;
+
+    const reordenados = [...this.alerts];
+    const [movido] = reordenados.splice(from, 1);
+    reordenados.splice(index, 0, movido);
+    this.alerts = reordenados;
+
+    this.supabase.reorderAlerts(reordenados.map(a => a.id!)).catch(err => {
       console.warn('Falha ao salvar nova ordem dos alertas:', err);
     });
+  }
+
+  onDragEnd() {
+    this.resetDrag();
+  }
+
+  private resetDrag() {
+    this.dragIndex = null;
+    this.dragOverIndex = null;
+    this.handleGrabbed = false;
   }
 
   async loadMinPrices() {

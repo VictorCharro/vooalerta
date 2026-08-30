@@ -61,16 +61,15 @@ h1 { font-size: 26px; margin-bottom: 4px; }
 .empty-state p { color: var(--color-text-muted); font-size: 14px; }
 
 /* ── Alert cards ─────────────────────────────────────────── */
-.alerts-list { display: grid; gap: 12px; position: relative; }
+.alerts-list { display: grid; gap: 12px; }
 .alert-card { display: flex; align-items: center; gap: 20px; padding: 18px 22px; background: var(--color-bg-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); transition: border-color var(--transition), opacity var(--transition); }
 .alert-card:hover { border-color: var(--color-border-hover); }
 .alert-card.card-inactive { opacity: 0.5; }
-.alert-card.cdk-drag-preview { box-shadow: 0 8px 24px rgba(0,0,0,0.35); border-color: var(--color-accent); }
-.alert-card.cdk-drag-placeholder { opacity: 0.3; }
-.alerts-list.cdk-drop-list-dragging .alert-card:not(.cdk-drag-placeholder) { transition: transform var(--transition); }
-.drag-handle { display: flex; align-items: center; color: var(--color-text-dim); cursor: grab; flex-shrink: 0; touch-action: none; -webkit-user-drag: none; user-select: none; }
+.alert-card.is-dragging { opacity: 0.4; }
+.alert-card.is-drag-over { border-color: var(--color-accent); }
+.drag-handle { display: flex; align-items: center; color: var(--color-text-dim); cursor: grab; flex-shrink: 0; user-select: none; }
 .drag-handle:active { cursor: grabbing; }
-.drag-handle svg { pointer-events: none; -webkit-user-drag: none; }
+.drag-handle svg { pointer-events: none; }
 .card-route { flex: 1; min-width: 0; }
 .route-iata { display: flex; align-items: center; gap: 8px; }
 .iata { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: 0.02em; }
