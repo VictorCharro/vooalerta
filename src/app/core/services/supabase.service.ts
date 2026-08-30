@@ -225,7 +225,14 @@ export class SupabaseService {
     return this.client
         .from('alerts')
         .select('*')
+        .order('ordem', { ascending: true, nullsFirst: false })
         .order('criado_em', { ascending: false });
+  }
+
+  async reorderAlerts(orderedIds: string[]) {
+    await Promise.all(
+      orderedIds.map((id, index) => this.updateAlert(id, { ordem: index }))
+    );
   }
 
   async createAlert(payload: AlertCreate) {

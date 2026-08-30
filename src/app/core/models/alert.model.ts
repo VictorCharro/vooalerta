@@ -11,6 +11,7 @@ export interface Alert {
   whatsapp: string;
   ativo: boolean;
   criado_em?: string;
+  ordem?: number | null;
 }
 
 export type AlertCreate = Omit<Alert, 'id' | 'user_id' | 'criado_em'>;

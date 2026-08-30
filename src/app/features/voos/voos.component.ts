@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { SupabaseService } from '@core/services/supabase.service';
 import { Alert, AlertCreate } from '@core/models/alert.model';
 import { AirportSearchComponent } from '@shared/components/airport-search/airport-search.component';
@@ -13,7 +14,7 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
 
 @Component({
     selector: 'app-voos',
-    imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent],
+    imports: [CommonModule, FormsModule, DragDropModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent],
     styleUrls: ['./voos.component.css'],
     template: `
     <div class="layout">
@@ -77,13 +78,17 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
           }
           <!-- Alert cards -->
           @if (!loading && alerts.length > 0) {
-            <div class="alerts-list">
+            <div class="alerts-list" cdkDropList (cdkDropListDropped)="onAlertDrop($event)">
               @for (alert of alerts; track alert; let i = $index) {
                 <div
                   class="alert-card fade-up"
+                  cdkDrag
                   [style.animation-delay]="(i * 0.04) + 's'"
                   [class.card-inactive]="!alert.ativo"
                   >
+                  <span cdkDragHandle class="drag-handle" title="Arrastar pra reordenar">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.2" fill="currentColor" stroke="none"/></svg>
+                  </span>
                   <div class="card-route">
                     <div class="route-iata">
                       <span class="iata">{{ alert.origem }}</span>
@@ -587,6 +592,14 @@ export class VoosComponent implements OnInit, OnDestroy {
     this.alerts  = (data as Alert[]) ?? [];
     this.loading = false;
     this.loadMinPrices();
+  }
+
+  onAlertDrop(event: CdkDragDrop<Alert[]>) {
+    if (event.previousIndex === event.currentIndex) return;
+    moveItemInArray(this.alerts, event.previousIndex, event.currentIndex);
+    this.supabase.reorderAlerts(this.alerts.map(a => a.id!)).catch(err => {
+      console.warn('Falha ao salvar nova ordem dos alertas:', err);
+    });
   }
 
   async loadMinPrices() {
