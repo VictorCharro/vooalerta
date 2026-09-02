@@ -8,7 +8,8 @@
 const http = require('http');
 const {
   refreshFlightPrice,
-  supabase
+  supabase,
+  closeSharedBrowser
 } = require('../backend/flight_scraper');
 
 const POLL_INTERVAL_MS = Number(process.env.WORKER_POLL_INTERVAL_MS || 4000);
@@ -128,3 +129,14 @@ http.createServer((req, res) => {
 }).listen(PORT, () => {
   console.log(`[worker] Health check ouvindo na porta ${PORT}`);
 });
+
+// Fecha o Chromium compartilhado (#135) antes de sair, pra nao deixar o
+// processo do browser orfao quando o Render reinicia/redeploya o worker.
+async function shutdown(signal) {
+  console.log(`[worker] Recebido ${signal}, encerrando...`);
+  await closeSharedBrowser().catch(() => {});
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

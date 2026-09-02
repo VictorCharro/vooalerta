@@ -596,10 +596,11 @@ async function waitForMaxMilhasPriceToSettle(page) {
 
 async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
   const url = buildMaxMilhasUrl(origem, destino, dataIda, dataVolta);
-  const browser = await launchBrowser();
+  const browser = await getSharedBrowser();
+  let page;
 
   try {
-    const page = await createStealthPage(browser);
+    page = await createStealthPage(browser);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: IS_VERCEL ? 30000 : DEFAULT_TIMEOUT_MS });
     await page.waitForSelector('strong', { timeout: 15000 }).catch(() => {});
 
@@ -619,7 +620,8 @@ async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
       link: url
     }];
   } finally {
-    await browser.close().catch(() => {});
+    await page?.close().catch(() => {});
+    if (IS_VERCEL) await browser.close().catch(() => {});
   }
 }
 
@@ -676,10 +678,11 @@ async function buscarTodasFontes(origem, destino, dataIda, dataVolta) {
 }
 
 async function buscarGoogleFlightsPlaywrightOnce(url, origem, destino) {
-  const browser = await launchBrowser();
+  const browser = await getSharedBrowser();
+  let page;
 
   try {
-    const page = await createStealthPage(browser);
+    page = await createStealthPage(browser);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: IS_VERCEL ? 30000 : DEFAULT_TIMEOUT_MS });
     if (!IS_VERCEL) {
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -697,8 +700,37 @@ async function buscarGoogleFlightsPlaywrightOnce(url, origem, destino) {
       ...flights.filter(flight => flight.preco >= advertisedPrice)
     ].sort((a, b) => a.preco - b.preco);
   } finally {
-    await browser.close().catch(() => {});
+    await page?.close().catch(() => {});
+    if (IS_VERCEL) await browser.close().catch(() => {});
   }
+}
+
+// No worker (Render) o processo fica sempre ligado e processa um job por
+// vez - reaproveitar a mesma instancia do Chromium entre MaxMilhas e Google
+// (e entre jobs) evita relancar o browser do zero em toda coleta (#135). No
+// Vercel o processo e efemero (uma invocacao == um container), entao ali
+// cada chamada continua subindo e derrubando o proprio Chromium.
+let sharedBrowserPromise = null;
+
+async function getSharedBrowser() {
+  if (IS_VERCEL) return launchBrowser();
+
+  if (sharedBrowserPromise) {
+    const browser = await sharedBrowserPromise.catch(() => null);
+    if (browser?.isConnected()) return browser;
+    sharedBrowserPromise = null;
+  }
+
+  sharedBrowserPromise = launchBrowser();
+  return sharedBrowserPromise;
+}
+
+async function closeSharedBrowser() {
+  if (!sharedBrowserPromise) return;
+  const promise = sharedBrowserPromise;
+  sharedBrowserPromise = null;
+  const browser = await promise.catch(() => null);
+  await browser?.close().catch(() => {});
 }
 
 async function launchBrowser() {
@@ -865,6 +897,8 @@ module.exports = {
   createStealthPage,
   getLowestPricesSnapshot,
   launchBrowser,
+  getSharedBrowser,
+  closeSharedBrowser,
   getVercelChromiumPath,
   parseFlightRow,
   parsePrice,
