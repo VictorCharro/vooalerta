@@ -531,6 +531,7 @@ export class VoosComponent implements OnInit, OnDestroy {
   refreshing:       Record<string, boolean> = {};
   toasts:           string[] = [];
   private realtimeChannel: any;
+  private realtimeDebounce: any;
   private cooldownTick: any;
   private cooldownNow = Date.now();
   private readonly COOLDOWN_MS = 30 * 60 * 1000;
@@ -567,23 +568,34 @@ export class VoosComponent implements OnInit, OnDestroy {
     this.missingCallmebotKey = !profile?.callmebot_key;
     this.profileWhatsapp     = this.stripPrefix(profile?.whatsapp ?? '');
 
-    this.realtimeChannel = this.supabase.subscribePriceCache(async () => {
-      const prevPrices = { ...this.minPrices };
-      await this.loadMinPrices();
-      for (const alert of this.alerts) {
-        const key = this.priceKey(alert);
-        const prev = prevPrices[key];
-        const curr = this.minPrices[key];
-        if (curr !== undefined && curr <= alert.meta && (prev === undefined || prev > alert.meta)) {
-          this.showToast(`✈ ${alert.origem} → ${alert.destino} abaixo da meta! R$ ${curr}`);
-        }
-      }
+    // Uma coleta salva dezenas de linhas em price_cache (DELETE + INSERT em
+    // lote), e cada linha dispara um evento de realtime separado. Sem o
+    // debounce, isso rodava loadMinPrices() (2 queries por alerta) dezenas de
+    // vezes em rajada a cada atualizacao, causando os precos "piscando" na
+    // tela (#138). Espera 1s de silencio antes de recarregar.
+    this.realtimeChannel = this.supabase.subscribePriceCache(() => {
+      clearTimeout(this.realtimeDebounce);
+      this.realtimeDebounce = setTimeout(() => this.aplicarAtualizacaoDePrecos(), 1000);
     });
     this.cooldownTick = setInterval(() => { this.cooldownNow = Date.now(); }, 1000);
   }
 
+  private async aplicarAtualizacaoDePrecos() {
+    const prevPrices = { ...this.minPrices };
+    await this.loadMinPrices();
+    for (const alert of this.alerts) {
+      const key = this.priceKey(alert);
+      const prev = prevPrices[key];
+      const curr = this.minPrices[key];
+      if (curr !== undefined && curr <= alert.meta && (prev === undefined || prev > alert.meta)) {
+        this.showToast(`✈ ${alert.origem} → ${alert.destino} abaixo da meta! R$ ${curr}`);
+      }
+    }
+  }
+
   ngOnDestroy() {
     this.realtimeChannel?.unsubscribe();
+    clearTimeout(this.realtimeDebounce);
     clearInterval(this.cooldownTick);
   }
 
@@ -669,18 +681,11 @@ export class VoosComponent implements OnInit, OnDestroy {
       this.alerts.map(async (alert) => {
         const key = this.priceKey(alert);
         if (prices[key] === undefined) {
-          const [price, link] = await Promise.all([
-            this.supabase.getMinPriceForRoute(
-              alert.origem, alert.destino, alert.data_ida,
-              alert.data_volta ?? null,
-              { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-            ),
-            this.supabase.getMinPriceLinkForRoute(
-              alert.origem, alert.destino, alert.data_ida,
-              alert.data_volta ?? null,
-              { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-            )
-          ]);
+          const { preco: price, link } = await this.supabase.getMinPriceRowForRoute(
+            alert.origem, alert.destino, alert.data_ida,
+            alert.data_volta ?? null,
+            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+          );
           if (price !== null) prices[key] = price;
           if (link !== null) links[key] = link;
         }
@@ -738,18 +743,11 @@ export class VoosComponent implements OnInit, OnDestroy {
     // de novo o preco que ja esta em cache (evita gastar coleta a toa
     // quando o preco provavelmente ainda nao mudou).
     if (this.getCooldownSeconds(alert) > 0) {
-      const [currentPrice, currentLink] = await Promise.all([
-        this.supabase.getMinPriceForRoute(
-          alert.origem, alert.destino, alert.data_ida,
-          alert.data_volta ?? null,
-          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-        ),
-        this.supabase.getMinPriceLinkForRoute(
-          alert.origem, alert.destino, alert.data_ida,
-          alert.data_volta ?? null,
-          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-        )
-      ]);
+      const { preco: currentPrice, link: currentLink } = await this.supabase.getMinPriceRowForRoute(
+        alert.origem, alert.destino, alert.data_ida,
+        alert.data_volta ?? null,
+        { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+      );
       if (currentPrice !== null) {
         this.minPrices = { ...this.minPrices, [this.priceKey(alert)]: currentPrice };
         if (currentLink !== null) {
@@ -776,18 +774,11 @@ export class VoosComponent implements OnInit, OnDestroy {
       if (!job || job.status === 'error' || job.preco === null) return;
 
       await this.ngZone.run(async () => {
-        const [currentPrice, currentLink] = await Promise.all([
-          this.supabase.getMinPriceForRoute(
-            alert.origem, alert.destino, alert.data_ida,
-            alert.data_volta ?? null,
-            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-          ),
-          this.supabase.getMinPriceLinkForRoute(
-            alert.origem, alert.destino, alert.data_ida,
-            alert.data_volta ?? null,
-            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-          )
-        ]);
+        const { preco: currentPrice, link: currentLink } = await this.supabase.getMinPriceRowForRoute(
+          alert.origem, alert.destino, alert.data_ida,
+          alert.data_volta ?? null,
+          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+        );
 
         localStorage.setItem(key, String(Date.now()));
         if (currentPrice !== null) {

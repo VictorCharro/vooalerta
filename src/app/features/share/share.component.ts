@@ -167,11 +167,12 @@ export class ShareComponent implements OnInit {
     this.alert = data as Alert | null;
 
     if (this.alert) {
-      this.minPrice = await this.supabase.getMinPriceForRoute(
+      const { preco } = await this.supabase.getMinPriceRowForRoute(
         this.alert.origem, this.alert.destino, this.alert.data_ida,
         this.alert.data_volta ?? null,
         { horarioMinimo: this.alert.horario_minimo, soDireto: this.alert.so_direto }
       );
+      this.minPrice = preco;
     }
 
     this.loading = false;
