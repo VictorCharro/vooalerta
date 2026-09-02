@@ -1,11 +1,15 @@
 const DEFAULT_TIMEOUT_MS = 45000;
 const NAVIGATION_ATTEMPTS = Number(process.env.FLIGHT_NAVIGATION_ATTEMPTS || 2);
-const PRICE_SETTLE_MS = Number(process.env.FLIGHT_PRICE_SETTLE_MS || 20000);
+// PRICE_STABLE_MS/MAXMILHAS_PRICE_STABLE_MS sao o unico criterio de saida do
+// settle agora (ver #136): antes havia tambem um piso fixo de espera
+// (20s/8s) aplicado em toda coleta, mesmo quando o preco ja estava estavel
+// no primeiro segundo. O criterio de estabilidade (mesma leitura por N
+// segundos seguidos) ja e suficiente pra confirmar que o valor nao e um
+// estado transitorio de carregamento da pagina.
 const PRICE_STABLE_MS = Number(process.env.FLIGHT_PRICE_STABLE_MS || 5000);
 const PRICE_TIMEOUT_MS = Number(process.env.FLIGHT_PRICE_TIMEOUT_MS || 30000);
 const CHROMIUM_LAUNCH_ATTEMPTS = Number(process.env.CHROMIUM_LAUNCH_ATTEMPTS || 4);
 const SERPAPI_TIMEOUT_MS = Number(process.env.SERPAPI_TIMEOUT_MS || 25000);
-const MAXMILHAS_PRICE_SETTLE_MS = Number(process.env.MAXMILHAS_PRICE_SETTLE_MS || 8000);
 const MAXMILHAS_PRICE_STABLE_MS = Number(process.env.MAXMILHAS_PRICE_STABLE_MS || 3000);
 const MAXMILHAS_PRICE_TIMEOUT_MS = Number(process.env.MAXMILHAS_PRICE_TIMEOUT_MS || 25000);
 const IS_VERCEL = !!process.env.VERCEL;
@@ -345,9 +349,8 @@ async function waitForLowestPricesToSettle(page, origem, destino) {
       previousSignature = signature;
     }
 
-    const minimumDelayPassed = Date.now() - startedAt >= PRICE_SETTLE_MS;
     const stableLongEnough = stableSince !== null && Date.now() - stableSince >= PRICE_STABLE_MS;
-    if (minimumDelayPassed && stableLongEnough) {
+    if (stableLongEnough) {
       return { advertisedPrice: snapshot.advertisedPrice };
     }
 
@@ -580,9 +583,8 @@ async function waitForMaxMilhasPriceToSettle(page) {
       previousPreco = snapshot.preco;
     }
 
-    const minimumDelayPassed = Date.now() - startedAt >= MAXMILHAS_PRICE_SETTLE_MS;
     const stableLongEnough = stableSince !== null && Date.now() - stableSince >= MAXMILHAS_PRICE_STABLE_MS;
-    if (minimumDelayPassed && stableLongEnough) {
+    if (stableLongEnough) {
       return last;
     }
 
