@@ -13,6 +13,11 @@ const {
 
 const POLL_INTERVAL_MS = Number(process.env.WORKER_POLL_INTERVAL_MS || 4000);
 const JOB_STALE_MS = Number(process.env.WORKER_JOB_STALE_MS || 10 * 60 * 1000);
+// Tempo maximo que um job pode ficar em "processing" antes de ser considerado
+// travado (worker morreu no meio: redeploy, OOM, crash do Chromium). Sem isso
+// o job zumbi ficava preso pra sempre e o front pollava ate 10min a toa (#131).
+const JOB_PROCESSING_TIMEOUT_MS = Number(process.env.WORKER_JOB_PROCESSING_TIMEOUT_MS || 5 * 60 * 1000);
+const REAPER_INTERVAL_MS = Number(process.env.WORKER_REAPER_INTERVAL_MS || 60 * 1000);
 const PORT = Number(process.env.PORT || 3000);
 
 let processing = false;
@@ -58,6 +63,22 @@ async function limparJobsAntigos() {
   });
 }
 
+async function liberarJobsTravados() {
+  const limite = new Date(Date.now() - JOB_PROCESSING_TIMEOUT_MS).toISOString();
+  const travados = await supabase(
+    'PATCH',
+    `refresh_jobs?status=eq.processing&atualizado_em=lt.${limite}`,
+    { status: 'error', error: 'timeout: job travado em processing (worker reiniciou no meio da coleta)', atualizado_em: new Date().toISOString() }
+  ).catch(err => {
+    console.warn('[worker] Falha ao liberar jobs travados:', err.message);
+    return [];
+  });
+
+  if (travados.length > 0) {
+    console.warn(`[worker] ${travados.length} job(s) travado(s) em processing foram liberados (timeout).`);
+  }
+}
+
 async function processarJob(job) {
   console.log(`[worker] Processando job ${job.id}: ${job.origem} -> ${job.destino} | ${job.data_ida}`);
   await marcarProcessando(job.id);
@@ -97,6 +118,9 @@ tick();
 
 setInterval(limparJobsAntigos, 30 * 60 * 1000);
 limparJobsAntigos();
+
+setInterval(liberarJobsTravados, REAPER_INTERVAL_MS);
+liberarJobsTravados();
 
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
