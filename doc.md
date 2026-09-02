@@ -79,8 +79,12 @@ vooalerta/
         ├── 005_grants_service_role.sql           # grants select/insert/update/delete para service_role
         ├── 006_fix_flight_cache_service_role_grants.sql  # reforço de grants do price_cache para service_role
         ├── 007_price_cache_rls.sql               # habilita RLS em price_cache e bus_price_cache (select público, escrita só via service_role)
-        ├── 008_scrape_lock.sql / 009_scrape_lock_rename_column.sql / 010_maxmilhas_lock.sql  # OBSOLETAS — criavam a tabela scrape_lock (lock por linha única). Substituídas pela fila em refresh_jobs (011). Podem ficar órfãs no banco, sem problema; o código não usa mais scrape_lock.
-        └── 011_refresh_jobs.sql                  # fila de atualização manual de preços — processada pelo worker (Render), não mais dentro da function da Vercel
+        ├── 008_scrape_lock.sql / 009_scrape_lock_rename_column.sql / 010_maxmilhas_lock.sql  # OBSOLETAS — criavam a tabela scrape_lock (lock por linha única). Substituídas pela fila em refresh_jobs (011). Removidas pela 015.
+        ├── 011_refresh_jobs.sql                  # fila de atualização manual de preços — processada pelo worker (Render), não mais dentro da function da Vercel
+        ├── 012_refresh_jobs_grant_delete.sql     # grant de delete em refresh_jobs pra service_role (limpeza de jobs antigos)
+        ├── 013_alerts_ordem.sql                  # coluna ordem em alerts, pro drag-and-drop de reordenar os cards
+        ├── 014_limpar_cache_antigo_grant_e_cron.sql  # grant explícito + tenta agendar limpar_cache_antigo() via pg_cron (a cada hora); acionamento garantido é a chamada do RPC ao final de cada rodada do monitor.js
+        └── 015_drop_scrape_lock.sql              # remove a tabela órfã scrape_lock (ver 008/009/010)
 ```
 
 ---
@@ -104,7 +108,7 @@ vooalerta/
 
 ### Tabelas de voo
 - **`alerts`** — alertas do usuário (origem IATA, destino IATA, data_ida, data_volta, meta, horario_minimo, so_direto, whatsapp, ativo). RLS: cada usuário só vê/edita os próprios; leitura pública por ID liberada (página de share).
-- **`price_cache`** — voos encontrados pelo Playwright/SerpAPI no Google Flights (preco, companhia, horario_partida, escalas, etc.). RLS: leitura pública, escrita só via `service_role`.
+- **`price_cache`** — voos encontrados pelo Playwright/SerpAPI no Google Flights (preco, companhia, horario_partida, escalas, etc.). RLS: leitura pública, escrita só via `service_role`. Linhas com mais de 24h sem atualização são apagadas por `limpar_cache_antigo()`, chamada ao final de cada rodada do `monitor.js` (e, se `pg_cron` estiver disponível no projeto, também a cada hora — migration 014).
 - **`notifications`** — controle anti-spam 6h por alerta
 - **`profiles`** — whatsapp + callmebot_key por usuário
 
