@@ -1,6 +1,8 @@
 const {
   supabase,
-  verifyUserToken
+  verifyUserToken,
+  isValidIata,
+  isValidIsoDate
 } = require('../backend/flight_scraper');
 
 const JOB_REUSE_WINDOW_MS = 2 * 60 * 1000; // evita criar job duplicado pra mesma rota em cliques repetidos
@@ -29,19 +31,31 @@ async function handler(req, res) {
     }
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    const { origem, destino, data_ida, data_volta } = body;
+    let { origem, destino, data_ida, data_volta } = body;
 
     if (!origem || !destino || !data_ida) {
       res.status(400).json({ error: 'origem, destino e data_ida sao obrigatorios' });
       return;
     }
 
-    const dataVoltaFilter = data_volta ? `&data_volta=eq.${data_volta}` : '&data_volta=is.null';
+    origem = String(origem).toUpperCase();
+    destino = String(destino).toUpperCase();
+
+    if (!isValidIata(origem) || !isValidIata(destino)) {
+      res.status(400).json({ error: 'origem e destino devem ser codigos IATA de 3 letras' });
+      return;
+    }
+    if (!isValidIsoDate(data_ida) || (data_volta && !isValidIsoDate(data_volta))) {
+      res.status(400).json({ error: 'data_ida/data_volta devem estar no formato AAAA-MM-DD' });
+      return;
+    }
+
+    const dataVoltaFilter = data_volta ? `&data_volta=eq.${encodeURIComponent(data_volta)}` : '&data_volta=is.null';
     const janela = new Date(Date.now() - JOB_REUSE_WINDOW_MS).toISOString();
 
     const existentes = await supabase(
       'GET',
-      `refresh_jobs?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${data_ida}${dataVoltaFilter}&status=in.(pending,processing)&criado_em=gte.${janela}&order=criado_em.desc&limit=1`
+      `refresh_jobs?origem=eq.${encodeURIComponent(origem)}&destino=eq.${encodeURIComponent(destino)}&data_ida=eq.${encodeURIComponent(data_ida)}${dataVoltaFilter}&status=in.(pending,processing)&criado_em=gte.${janela}&order=criado_em.desc&limit=1`
     );
 
     let job = existentes[0];

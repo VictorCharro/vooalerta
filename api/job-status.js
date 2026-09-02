@@ -1,6 +1,7 @@
 const {
   supabase,
-  verifyUserToken
+  verifyUserToken,
+  isValidUuid
 } = require('../backend/flight_scraper');
 
 async function handler(req, res) {
@@ -28,12 +29,12 @@ async function handler(req, res) {
     }
 
     const jobId = req.query?.job_id;
-    if (!jobId) {
-      res.status(400).json({ error: 'job_id e obrigatorio' });
+    if (!jobId || !isValidUuid(jobId)) {
+      res.status(400).json({ error: 'job_id e obrigatorio e deve ser um uuid valido' });
       return;
     }
 
-    const jobs = await supabase('GET', `refresh_jobs?id=eq.${jobId}&limit=1`);
+    const jobs = await supabase('GET', `refresh_jobs?id=eq.${encodeURIComponent(jobId)}&limit=1`);
     const job = jobs[0];
     if (!job) {
       res.status(404).json({ error: 'Job nao encontrado' });

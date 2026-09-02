@@ -11,6 +11,35 @@ const MAXMILHAS_PRICE_TIMEOUT_MS = Number(process.env.MAXMILHAS_PRICE_TIMEOUT_MS
 const IS_VERCEL = !!process.env.VERCEL;
 let vercelChromiumPathPromise;
 
+// Validacao de parametros que entram em filtros do PostgREST (ver issue #132).
+// Todas as chamadas em flight_scraper.js/worker/api rodam com a service_role
+// key, que ignora RLS - um valor nao validado aqui vira um filtro arbitrario
+// com privilegio total sobre price_cache/refresh_jobs.
+const IATA_RE = /^[A-Za-z]{3}$/;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidIata(value) {
+  return IATA_RE.test(value || '');
+}
+
+function isValidIsoDate(value) {
+  return ISO_DATE_RE.test(value || '');
+}
+
+function isValidUuid(value) {
+  return UUID_RE.test(value || '');
+}
+
+function assertValidRoute(origem, destino, dataIda, dataVolta) {
+  if (!isValidIata(origem) || !isValidIata(destino)) {
+    throw new Error('Origem/destino invalidos (esperado codigo IATA de 3 letras).');
+  }
+  if (!isValidIsoDate(dataIda) || (dataVolta && !isValidIsoDate(dataVolta))) {
+    throw new Error('Data invalida (esperado AAAA-MM-DD).');
+  }
+}
+
 function getSupabaseConfig({ serviceRole = false } = {}) {
   const url =
     process.env.SUPABASE_URL ||
@@ -593,10 +622,11 @@ async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
 }
 
 async function buscarCacheExistente(origem, destino, dataIda, dataVolta) {
-  const dataVoltaFilter = dataVolta ? `&data_volta=eq.${dataVolta}` : '&data_volta=is.null';
+  assertValidRoute(origem, destino, dataIda, dataVolta);
+  const dataVoltaFilter = dataVolta ? `&data_volta=eq.${encodeURIComponent(dataVolta)}` : '&data_volta=is.null';
   return supabase(
     'GET',
-    `price_cache?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${dataIda}${dataVoltaFilter}&preco=not.is.null&order=preco.asc&limit=1`
+    `price_cache?origem=eq.${encodeURIComponent(origem)}&destino=eq.${encodeURIComponent(destino)}&data_ida=eq.${encodeURIComponent(dataIda)}${dataVoltaFilter}&preco=not.is.null&order=preco.asc&limit=1`
   );
 }
 
@@ -748,14 +778,14 @@ async function waitForExecutableToSettle(executablePath) {
 }
 
 async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
-  const dataVoltaFilter = dataVolta ? `&data_volta=eq.${dataVolta}` : '&data_volta=is.null';
-  await supabase(
-    'DELETE',
-    `price_cache?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${dataIda}${dataVoltaFilter}`
-  );
-
   if (voos.length === 0) return;
+  assertValidRoute(origem, destino, dataIda, dataVolta);
 
+  // Insere as linhas novas ANTES de apagar as antigas (ver issue #133): a
+  // ordem antiga (DELETE depois POST) deixava a rota sem nenhum preco no
+  // meio das duas chamadas e, se o POST falhasse, o cache anterior ja
+  // tinha sido perdido - exatamente o que buscarCacheExistente() usa como
+  // fallback quando as fontes falham.
   const agora = new Date().toISOString();
   const rows = voos.map(voo => ({
       origem,
@@ -773,6 +803,12 @@ async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
   }));
 
   await supabase('POST', 'price_cache', rows);
+
+  const dataVoltaFilter = dataVolta ? `&data_volta=eq.${encodeURIComponent(dataVolta)}` : '&data_volta=is.null';
+  await supabase(
+    'DELETE',
+    `price_cache?origem=eq.${encodeURIComponent(origem)}&destino=eq.${encodeURIComponent(destino)}&data_ida=eq.${encodeURIComponent(dataIda)}${dataVoltaFilter}&atualizado_em=lt.${encodeURIComponent(agora)}`
+  );
 }
 
 function cacheRowParaResposta(row) {
@@ -836,6 +872,9 @@ module.exports = {
   salvarCache,
   sleep,
   supabase,
+  isValidIata,
+  isValidIsoDate,
+  isValidUuid,
   waitForLowestPricesToSettle,
   waitForExecutableToSettle,
   verifyUserToken
