@@ -91,9 +91,20 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
               @for (alert of alerts; track alert; let i = $index) {
                 <div
                   class="alert-card fade-up"
+                  [draggable]="true"
+                  (dragstart)="onDragStart($event, i)"
+                  (dragover)="onDragOver($event, i)"
+                  (dragleave)="onDragLeave(i)"
+                  (drop)="onDrop($event, i)"
+                  (dragend)="onDragEnd()"
                   [style.animation-delay]="(i * 0.04) + 's'"
                   [class.card-inactive]="!alert.ativo"
+                  [class.is-dragging]="dragIndex === i"
+                  [class.is-drag-over]="dragOverIndex === i && dragIndex !== i"
                   >
+                  <span class="drag-handle" title="Arrastar pra reordenar" (pointerdown)="onHandleGrab()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.2" fill="currentColor" stroke="none"/></svg>
+                  </span>
                   <div class="card-route">
                     <div class="route-iata">
                       <span class="iata">{{ alert.origem }}</span>
@@ -634,6 +645,7 @@ export class VoosComponent implements OnInit, OnDestroy {
   refreshing:       Record<string, boolean> = {};
   toasts:           string[] = [];
   private realtimeChannel: any;
+  private realtimeDebounce: any;
   private cooldownTick: any;
   private cooldownNow = Date.now();
   private readonly COOLDOWN_MS = 30 * 60 * 1000;
@@ -680,23 +692,34 @@ export class VoosComponent implements OnInit, OnDestroy {
     this.profileNome         = profile?.nome ?? '';
     await this.loadAlerts();
 
-    this.realtimeChannel = this.supabase.subscribePriceCache(async () => {
-      const prevPrices = { ...this.minPrices };
-      await this.loadMinPrices();
-      for (const alert of this.alerts) {
-        const key = this.priceKey(alert);
-        const prev = prevPrices[key];
-        const curr = this.minPrices[key];
-        if (curr !== undefined && curr <= alert.meta && (prev === undefined || prev > alert.meta)) {
-          this.showToast(`✈ ${alert.origem} → ${alert.destino} abaixo da meta! R$ ${curr}`);
-        }
-      }
+    // Uma coleta salva dezenas de linhas em price_cache (DELETE + INSERT em
+    // lote), e cada linha dispara um evento de realtime separado. Sem o
+    // debounce, isso rodava loadMinPrices() (2 queries por alerta) dezenas de
+    // vezes em rajada a cada atualizacao, causando os precos "piscando" na
+    // tela (#138). Espera 1s de silencio antes de recarregar.
+    this.realtimeChannel = this.supabase.subscribePriceCache(() => {
+      clearTimeout(this.realtimeDebounce);
+      this.realtimeDebounce = setTimeout(() => this.aplicarAtualizacaoDePrecos(), 1000);
     });
     this.cooldownTick = setInterval(() => { this.cooldownNow = Date.now(); }, 1000);
   }
 
+  private async aplicarAtualizacaoDePrecos() {
+    const prevPrices = { ...this.minPrices };
+    await this.loadMinPrices();
+    for (const alert of this.alerts) {
+      const key = this.priceKey(alert);
+      const prev = prevPrices[key];
+      const curr = this.minPrices[key];
+      if (curr !== undefined && curr <= alert.meta && (prev === undefined || prev > alert.meta)) {
+        this.showToast(`✈ ${alert.origem} → ${alert.destino} abaixo da meta! R$ ${curr}`);
+      }
+    }
+  }
+
   ngOnDestroy() {
     this.realtimeChannel?.unsubscribe();
+    clearTimeout(this.realtimeDebounce);
     clearInterval(this.cooldownTick);
   }
 
@@ -713,6 +736,66 @@ export class VoosComponent implements OnInit, OnDestroy {
     this.loadMinPrices();
   }
 
+  // ── Reordenar cards (drag-and-drop nativo do HTML5) ──────────
+  // Sem Angular CDK: o proprio navegador desenha o "fantasma" do card
+  // enquanto arrasta, entao nao ha preview posicionado por CSS pra dar
+  // errado. So arrasta quem pegou pela alca (handleGrabbed) - assim os
+  // botoes e o link do card continuam clicaveis normalmente.
+  dragIndex: number | null = null;
+  dragOverIndex: number | null = null;
+  private handleGrabbed = false;
+
+  onHandleGrab() {
+    this.handleGrabbed = true;
+  }
+
+  onDragStart(event: DragEvent, index: number) {
+    if (!this.handleGrabbed) {
+      event.preventDefault();
+      return;
+    }
+    this.dragIndex = index;
+    event.dataTransfer?.setData('text/plain', String(index));
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  onDragOver(event: DragEvent, index: number) {
+    if (this.dragIndex === null) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    this.dragOverIndex = index;
+  }
+
+  onDragLeave(index: number) {
+    if (this.dragOverIndex === index) this.dragOverIndex = null;
+  }
+
+  onDrop(event: DragEvent, index: number) {
+    event.preventDefault();
+    const from = this.dragIndex;
+    this.resetDrag();
+    if (from === null || from === index) return;
+
+    const reordenados = [...this.alerts];
+    const [movido] = reordenados.splice(from, 1);
+    reordenados.splice(index, 0, movido);
+    this.alerts = reordenados;
+
+    this.supabase.reorderAlerts(reordenados.map(a => a.id!)).catch(err => {
+      console.warn('Falha ao salvar nova ordem dos alertas:', err);
+    });
+  }
+
+  onDragEnd() {
+    this.resetDrag();
+  }
+
+  private resetDrag() {
+    this.dragIndex = null;
+    this.dragOverIndex = null;
+    this.handleGrabbed = false;
+  }
+
   async loadMinPrices() {
     if (!this.alerts.length) return;
     this.minPricesLoading = true;
@@ -722,18 +805,11 @@ export class VoosComponent implements OnInit, OnDestroy {
       this.alerts.map(async (alert) => {
         const key = this.priceKey(alert);
         if (prices[key] === undefined) {
-          const [price, link] = await Promise.all([
-            this.supabase.getMinPriceForRoute(
-              alert.origem, alert.destino, alert.data_ida,
-              alert.data_volta ?? null,
-              { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-            ),
-            this.supabase.getMinPriceLinkForRoute(
-              alert.origem, alert.destino, alert.data_ida,
-              alert.data_volta ?? null,
-              { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-            )
-          ]);
+          const { preco: price, link } = await this.supabase.getMinPriceRowForRoute(
+            alert.origem, alert.destino, alert.data_ida,
+            alert.data_volta ?? null,
+            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+          );
           if (price !== null) prices[key] = price;
           if (link !== null) links[key] = link;
         }
@@ -791,18 +867,11 @@ export class VoosComponent implements OnInit, OnDestroy {
     // de novo o preco que ja esta em cache (evita gastar coleta a toa
     // quando o preco provavelmente ainda nao mudou).
     if (this.getCooldownSeconds(alert) > 0) {
-      const [currentPrice, currentLink] = await Promise.all([
-        this.supabase.getMinPriceForRoute(
-          alert.origem, alert.destino, alert.data_ida,
-          alert.data_volta ?? null,
-          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-        ),
-        this.supabase.getMinPriceLinkForRoute(
-          alert.origem, alert.destino, alert.data_ida,
-          alert.data_volta ?? null,
-          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-        )
-      ]);
+      const { preco: currentPrice, link: currentLink } = await this.supabase.getMinPriceRowForRoute(
+        alert.origem, alert.destino, alert.data_ida,
+        alert.data_volta ?? null,
+        { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+      );
       if (currentPrice !== null) {
         this.minPrices = { ...this.minPrices, [this.priceKey(alert)]: currentPrice };
         if (currentLink !== null) {
@@ -829,18 +898,11 @@ export class VoosComponent implements OnInit, OnDestroy {
       if (!job || job.status === 'error' || job.preco === null) return;
 
       await this.ngZone.run(async () => {
-        const [currentPrice, currentLink] = await Promise.all([
-          this.supabase.getMinPriceForRoute(
-            alert.origem, alert.destino, alert.data_ida,
-            alert.data_volta ?? null,
-            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-          ),
-          this.supabase.getMinPriceLinkForRoute(
-            alert.origem, alert.destino, alert.data_ida,
-            alert.data_volta ?? null,
-            { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
-          )
-        ]);
+        const { preco: currentPrice, link: currentLink } = await this.supabase.getMinPriceRowForRoute(
+          alert.origem, alert.destino, alert.data_ida,
+          alert.data_volta ?? null,
+          { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+        );
 
         localStorage.setItem(key, String(Date.now()));
         if (currentPrice !== null) {

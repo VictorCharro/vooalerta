@@ -87,46 +87,17 @@ export class SupabaseService {
         .eq('id', session.user.id);
   }
 
-  async getMinPriceForRoute(
+  // Antes eram duas queries identicas (getMinPriceForRoute +
+  // getMinPriceLinkForRoute) chamadas sempre em par - mesma tabela, mesmo
+  // filtro, mesma ordenacao, so mudando as colunas do select. Unificadas
+  // numa so pra cortar pela metade os round-trips ao Supabase (#137).
+  async getMinPriceRowForRoute(
     origem: string,
     destino: string,
     dataIda: string,
     dataVolta: string | null = null,
     options: { horarioMinimo?: string | null; soDireto?: boolean } = {}
-  ): Promise<number | null> {
-    let query = this.client
-        .from('price_cache')
-        .select('preco, horario_partida, escalas')
-        .eq('origem', origem)
-        .eq('destino', destino)
-        .eq('data_ida', dataIda)
-        .not('preco', 'is', null);
-
-    query = dataVolta ? query.eq('data_volta', dataVolta) : query.is('data_volta', null);
-
-    const { data } = await query
-        .order('preco', { ascending: true })
-        .limit(200);
-
-    const horarioMinimo = options.horarioMinimo && options.horarioMinimo !== '00:00'
-      ? options.horarioMinimo
-      : null;
-    const prices = (data ?? [])
-      .filter(row => !horarioMinimo || row.horario_partida === null || row.horario_partida >= horarioMinimo)
-      .filter(row => !options.soDireto || row.escalas === null || row.escalas === 0)
-      .map(row => row.preco)
-      .filter((preco): preco is number => typeof preco === 'number');
-
-    return prices.length ? Math.min(...prices) : null;
-  }
-
-  async getMinPriceLinkForRoute(
-    origem: string,
-    destino: string,
-    dataIda: string,
-    dataVolta: string | null = null,
-    options: { horarioMinimo?: string | null; soDireto?: boolean } = {}
-  ): Promise<string | null> {
+  ): Promise<{ preco: number | null; link: string | null }> {
     let query = this.client
         .from('price_cache')
         .select('preco, link, horario_partida, escalas')
@@ -144,12 +115,15 @@ export class SupabaseService {
     const horarioMinimo = options.horarioMinimo && options.horarioMinimo !== '00:00'
       ? options.horarioMinimo
       : null;
-    const row = (data ?? [])
+    const rows = (data ?? [])
       .filter(row => !horarioMinimo || row.horario_partida === null || row.horario_partida >= horarioMinimo)
       .filter(row => !options.soDireto || row.escalas === null || row.escalas === 0)
-      .find(row => typeof row.preco === 'number' && row.link);
+      .filter((row): row is typeof row & { preco: number } => typeof row.preco === 'number');
 
-    return row?.link ?? null;
+    if (rows.length === 0) return { preco: null, link: null };
+
+    const menor = rows.reduce((min, row) => row.preco < min.preco ? row : min);
+    return { preco: menor.preco, link: menor.link ?? null };
   }
 
   async getMinPriceDetailsForRoute(
@@ -258,7 +232,31 @@ export class SupabaseService {
     return this.client
         .from('alerts')
         .select('*')
+        .order('ordem', { ascending: true, nullsFirst: false })
         .order('criado_em', { ascending: false });
+  }
+
+  async reorderAlerts(orderedIds: string[]) {
+    // upsert em lote em vez de um UPDATE por card (#141): so a coluna
+    // "ordem" muda, mas upsert exige a linha inteira ou risca sobrescrever
+    // as demais colunas com null - por isso le a linha atual antes.
+    const { data: existentes, error: fetchError } = await this.client
+      .from('alerts')
+      .select('*')
+      .in('id', orderedIds);
+
+    if (fetchError || !existentes) throw fetchError ?? new Error('Falha ao carregar alertas para reordenar.');
+
+    const porId = new Map(existentes.map(row => [row.id, row]));
+    const rows = orderedIds
+      .map((id, index) => {
+        const row = porId.get(id);
+        return row ? { ...row, ordem: index } : null;
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+
+    const { error } = await this.client.from('alerts').upsert(rows, { onConflict: 'id' });
+    if (error) throw error;
   }
 
   async createAlert(payload: AlertCreate) {

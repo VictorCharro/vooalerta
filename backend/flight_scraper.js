@@ -1,15 +1,48 @@
 const DEFAULT_TIMEOUT_MS = 45000;
 const NAVIGATION_ATTEMPTS = Number(process.env.FLIGHT_NAVIGATION_ATTEMPTS || 2);
-const PRICE_SETTLE_MS = Number(process.env.FLIGHT_PRICE_SETTLE_MS || 20000);
+// PRICE_STABLE_MS/MAXMILHAS_PRICE_STABLE_MS sao o unico criterio de saida do
+// settle agora (ver #136): antes havia tambem um piso fixo de espera
+// (20s/8s) aplicado em toda coleta, mesmo quando o preco ja estava estavel
+// no primeiro segundo. O criterio de estabilidade (mesma leitura por N
+// segundos seguidos) ja e suficiente pra confirmar que o valor nao e um
+// estado transitorio de carregamento da pagina.
 const PRICE_STABLE_MS = Number(process.env.FLIGHT_PRICE_STABLE_MS || 5000);
 const PRICE_TIMEOUT_MS = Number(process.env.FLIGHT_PRICE_TIMEOUT_MS || 30000);
 const CHROMIUM_LAUNCH_ATTEMPTS = Number(process.env.CHROMIUM_LAUNCH_ATTEMPTS || 4);
 const SERPAPI_TIMEOUT_MS = Number(process.env.SERPAPI_TIMEOUT_MS || 25000);
-const MAXMILHAS_PRICE_SETTLE_MS = Number(process.env.MAXMILHAS_PRICE_SETTLE_MS || 8000);
 const MAXMILHAS_PRICE_STABLE_MS = Number(process.env.MAXMILHAS_PRICE_STABLE_MS || 3000);
 const MAXMILHAS_PRICE_TIMEOUT_MS = Number(process.env.MAXMILHAS_PRICE_TIMEOUT_MS || 25000);
 const IS_VERCEL = !!process.env.VERCEL;
 let vercelChromiumPathPromise;
+
+// Validacao de parametros que entram em filtros do PostgREST (ver issue #132).
+// Todas as chamadas em flight_scraper.js/worker/api rodam com a service_role
+// key, que ignora RLS - um valor nao validado aqui vira um filtro arbitrario
+// com privilegio total sobre price_cache/refresh_jobs.
+const IATA_RE = /^[A-Za-z]{3}$/;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidIata(value) {
+  return IATA_RE.test(value || '');
+}
+
+function isValidIsoDate(value) {
+  return ISO_DATE_RE.test(value || '');
+}
+
+function isValidUuid(value) {
+  return UUID_RE.test(value || '');
+}
+
+function assertValidRoute(origem, destino, dataIda, dataVolta) {
+  if (!isValidIata(origem) || !isValidIata(destino)) {
+    throw new Error('Origem/destino invalidos (esperado codigo IATA de 3 letras).');
+  }
+  if (!isValidIsoDate(dataIda) || (dataVolta && !isValidIsoDate(dataVolta))) {
+    throw new Error('Data invalida (esperado AAAA-MM-DD).');
+  }
+}
 
 function getSupabaseConfig({ serviceRole = false } = {}) {
   const url =
@@ -316,9 +349,8 @@ async function waitForLowestPricesToSettle(page, origem, destino) {
       previousSignature = signature;
     }
 
-    const minimumDelayPassed = Date.now() - startedAt >= PRICE_SETTLE_MS;
     const stableLongEnough = stableSince !== null && Date.now() - stableSince >= PRICE_STABLE_MS;
-    if (minimumDelayPassed && stableLongEnough) {
+    if (stableLongEnough) {
       return { advertisedPrice: snapshot.advertisedPrice };
     }
 
@@ -551,9 +583,8 @@ async function waitForMaxMilhasPriceToSettle(page) {
       previousPreco = snapshot.preco;
     }
 
-    const minimumDelayPassed = Date.now() - startedAt >= MAXMILHAS_PRICE_SETTLE_MS;
     const stableLongEnough = stableSince !== null && Date.now() - stableSince >= MAXMILHAS_PRICE_STABLE_MS;
-    if (minimumDelayPassed && stableLongEnough) {
+    if (stableLongEnough) {
       return last;
     }
 
@@ -565,10 +596,11 @@ async function waitForMaxMilhasPriceToSettle(page) {
 
 async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
   const url = buildMaxMilhasUrl(origem, destino, dataIda, dataVolta);
-  const browser = await launchBrowser();
+  const browser = await getSharedBrowser();
+  let page;
 
   try {
-    const page = await createStealthPage(browser);
+    page = await createStealthPage(browser);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: IS_VERCEL ? 30000 : DEFAULT_TIMEOUT_MS });
     await page.waitForSelector('strong', { timeout: 15000 }).catch(() => {});
 
@@ -588,15 +620,17 @@ async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
       link: url
     }];
   } finally {
-    await browser.close().catch(() => {});
+    await page?.close().catch(() => {});
+    if (IS_VERCEL) await browser.close().catch(() => {});
   }
 }
 
 async function buscarCacheExistente(origem, destino, dataIda, dataVolta) {
-  const dataVoltaFilter = dataVolta ? `&data_volta=eq.${dataVolta}` : '&data_volta=is.null';
+  assertValidRoute(origem, destino, dataIda, dataVolta);
+  const dataVoltaFilter = dataVolta ? `&data_volta=eq.${encodeURIComponent(dataVolta)}` : '&data_volta=is.null';
   return supabase(
     'GET',
-    `price_cache?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${dataIda}${dataVoltaFilter}&preco=not.is.null&order=preco.asc&limit=1`
+    `price_cache?origem=eq.${encodeURIComponent(origem)}&destino=eq.${encodeURIComponent(destino)}&data_ida=eq.${encodeURIComponent(dataIda)}${dataVoltaFilter}&preco=not.is.null&order=preco.asc&limit=1`
   );
 }
 
@@ -644,10 +678,11 @@ async function buscarTodasFontes(origem, destino, dataIda, dataVolta) {
 }
 
 async function buscarGoogleFlightsPlaywrightOnce(url, origem, destino) {
-  const browser = await launchBrowser();
+  const browser = await getSharedBrowser();
+  let page;
 
   try {
-    const page = await createStealthPage(browser);
+    page = await createStealthPage(browser);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: IS_VERCEL ? 30000 : DEFAULT_TIMEOUT_MS });
     if (!IS_VERCEL) {
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -665,8 +700,37 @@ async function buscarGoogleFlightsPlaywrightOnce(url, origem, destino) {
       ...flights.filter(flight => flight.preco >= advertisedPrice)
     ].sort((a, b) => a.preco - b.preco);
   } finally {
-    await browser.close().catch(() => {});
+    await page?.close().catch(() => {});
+    if (IS_VERCEL) await browser.close().catch(() => {});
   }
+}
+
+// No worker (Render) o processo fica sempre ligado e processa um job por
+// vez - reaproveitar a mesma instancia do Chromium entre MaxMilhas e Google
+// (e entre jobs) evita relancar o browser do zero em toda coleta (#135). No
+// Vercel o processo e efemero (uma invocacao == um container), entao ali
+// cada chamada continua subindo e derrubando o proprio Chromium.
+let sharedBrowserPromise = null;
+
+async function getSharedBrowser() {
+  if (IS_VERCEL) return launchBrowser();
+
+  if (sharedBrowserPromise) {
+    const browser = await sharedBrowserPromise.catch(() => null);
+    if (browser?.isConnected()) return browser;
+    sharedBrowserPromise = null;
+  }
+
+  sharedBrowserPromise = launchBrowser();
+  return sharedBrowserPromise;
+}
+
+async function closeSharedBrowser() {
+  if (!sharedBrowserPromise) return;
+  const promise = sharedBrowserPromise;
+  sharedBrowserPromise = null;
+  const browser = await promise.catch(() => null);
+  await browser?.close().catch(() => {});
 }
 
 async function launchBrowser() {
@@ -748,14 +812,14 @@ async function waitForExecutableToSettle(executablePath) {
 }
 
 async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
-  const dataVoltaFilter = dataVolta ? `&data_volta=eq.${dataVolta}` : '&data_volta=is.null';
-  await supabase(
-    'DELETE',
-    `price_cache?origem=eq.${origem}&destino=eq.${destino}&data_ida=eq.${dataIda}${dataVoltaFilter}`
-  );
-
   if (voos.length === 0) return;
+  assertValidRoute(origem, destino, dataIda, dataVolta);
 
+  // Insere as linhas novas ANTES de apagar as antigas (ver issue #133): a
+  // ordem antiga (DELETE depois POST) deixava a rota sem nenhum preco no
+  // meio das duas chamadas e, se o POST falhasse, o cache anterior ja
+  // tinha sido perdido - exatamente o que buscarCacheExistente() usa como
+  // fallback quando as fontes falham.
   const agora = new Date().toISOString();
   const rows = voos.map(voo => ({
       origem,
@@ -773,6 +837,12 @@ async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
   }));
 
   await supabase('POST', 'price_cache', rows);
+
+  const dataVoltaFilter = dataVolta ? `&data_volta=eq.${encodeURIComponent(dataVolta)}` : '&data_volta=is.null';
+  await supabase(
+    'DELETE',
+    `price_cache?origem=eq.${encodeURIComponent(origem)}&destino=eq.${encodeURIComponent(destino)}&data_ida=eq.${encodeURIComponent(dataIda)}${dataVoltaFilter}&atualizado_em=lt.${encodeURIComponent(agora)}`
+  );
 }
 
 function cacheRowParaResposta(row) {
@@ -827,6 +897,8 @@ module.exports = {
   createStealthPage,
   getLowestPricesSnapshot,
   launchBrowser,
+  getSharedBrowser,
+  closeSharedBrowser,
   getVercelChromiumPath,
   parseFlightRow,
   parsePrice,
@@ -836,6 +908,9 @@ module.exports = {
   salvarCache,
   sleep,
   supabase,
+  isValidIata,
+  isValidIsoDate,
+  isValidUuid,
   waitForLowestPricesToSettle,
   waitForExecutableToSettle,
   verifyUserToken

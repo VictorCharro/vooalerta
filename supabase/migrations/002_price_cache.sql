@@ -1,7 +1,11 @@
 -- ============================================================
 -- VooAlerta — Migration 002: Cache de preços
--- Já incluído no 001_initial_schema.sql
--- Este arquivo existe para referência e rollback se necessário
+-- Rodar no Supabase: SQL Editor -> New Query -> Run
+--
+-- O comentario original aqui dizia "ja incluido no 001_initial_schema.sql",
+-- mas isso e falso - a funcao nao esta no 001. Migration 014 recria essa
+-- funcao de forma idempotente (create or replace), entao rodar essa 002
+-- agora ou nao faz diferenca se a 014 ja foi aplicada.
 -- ============================================================
 
 -- Para limpar cache antigo (rodar manualmente ou via cron no Supabase)

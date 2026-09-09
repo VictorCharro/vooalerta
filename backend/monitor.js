@@ -153,6 +153,15 @@ async function main() {
   const hoje = new Date().toISOString().split('T')[0];
   await supabase('DELETE', `price_cache?data_ida=lt.${hoje}`);
   console.log('\nCache de datas passadas removido');
+
+  // limpar_cache_antigo() (migration 002/014) apaga linhas de price_cache
+  // com mais de 24h sem atualizacao - cobre rotas com data futura que
+  // pararam de ser coletadas e ficariam acumulando pra sempre (#140).
+  await supabase('POST', 'rpc/limpar_cache_antigo', {}).catch(err => {
+    console.warn('Falha ao rodar limpar_cache_antigo:', err.message);
+  });
+  console.log('Cache antigo (>24h) removido');
+
   console.log('\nMonitoramento concluido');
 }
 
