@@ -186,7 +186,7 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
                         }
                       }
                     </button>
-                    <button class="chevron-btn" (click)="openQuickView(alert)" title="Ver detalhes">
+                    <button class="chevron-btn" [class.active]="quickViewAlert?.id === alert.id" (click)="openQuickView(alert)" title="Ver detalhes">
                     <img src="assets/icons/icon_expandir.png" alt="" />
                   </button>
                   <button class="card-favorite-btn" disabled title="Em breve" aria-label="Favoritar">
@@ -206,12 +206,13 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
                   <img src="assets/icons/icon_aviao.png" alt="" />
                 </div>
                 <div class="qp-route">
-                  <img class="qp-route-icon" src="assets/icons/icon_perfil.png" alt="" />
+                  <img class="qp-route-icon" src="assets/icons/icon_local.png" alt="" />
                   <span>{{ quickViewAlert.origem }}</span>
                   <span class="qp-route-arrow">⟶</span>
                   <span>{{ quickViewAlert.destino }}</span>
                 </div>
               </div>
+              <div class="qp-body">
               <div class="qp-row">
                 <div class="qp-item">
                   <img src="assets/icons/icon_data.png" alt="" />
@@ -286,7 +287,11 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
                 </div>
               </div>
               <div class="qp-actions">
-                <button type="button" class="btn-edit" (click)="openDetail(quickViewAlert)">✎ Editar</button>
+                <button type="button" class="btn-edit" (click)="openDetail(quickViewAlert)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="M15 5l4 4"/></svg>
+                  Editar
+                </button>
+              </div>
               </div>
             </aside>
           }

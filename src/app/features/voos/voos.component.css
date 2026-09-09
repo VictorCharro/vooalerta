@@ -100,6 +100,8 @@ h1 { font-size: 26px; margin-bottom: 4px; }
 .card-controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .chevron-btn { background: var(--color-bg-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--color-text-muted); cursor: pointer; transition: all var(--transition); line-height: 1; }
 .chevron-btn:hover { border-color: var(--color-accent); color: var(--color-accent); background: var(--color-accent-dim); }
+.chevron-btn.active { background: var(--color-accent); border-color: var(--color-accent); }
+.chevron-btn.active:hover { background: var(--color-accent); border-color: var(--color-accent); }
 .chevron-btn img { width: 16px; height: 16px; }
 .card-favorite-btn { background: var(--color-bg-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--transition); }
 .card-favorite-btn img { width: 20px; height: 20px; }
@@ -151,21 +153,22 @@ h1 { font-size: 26px; margin-bottom: 4px; }
 /* ── Painel rápido (ver detalhes) ────────────────────────── */
 .content-row { display: flex; align-items: flex-start; gap: 24px; }
 .list-column { flex: 1; min-width: 0; }
-.quick-panel { width: 380px; flex-shrink: 0; background: var(--color-bg-3); border-radius: var(--radius-md); padding: 20px 24px; }
-.qp-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-.qp-badge { width: 42px; height: 42px; flex-shrink: 0; background: var(--color-bg-2); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; }
-.qp-badge img { width: 20px; height: 20px; }
-.qp-route { flex: 1; display: flex; align-items: center; gap: 8px; background: var(--color-bg-2); padding: 10px 16px; border-radius: var(--radius-md); font-family: var(--font-display); font-weight: 700; font-size: 16px; }
-.qp-route-icon { width: 16px; height: 16px; opacity: .8; }
+.quick-panel { width: 340px; flex-shrink: 0; background: var(--color-bg-3); border-radius: var(--radius-md); padding: 0; overflow: visible; }
+.qp-header { display: flex; align-items: center; gap: 28px; margin: 0 -1px 20px; padding: 20px 0 0; }
+.qp-body { padding: 0 24px 24px; }
+.qp-badge { width: 48px; height: 48px; flex-shrink: 0; background: var(--color-bg-2); border-radius: 0 var(--radius-md) var(--radius-md) 0; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 4px rgba(0,0,0,.4); }
+.qp-badge img { width: 22px; height: 22px; }
+.qp-route { flex: 1; height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--color-bg-2); padding: 0 16px; border-radius: var(--radius-md) 0 0 var(--radius-md); font-family: var(--font-display); font-weight: 700; font-size: 16px; white-space: nowrap; box-sizing: border-box; box-shadow: 0 3px 4px rgba(0,0,0,.4); }
+.qp-route-icon { width: 20px; height: 20px; opacity: .8; }
 .qp-route-arrow { color: var(--color-text-muted); }
 .qp-row { display: flex; gap: 16px; }
-.qp-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; flex: 1; min-width: 0; }
-.qp-item img { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
-.qp-item-noicon { padding-left: 28px; }
+.qp-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 20px; flex: 1; min-width: 0; }
+.qp-item img { width: 20px; height: 20px; margin-top: 2px; flex-shrink: 0; }
+.qp-item-noicon { padding-left: 30px; }
 .qp-label { display: block; font-size: 12px; color: var(--color-text-muted); margin-bottom: 2px; }
 .qp-value { display: block; font-size: 14px; font-weight: 600; color: var(--color-text); }
-.qp-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
-.btn-edit { background: var(--color-bg-2); color: var(--color-text); border: none; border-radius: var(--radius-sm); padding: 10px 18px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background var(--transition); }
+.qp-actions { display: flex; justify-content: center; margin-top: 12px; }
+.btn-edit { display: inline-flex; align-items: center; gap: 8px; height: 44px; background: var(--color-bg); color: var(--color-text); border: none; border-radius: var(--radius-lg); padding: 0 24px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background var(--transition); }
 .btn-edit:hover { background: var(--color-accent); }
 
 /* ── Responsive ──────────────────────────────────────────── */
