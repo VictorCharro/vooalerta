@@ -54,6 +54,8 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
               <button pButton severity="primary" class="new-alert-btn" (click)="openModal()">+ Novo Alerta</button>
             </div>
           </div>
+          <div class="content-row">
+          <div class="list-column" [class.list-column-narrow]="quickViewAlert">
           <h2 class="list-heading">Voos</h2>
           <!-- Aviso callmebot_key ausente -->
           @if (missingCallmebotKey) {
@@ -173,7 +175,7 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
                         }
                       }
                     </button>
-                    <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">
+                    <button class="chevron-btn" (click)="openQuickView(alert)" title="Ver detalhes">
                     <img src="assets/icons/icon_expandir.png" alt="" />
                   </button>
                   <button class="card-favorite-btn" disabled title="Em breve" aria-label="Favoritar">
@@ -184,8 +186,102 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
               }
             </div>
           }
+          </div>
+          <!-- ══ PAINEL RÁPIDO ══ -->
+          @if (quickViewAlert) {
+            <aside class="quick-panel fade-up">
+              <div class="qp-header">
+                <div class="qp-badge">
+                  <img src="assets/icons/icon_aviao.png" alt="" />
+                </div>
+                <div class="qp-route">
+                  <img class="qp-route-icon" src="assets/icons/icon_perfil.png" alt="" />
+                  <span>{{ quickViewAlert.origem }}</span>
+                  <span class="qp-route-arrow">⟶</span>
+                  <span>{{ quickViewAlert.destino }}</span>
+                </div>
+              </div>
+              <div class="qp-row">
+                <div class="qp-item">
+                  <img src="assets/icons/icon_data.png" alt="" />
+                  <div>
+                    <span class="qp-label">Ida:</span>
+                    <span class="qp-value">{{ quickViewAlert.data_ida | date:'dd/MM/yyyy' }}</span>
+                  </div>
+                </div>
+                <div class="qp-item qp-item-noicon">
+                  <div>
+                    <span class="qp-label">volta:</span>
+                    <span class="qp-value">{{ (quickViewAlert.data_volta || quickViewAlert.data_ida) | date:'dd/MM/yyyy' }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="qp-row">
+                <div class="qp-item">
+                  <img src="assets/icons/icon_preco.png" alt="" />
+                  <div>
+                    <span class="qp-label">Preço Atual:</span>
+                    <span class="qp-value">
+                      @if (getMinPrice(quickViewAlert) !== null) {
+                        R$&nbsp;{{ getMinPrice(quickViewAlert) | number:'1.0-0' }}
+                      }
+                      @if (getMinPrice(quickViewAlert) === null) {
+                        —
+                      }
+                    </span>
+                  </div>
+                </div>
+                <div class="qp-item qp-item-noicon">
+                  <div>
+                    <span class="qp-label">Sua Meta:</span>
+                    <span class="qp-value">R$&nbsp;{{ quickViewAlert.meta | number:'1.0-0' }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="qp-item">
+                <img src="assets/icons/icon_economia.png" alt="" />
+                <div>
+                  <span class="qp-label">O quanto você Economiza:</span>
+                  <span class="qp-value">R$&nbsp;{{ economia(quickViewAlert) | number:'1.0-0' }}</span>
+                </div>
+              </div>
+              <div class="qp-item">
+                <img src="assets/icons/icon_aviao.png" alt="" />
+                <div>
+                  <span class="qp-label">Companhia Aérea:</span>
+                  <span class="qp-value">
+                    @if (quickViewLoading) { — }
+                    @if (!quickViewLoading) { {{ quickViewDetails?.companhia || 'Não informada' }} }
+                  </span>
+                </div>
+              </div>
+              <div class="qp-item">
+                <img src="assets/icons/icon_atualizado.png" alt="" />
+                <div>
+                  <span class="qp-label">Última atualização:</span>
+                  <span class="qp-value">
+                    @if (quickViewLoading) { — }
+                    @if (!quickViewLoading) {
+                      {{ quickViewDetails?.atualizado_em ? timeAgo(quickViewDetails!.atualizado_em!) : 'Sem dados' }}
+                    }
+                  </span>
+                </div>
+              </div>
+              <div class="qp-item">
+                <img src="assets/icons/icon_whatsApp.png" alt="" />
+                <div>
+                  <span class="qp-label">WhatsApp:</span>
+                  <span class="qp-value">{{ quickViewAlert.ativo ? 'Ativo' : 'Inativo' }}</span>
+                </div>
+              </div>
+              <div class="qp-actions">
+                <button type="button" class="btn-edit" (click)="openDetail(quickViewAlert)">✎ Editar</button>
+              </div>
+            </aside>
+          }
+          </div>
         }
-    
+
         <!-- ══ DETALHE ══ -->
         @if (selectedAlert) {
           <div class="detail-view fade-up">
@@ -524,6 +620,10 @@ export class VoosComponent implements OnInit, OnDestroy {
 
   selectedAlert: Alert | null = null;
 
+  quickViewAlert: Alert | null = null;
+  quickViewLoading = false;
+  quickViewDetails: { companhia: string | null; atualizado_em: string | null } | null = null;
+
   missingCallmebotKey = false;
   profileWhatsapp     = '';
   profileNome         = '';
@@ -806,7 +906,49 @@ export class VoosComponent implements OnInit, OnDestroy {
     this.origens = this.origens.filter(x => x !== o);
   }
 
+  async openQuickView(alert: Alert) {
+    if (this.quickViewAlert?.id === alert.id) {
+      this.closeQuickView();
+      return;
+    }
+    this.quickViewAlert   = alert;
+    this.quickViewDetails = null;
+    this.quickViewLoading = true;
+    const details = await this.supabase.getMinPriceDetailsForRoute(
+      alert.origem, alert.destino, alert.data_ida,
+      alert.data_volta ?? null,
+      { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+    );
+    this.quickViewDetails = details
+      ? { companhia: details.companhia, atualizado_em: details.atualizado_em }
+      : { companhia: null, atualizado_em: null };
+    this.quickViewLoading = false;
+  }
+
+  closeQuickView() {
+    this.quickViewAlert   = null;
+    this.quickViewDetails = null;
+  }
+
+  economia(alert: Alert): number {
+    const price = this.getMinPrice(alert);
+    if (price === null || price > alert.meta) return 0;
+    return alert.meta - price;
+  }
+
+  timeAgo(dateStr: string): string {
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'Agora mesmo';
+    if (mins < 60) return `Há ${mins} minuto${mins !== 1 ? 's' : ''}`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `Há ${hours} hora${hours !== 1 ? 's' : ''}`;
+    const days = Math.floor(hours / 24);
+    return `Há ${days} dia${days !== 1 ? 's' : ''}`;
+  }
+
   openDetail(alert: Alert) {
+    this.closeQuickView();
     this.selectedAlert = alert;
     this.editingId = alert.id!;
     this.form = {

@@ -12,10 +12,10 @@
 .brand-icon img { width: 30px; height: 30px; transform: translate(-1px, -1px); }
 .brand-name { font-family: var(--font-display); font-weight: 800; font-size: 16px; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 32px; margin: auto 0; }
-.nav-item { display: flex; align-items: center; justify-content: flex-start; gap: 12px; height: 50px; padding: 0 18px; border-radius: var(--radius-lg); font-size: 15px; font-weight: 700; color: var(--color-text); background: var(--color-bg-3); border: none; width: 100%; text-align: left; cursor: pointer; transition: background var(--transition), color var(--transition); box-shadow: 0 4px 0 0 #232021; }
-.nav-item:hover { background: var(--color-border-hover); }
-.nav-item.active { background: var(--color-accent); color: #fff; box-shadow: 0 4px 0 0 #6F132F; }
-.nav-item.active:hover { background: var(--color-accent); }
+.nav-item { display: flex; align-items: center; justify-content: flex-start; gap: 12px; height: 50px; padding: 0 18px; border-radius: var(--radius-lg); font-size: 15px; font-weight: 700; color: var(--color-text) !important; background: var(--color-bg-3) !important; border: none; width: 100%; text-align: left; cursor: pointer; transition: background var(--transition), color var(--transition); box-shadow: 0 4px 0 0 #232021; }
+.nav-item:hover { background: var(--color-accent) !important; color: #fff !important; }
+.nav-item.active { background: var(--color-accent) !important; color: #fff !important; box-shadow: 0 4px 0 0 #6F132F; }
+.nav-item.active:hover { background: var(--color-accent) !important; }
 .nav-icon { width: 22px; height: 22px; object-fit: contain; flex-shrink: 0; }
 .nav-label { flex: 1; text-align: center; }
 .sidebar-bottom { display: flex; flex-direction: column; gap: 12px; }
@@ -23,8 +23,8 @@
 .theme-btn { width: 46px; height: 46px; padding: 0; border-radius: var(--radius-lg); background: var(--color-bg-3); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; box-shadow: 0 4px 0 0 #232021; }
 .theme-btn img { width: 20px; height: 20px; }
 .theme-btn:hover { background: var(--color-border-hover); }
-.sidebar-logout { width: 46px; height: 46px; padding: 0; border-radius: var(--radius-lg); background: var(--color-bg-3); color: var(--color-text); border: none; font-size: 12px; font-weight: 600; cursor: pointer; flex-shrink: 0; box-shadow: 0 4px 0 0 #232021; }
-.sidebar-logout:hover { background: var(--color-bg-2); }
+.sidebar-logout { width: 46px; height: 46px; padding: 0; border-radius: var(--radius-lg); background: var(--color-bg-3) !important; color: var(--color-text) !important; border: none; font-size: 12px; font-weight: 600; cursor: pointer; flex-shrink: 0; box-shadow: 0 4px 0 0 #232021; }
+.sidebar-logout:hover { background: var(--color-accent) !important; color: #fff !important; }
 
 /* ── Modal perfil ─────────────────────────────────────────── */
 .modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.72); display: flex; align-items: center; justify-content: center; padding: 24px; }
