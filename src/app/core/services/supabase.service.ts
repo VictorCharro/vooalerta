@@ -115,8 +115,14 @@ export class SupabaseService {
     const horarioMinimo = options.horarioMinimo && options.horarioMinimo !== '00:00'
       ? options.horarioMinimo
       : null;
+    // Com horario minimo definido, linhas sem horario conhecido ficam de fora:
+    // o preco "a partir de" da aba do Google e todas as linhas da MaxMilhas
+    // salvam horario_partida null, e nao da pra garantir que esses precos sao
+    // de um voo que parte depois do horario pedido - antes elas passavam
+    // sempre e furavam o filtro, mostrando o preco de um voo da manha num
+    // alerta que so aceitava voos da noite.
     const rows = (data ?? [])
-      .filter(row => !horarioMinimo || row.horario_partida === null || row.horario_partida >= horarioMinimo)
+      .filter(row => !horarioMinimo || (row.horario_partida !== null && row.horario_partida >= horarioMinimo))
       .filter(row => !options.soDireto || row.escalas === null || row.escalas === 0)
       .filter((row): row is typeof row & { preco: number } => typeof row.preco === 'number');
 

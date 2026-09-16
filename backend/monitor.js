@@ -64,10 +64,11 @@ async function processarAlerta(alerta, voosCache) {
   let voosFiltrados = voosCache.filter(v => v.preco != null);
 
   if (alerta.horario_minimo) {
-    voosFiltrados = voosFiltrados.filter(v => {
-      if (!v.horario_partida) return true;
-      return v.horario_partida >= alerta.horario_minimo;
-    });
+    // Linhas sem horario conhecido (preco "a partir de" do Google e MaxMilhas)
+    // ficam de fora: nao da pra garantir que partem depois do horario pedido.
+    // Antes elas passavam sempre, e a notificacao podia disparar com o preco
+    // de um voo fora do horario que o usuario escolheu.
+    voosFiltrados = voosFiltrados.filter(v => v.horario_partida && v.horario_partida >= alerta.horario_minimo);
     console.log(`    Filtro horario >= ${alerta.horario_minimo}: ${voosFiltrados.length} voos`);
   }
 
