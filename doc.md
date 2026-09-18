@@ -9,7 +9,8 @@ Documentação de referência do projeto. Atualizar sempre que houver mudanças 
 Aplicação de alertas de preço para **voos** e **ônibus (Buser)**. O usuário cadastra uma rota + meta de preço e recebe notificação no WhatsApp quando o preço cai abaixo da meta.
 
 - **Frontend:** Angular 21 standalone, Supabase JS client
-- **Backend:** Node.js scripts via GitHub Actions (cron) e Vercel Functions (on-demand)
+- **Backend:** Node.js — cron via GitHub Actions, worker sempre ligado no Render (fila de atualização manual) e Vercel Functions leves (enfileirar/consultar job)
+- **Fontes de preço (voos):** MaxMilhas e Google Flights (Playwright, SerpAPI como fallback)
 - **Banco:** Supabase (Postgres + RLS + Realtime)
 - **Notificações:** CallMeBot (WhatsApp gratuito)
 - **Produção:** [viagemalerta.vercel.app](https://viagemalerta.vercel.app)
@@ -32,6 +33,7 @@ vooalerta/
 │       ├── app.config.ts
 │       ├── core/
 │       │   ├── guards/auth.guard.ts       # authGuard + guestGuard
+│       │   ├── theme/vooalerta-preset.ts  # preset de tema do PrimeNG
 │       │   ├── models/
 │       │   │   ├── alert.model.ts         # Interface Alert (voos)
 │       │   │   └── user.model.ts
@@ -62,12 +64,16 @@ vooalerta/
 ├── backend/
 │   ├── flight_scraper.js   # Coleta Google Flights (Playwright + SerpAPI) e MaxMilhas (Playwright) + cache Supabase
 │   ├── monitor.js          # Monitor de VOOS — cron → Supabase → CallMeBot
-│   └── monitor_onibus.js   # Monitor de ÔNIBUS — scraping Buser → Supabase → CallMeBot
+│   ├── monitor_onibus.js   # Monitor de ÔNIBUS — scraping Buser → Supabase → CallMeBot
+│   └── README.md           # Resumo do backend (aponta pra esta doc)
 ├── worker/
 │   └── index.js            # Worker sempre ligado (Render) — processa a fila refresh_jobs, sem limite de 60s
+├── scripts/
+│   └── generate-env.js     # Gera src/environments/*.ts a partir de SUPABASE_URL/SUPABASE_KEY no build da Vercel
+├── vercel.json             # Build, rewrites da SPA e maxDuration das functions
 ├── .github/workflows/
 │   ├── monitor.yml         # Cron voos: a cada 3h
-│   └── monitor_onibus.yml  # Cron ônibus: 9h30, 13h30, 17h30, 21h30 BRT
+│   └── monitor_onibus.yml  # Cron ônibus: a cada hora, nos :30
 └── supabase/
     ├── functions/scrape-buser/  # Edge Function — atualização manual de ônibus
     └── migrations/
@@ -107,10 +113,11 @@ vooalerta/
 ## Banco de dados (Supabase)
 
 ### Tabelas de voo
-- **`alerts`** — alertas do usuário (origem IATA, destino IATA, data_ida, data_volta, meta, horario_minimo, so_direto, whatsapp, ativo). RLS: cada usuário só vê/edita os próprios; leitura pública por ID liberada (página de share).
-- **`price_cache`** — voos encontrados pelo Playwright/SerpAPI no Google Flights (preco, companhia, horario_partida, escalas, etc.). RLS: leitura pública, escrita só via `service_role`. Linhas com mais de 24h sem atualização são apagadas por `limpar_cache_antigo()`, chamada ao final de cada rodada do `monitor.js` (e, se `pg_cron` estiver disponível no projeto, também a cada hora — migration 014).
+- **`alerts`** — alertas do usuário (origem IATA, destino IATA, data_ida, data_volta, meta, horario_minimo, so_direto, whatsapp, ativo, ordem). `ordem` guarda a posição do card definida no arrastar-e-soltar (null = ordena por `criado_em`). RLS: cada usuário só vê/edita os próprios; leitura pública por ID liberada (página de share).
+- **`price_cache`** — voos coletados no Google Flights e na MaxMilhas (preco, companhia, horario_partida, horario_chegada, escalas, link, etc.). Uma rota/data tem várias linhas: uma por voo, mais uma linha "a partir de" do Google sem horário. RLS: leitura pública, escrita só via `service_role`. Linhas com mais de 24h sem atualização são apagadas por `limpar_cache_antigo()`, chamada ao final de cada rodada do `monitor.js` (e, se `pg_cron` estiver disponível no projeto, também a cada hora — migration 014).
 - **`notifications`** — controle anti-spam 6h por alerta
 - **`profiles`** — whatsapp + callmebot_key por usuário
+- **`refresh_jobs`** — fila de atualização manual (status `pending` → `processing` → `done`/`error`, com preco/link/fontes do resultado). Sem policies públicas: só `service_role` lê/escreve (via `api/*` e worker).
 
 ### Tabelas de ônibus (separadas, sem conflito)
 - **`bus_alerts`** — alertas do usuário (origem/destino nome + slug Buser, meta, whatsapp)
@@ -140,12 +147,20 @@ vooalerta/
 ### Variáveis do worker (Render)
 - `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` — mesmas do resto do backend
 - `SERPAPI_KEY` — fallback do Google Flights
+- `PLAYWRIGHT_BROWSERS_PATH=0` — **obrigatória**: faz o Chromium ser instalado dentro de `node_modules` no build, senão o runtime não encontra o executável
 - `WORKER_POLL_INTERVAL_MS` (padrão 4000) — intervalo entre checagens da fila
 - `WORKER_JOB_STALE_MS` (padrão 600000 = 10min) — depois de quanto tempo um job `done`/`error` é apagado
+- `WORKER_JOB_PROCESSING_TIMEOUT_MS` (padrão 300000 = 5min) — job em `processing` há mais que isso é considerado travado e vira `error`
+- `WORKER_REAPER_INTERVAL_MS` (padrão 60000) — frequência da checagem de jobs travados
+- `WORKER_HEALTH_STALE_MS` (padrão 5× o poll = 20s) — se o loop não roda há mais que isso, `/health` responde 503
+- `FLIGHT_PRICE_STABLE_MS`, `MAXMILHAS_PRICE_STABLE_MS` (opcionais) — endurecem o critério de estabilidade da leitura de preço se a coleta começar a pegar valores intermediários
 - `PORT` — porta do health check (o Render define automaticamente)
+- Build no Render: precisa instalar o Chromium com `npx playwright install chromium` **sem** `--with-deps` (o Render não permite `su`/apt no build — com a flag, o deploy falha com `su: Authentication failure`). Start: `npm run worker` (equivale a `node worker/index.js`).
 
 ### Rodando local
-`src/environments/environment.ts` (e `environment.prod.ts`) não existem no repo (gitignored). Pra rodar `npm start` local, criar esses dois arquivos manualmente com `supabaseUrl`/`supabaseKey` reais do projeto (Supabase → Settings → API). Nunca commitar esses arquivos — o `.gitignore` já bloqueia, mas vale checar `git status` depois de criar/editar.
+`src/environments/environment.ts` (e `environment.prod.ts`) não existem no repo (gitignored). Pra rodar `npm start` local, criar esses dois arquivos manualmente com `supabaseUrl`/`supabaseKey` reais do projeto (Supabase → Settings → API) — ou exportar `SUPABASE_URL`/`SUPABASE_KEY` e rodar `node scripts/generate-env.js`. Nunca commitar esses arquivos — o `.gitignore` já bloqueia, mas vale checar `git status` depois de criar/editar.
+
+O backend lê as chaves de variáveis de ambiente (não há `dotenv`). Um `.env` na raiz é ignorado pelo Git e pode ser usado pra guardar valores de teste local, mas precisa ser carregado manualmente no shell/script.
 
 ---
 
@@ -158,8 +173,11 @@ vooalerta/
 - **MaxMilhas** (`buscarMaxMilhas`): navega direto pra URL de busca (`https://www.maxmilhas.com.br/busca-passagens-aereas/{RT|OW}/{origem}/{destino}/{data_ida}[/{data_volta}]/1/0/0/EC`), sem precisar clicar em aba — os resultados já vêm ordenados "Mais baratos primeiro" por padrão. Lê o **total da oferta** num `<b>`/`<strong>` dentro de `.content-price` (ignorando o preço cheio riscado em `.line-through` e a quebra tarifa/desconto/taxas, que ficam em `<span>`), esperando ele **estabilizar** — `MAXMILHAS_PRICE_STABLE_MS=3000`, `MAXMILHAS_PRICE_TIMEOUT_MS=25000`.
 - A MaxMilhas lista, junto da oferta, **os voos de ida aos quais aquele preço se aplica** (seção com cabeçalho `Ida - <dia> <data>` em `.header-stretch`, linhas em `.bound`). O scraper emite **uma linha por voo de ida**, todas com o mesmo preço, cada uma com `horario_partida`/`horario_chegada`/`duracao_min`/`escalas`. Isso é o que permite a MaxMilhas competir em alertas com `horario_minimo` — antes ia uma linha única sem horário, descartada pelo filtro (ver #143). Há uma guarda de direção (a primeira sigla IATA da linha tem que ser a origem) pra os voos de volta não vazarem, e um fallback pra linha única sem horário caso o layout mude e nenhum voo seja extraído.
 - Se uma fonte falhar ou não achar nada, a outra ainda atualiza o cache; a falha fica registrada como aviso em `fontes`/`warning`. Se as duas falharem, `refreshFlightPrice` cai pro último preço salvo em `price_cache` pra rota em vez de propagar erro.
-- Cache: reutiliza dados com menos de 3h30 de idade (evita duplicar em disparo manual logo após o cron)
-- Filtros por alerta: `horario_minimo`, `so_direto`
+- Cache: reutiliza dados com menos de 3h30 de idade (evita duplicar em disparo manual logo após o cron). `salvarCache` insere as linhas novas **antes** de apagar as antigas da rota, pra nunca haver janela sem preço nem perda do cache se o insert falhar.
+- Filtros por alerta (valem igual na tela — `getMinPriceRowForRoute` — e na notificação — `monitor.js`):
+  - `horario_minimo` — **só da ida**. Com horário definido, só contam linhas com `horario_partida` conhecido e `>=` ao pedido; linhas sem horário (a "a partir de" do Google) ficam de fora. Se nenhum voo coletado qualificar, a rota fica sem preço.
+  - `so_direto` — ⚠️ ainda deixa passar linhas com `escalas` nulo (a "a partir de" do Google). Mesmo bug que foi corrigido no horário (#143), pendente.
+- Todos os parâmetros que entram em filtros do PostgREST (`origem`, `destino`, datas, `job_id`) são validados (IATA de 3 letras, `AAAA-MM-DD`, uuid) e codificados antes de montar a query, já que essas chamadas rodam com `service_role`.
 - Rodar manualmente: ver seção "Rodando local" acima — precisa de `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SERPAPI_KEY` como variáveis de ambiente, depois `npx playwright install chromium && node backend/monitor.js`
 
 ### Fila de atualização manual (`refresh_jobs` + worker no Render)
@@ -168,10 +186,16 @@ Histórico do problema: o botão de atualizar rodava a coleta dentro da function
 **Solução:** tirar o scraping de dentro da function da Vercel e mover pra um worker sempre ligado, sem limite de tempo:
 
 1. **`api/scrape-flight.js`** (Vercel, rápido, sem Playwright): recebe o clique do botão, cria uma linha em `refresh_jobs` com `status='pending'` (ou reaproveita um job pendente/em andamento recente pra mesma rota, pra não duplicar em cliques repetidos) e devolve o `job_id` na hora.
-2. **`worker/index.js`** (Render, processo sempre ligado): fica em loop (`WORKER_POLL_INTERVAL_MS`, padrão 4s) pegando o job `pending` mais antigo, marcando como `processing`, chamando `refreshFlightPrice` (mesma função do cron — MaxMilhas + Google, com calma, sem pressa de tempo) e salvando o resultado como `done` (ou `error`). Processa **um job por vez** — não precisa mais de lock/fila no banco, porque só existe um worker rodando. Expõe um endpoint HTTP simples (`/health`) só pra responder "ok" a quem pingar.
+2. **`worker/index.js`** (Render, processo sempre ligado): fica em loop (`WORKER_POLL_INTERVAL_MS`, padrão 4s) pegando o job `pending` mais antigo, chamando `refreshFlightPrice` (mesma função do cron — MaxMilhas + Google) e salvando o resultado como `done` (ou `error`). Processa **um job por vez**. Detalhes de robustez:
+   - **Claim atômico:** o job só passa pra `processing` via `PATCH ... &status=eq.pending` — se outra instância já pegou, volta vazio e ninguém processa em dobro.
+   - **Reaper:** a cada `WORKER_REAPER_INTERVAL_MS`, jobs presos em `processing` há mais de `WORKER_JOB_PROCESSING_TIMEOUT_MS` (worker morreu no meio) viram `error`.
+   - **Chromium compartilhado:** uma única instância do browser é reaproveitada entre fontes e entre jobs (`getSharedBrowser`); cada coleta abre e fecha só a página. Fechado no `SIGTERM`/`SIGINT`.
+   - **`/health`** responde `ok` se o loop rodou recentemente e **503** se travou (`WORKER_HEALTH_STALE_MS`) — assim o UptimeRobot detecta worker parado de verdade.
+   - `unhandledRejection`/`uncaughtException` são logados e encerram o processo com erro, pra o Render reiniciar.
 3. **UptimeRobot** pinga esse `/health` a cada poucos minutos pra não deixar o serviço gratuito do Render dormir por inatividade.
 4. **`api/job-status.js`** (Vercel): consulta o status/resultado de um `job_id`.
-5. **Frontend** (`voos.component.ts`): clique no botão → enfileira → fica consultando o status a cada 3s (até ~2min) → atualiza o card quando o job terminar. Nenhuma mensagem técnica chega ao toast — sempre um texto genérico em caso de erro/timeout.
+5. **Frontend** (`voos.component.ts`): clique no botão → enfileira → consulta o status a cada 4s (até ~10min, fora da zone do Angular pra não re-renderizar a tela inteira a cada tick) → atualiza o card quando o job terminar. Nenhuma mensagem técnica chega ao usuário — em erro/timeout o preço anterior continua na tela, sem toast.
+6. **Realtime:** o card também escuta mudanças em `price_cache`, com debounce de 1s (uma coleta gera dezenas de eventos; sem o debounce os preços ficavam "piscando").
 
 Isso elimina de vez o teto de 60s pro scraping em si (o worker não tem esse limite) e a necessidade de lock (só um processo raspa por vez, por natureza). O cron (`monitor.js`, GitHub Actions) continua funcionando à parte, sem depender da fila — ele já é sequencial por conta própria.
 
@@ -195,7 +219,7 @@ Isso elimina de vez o teto de 60s pro scraping em si (o worker não tem esse lim
 - `POST /api/scrape-flight`: recebe `{ origem, destino, data_ida, data_volta }`, cria (ou reaproveita) um job em `refresh_jobs`, devolve `{ job_id }` na hora — **não** raspa nada, não abre Playwright.
 - `GET /api/job-status?job_id=...`: devolve `{ status, preco, link, fontes, warning, error }` do job.
 - Quem processa de fato é o worker (`worker/index.js`, Render) — ver seção acima.
-- **Cooldown:** 30 minutos por rota, rastreado em `localStorage` com chave `flight_refresh_{orig}_{dest}_{data}_{volta}`. Clicar em ↻ **dentro** da janela de cooldown não enfileira coleta nova — só relê o preço já salvo em `price_cache` (via `getMinPriceForRoute`) e atualiza a tela na hora, sem gastar coleta à toa.
+- **Cooldown:** 30 minutos por rota, rastreado em `localStorage` com chave `flight_refresh_{orig}_{dest}_{data}_{volta}`. Clicar em ↻ **dentro** da janela de cooldown não enfileira coleta nova — só relê o preço já salvo em `price_cache` (via `getMinPriceRowForRoute`) e atualiza a tela na hora, sem gastar coleta à toa.
 
 ---
 
@@ -215,7 +239,8 @@ Tema claro disponível via `html[data-theme="light"]`, toggled por `localStorage
 
 Classes globais reutilizáveis em `src/styles/components.css`: `btn-primary`, `btn-ghost`, `btn-icon`, `spinner`, `error-box`, `success-box`, `form-hint`, `toggle` (switch).
 - O `.toggle` global (`components.css`) é a única definição — não duplicar em CSS de componente.
-- Botão `.open-btn` (link externo) presente nos cards de voos (Google Flights) e ônibus (Buser); também no detalhe de ambas as páginas.
+- Botão `.open-btn` (link externo) presente nos cards de voos e ônibus (Buser); também no detalhe de ambas as páginas. Em voos, o link aponta pro site da fonte que deu o menor preço (Google Flights ou MaxMilhas).
+- Cards de voo podem ser reordenados arrastando pela alça (HTML5 drag-and-drop nativo — o CDK do Angular foi abandonado porque o preview do arraste travava no canto da tela). A nova ordem é salva em `alerts.ordem`.
 
 ---
 

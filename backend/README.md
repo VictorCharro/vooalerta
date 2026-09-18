@@ -1,31 +1,18 @@
-# Backend - GitHub Actions
+# Backend
 
-O monitoramento de voos roda via GitHub Actions usando Playwright e SerpAPI em paralelo para coletar precos no Google Flights.
+Coleta de preços e envio de alertas. Documentação completa em [`../doc.md`](../doc.md).
 
-## Fluxo
-
-```text
-GitHub Actions cron
-  -> backend/monitor.js
-  -> backend/flight_scraper.js
-  -> Google Flights via Playwright + SerpAPI
-  -> combina as duas fontes e escolhe o menor preco
-  -> price_cache no Supabase
-  -> filtros por alerta
-  -> WhatsApp via CallMeBot quando preco <= meta
-```
-
-## Secrets
-
-| Secret | Onde obter |
+| Arquivo | Papel |
 |---|---|
-| `SUPABASE_URL` | Supabase -> Settings -> API -> Project URL |
-| `SUPABASE_SERVICE_KEY` | Supabase -> Settings -> API -> service_role key |
-| `SERPAPI_KEY` | SerpAPI -> Dashboard -> API Key |
+| `flight_scraper.js` | Coleta de voos: **MaxMilhas** primeiro, depois **Google Flights** (Playwright; SerpAPI só se o Playwright falhar). Salva em `price_cache` e escolhe o menor preço. |
+| `monitor.js` | Rodada completa de voos (cron do GitHub Actions, a cada 3h): coleta cada rota, aplica os filtros de cada alerta e manda WhatsApp quando o preço fica abaixo da meta. |
+| `monitor_onibus.js` | Mesma ideia pra ônibus, a partir da Buser (a cada hora). |
 
-As duas fontes sao consultadas em toda coleta. Se uma falhar, a outra ainda pode atualizar o cache.
+A atualização manual (botão ↻ do site) não roda aqui: vai pra fila `refresh_jobs` e é processada pelo worker em [`../worker/index.js`](../worker/index.js).
 
 ## Rodar manualmente
+
+Com `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` e `SERPAPI_KEY` definidas no ambiente:
 
 ```bash
 npm ci
@@ -33,4 +20,4 @@ npx playwright install chromium
 node backend/monitor.js
 ```
 
-No GitHub: Actions -> VooAlerta - Monitoramento de Passagens -> Run workflow.
+No GitHub: Actions → *VooAlerta - Monitoramento de Passagens* → Run workflow.
