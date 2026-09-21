@@ -541,8 +541,8 @@ function buildMaxMilhasUrl(origem, destino, dataIda, dataVolta) {
     : `https://www.maxmilhas.com.br/busca-passagens-aereas/OW/${origem}/${destino}/${dataIda}/1/0/0/EC`;
 }
 
-async function lerPrecoMaxMilhas(page) {
-  return page.evaluate((nbsp) => {
+async function lerPrecoMaxMilhas(page, origem) {
+  return page.evaluate(({ nbsp, origem }) => {
     const normalize = value => (value || '')
       .split(nbsp).join(' ')
       .replace(/\s+/g, ' ')
@@ -552,9 +552,58 @@ async function lerPrecoMaxMilhas(page) {
       return match ? Number(match[1].replace(/\./g, '')) : null;
     };
 
-    const strong = Array.from(document.querySelectorAll('strong'))
-      .find(el => /R\$/.test(el.textContent || ''));
-    const preco = strong ? parsePrice(strong.textContent) : null;
+    // O total da oferta fica num <b>/<strong> dentro de .content-price. Os
+    // outros valores por perto sao o preco cheio riscado (.line-through) e a
+    // quebra em tarifa/desconto/taxas, que ficam em <span> - por isso a busca
+    // e restrita a b/strong e ignora qualquer coisa riscada.
+    const blocoPreco = document.querySelector('.content-price');
+    const totais = blocoPreco
+      ? Array.from(blocoPreco.querySelectorAll('b, strong'))
+          .filter(el => !el.closest('.line-through'))
+          .map(el => parsePrice(el.textContent))
+          .filter(valor => valor !== null)
+      : [];
+    let preco = totais.length ? totais[totais.length - 1] : null;
+
+    if (preco === null) {
+      const destaque = Array.from(document.querySelectorAll('strong, b'))
+        .find(el => /R\$/.test(el.textContent || '') && !el.closest('.line-through'));
+      preco = destaque ? parsePrice(destaque.textContent) : null;
+    }
+
+    // Voos da IDA: a MaxMilhas lista, junto da oferta, todos os voos de ida
+    // aos quais aquele preco se aplica (e, separadamente, os de volta - que
+    // precisam ficar de fora). A secao e identificada pelo cabecalho
+    // "Ida - <dia> <data>" em .header-stretch.
+    const cabecalhos = Array.from(document.querySelectorAll('.header-stretch'));
+    const cabecalhoIda = cabecalhos.find(el => /^ida\b/i.test(normalize(el.innerText)));
+    const secaoIda = cabecalhoIda ? cabecalhoIda.parentElement : null;
+
+    const voos = (secaoIda ? Array.from(secaoIda.querySelectorAll('.bound')) : [])
+      .map(el => {
+        const texto = normalize(el.innerText);
+        const horarios = texto.match(/\d{1,2}:\d{2}/g) || [];
+        if (horarios.length < 2) return null;
+
+        // Guarda de direcao: a primeira sigla da linha tem que ser a origem.
+        const primeiraSigla = (texto.match(/\b([A-Z]{3})\b/) || [])[1];
+        if (origem && primeiraSigla && primeiraSigla !== origem) return null;
+
+        const duracao = texto.match(/(\d+)h(?:\s*(\d+))?m/i);
+        const paradas = texto.match(/(\d+)\s*parada/i);
+        const companhia = (texto.match(/^(.*?)\s+[A-Z]{3}\s+\d{1,2}:\d{2}/) || [])[1]
+          || texto.split(' ')[0]
+          || null;
+
+        return {
+          companhia: companhia || null,
+          horario_partida: horarios[0],
+          horario_chegada: horarios[horarios.length - 1],
+          duracao_min: duracao ? Number(duracao[1]) * 60 + Number(duracao[2] || 0) : null,
+          escalas: /direto/i.test(texto) ? 0 : (paradas ? Number(paradas[1]) : null)
+        };
+      })
+      .filter(Boolean);
 
     const airlineLabel = Array.from(document.querySelectorAll('p'))
       .find(el => /^Na\s+\S+/i.test(normalize(el.textContent)));
@@ -562,18 +611,18 @@ async function lerPrecoMaxMilhas(page) {
       ? normalize(airlineLabel.textContent).match(/^Na\s+(\S+)/i)
       : null;
 
-    return { preco, companhia: companhiaMatch ? companhiaMatch[1] : null };
-  }, " ");
+    return { preco, companhia: companhiaMatch ? companhiaMatch[1] : null, voos };
+  }, { nbsp: String.fromCharCode(160), origem });
 }
 
-async function waitForMaxMilhasPriceToSettle(page) {
+async function waitForMaxMilhasPriceToSettle(page, origem) {
   const startedAt = Date.now();
   let stableSince = null;
   let previousPreco = null;
-  let last = { preco: null, companhia: null };
+  let last = { preco: null, companhia: null, voos: [] };
 
   while (Date.now() - startedAt < MAXMILHAS_PRICE_TIMEOUT_MS) {
-    const snapshot = await lerPrecoMaxMilhas(page);
+    const snapshot = await lerPrecoMaxMilhas(page, origem);
     last = snapshot;
 
     if (snapshot.preco !== null && snapshot.preco === previousPreco) {
@@ -604,12 +653,30 @@ async function buscarMaxMilhas(origem, destino, dataIda, dataVolta) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: IS_VERCEL ? 30000 : DEFAULT_TIMEOUT_MS });
     await page.waitForSelector('strong', { timeout: 15000 }).catch(() => {});
 
-    const result = await waitForMaxMilhasPriceToSettle(page);
+    const result = await waitForMaxMilhasPriceToSettle(page, origem);
 
     if (!result.preco) {
       throw new Error('Nao foi possivel ler o preco na Maxmilhas.');
     }
 
+    // A MaxMilhas lista, junto da oferta, os voos de ida aos quais aquele
+    // preco se aplica. Emitimos uma linha por voo pra que o filtro de horario
+    // minimo do alerta funcione (#143) - antes ia uma linha unica sem horario,
+    // que era descartada por qualquer alerta com horario definido.
+    if (result.voos?.length) {
+      return result.voos.map(voo => ({
+        preco: result.preco,
+        companhia: voo.companhia ?? result.companhia,
+        horario_partida: voo.horario_partida,
+        horario_chegada: voo.horario_chegada,
+        duracao_min: voo.duracao_min,
+        escalas: voo.escalas,
+        link: url
+      }));
+    }
+
+    // Sem os voos (layout mudou, render incompleto), mantem o comportamento
+    // antigo: uma linha so com o preco, sem horario.
     return [{
       preco: result.preco,
       companhia: result.companhia,
