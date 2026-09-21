@@ -302,7 +302,28 @@ export class SupabaseService {
     return this.client
       .from('bus_alerts')
       .select('*')
+      .order('ordem', { ascending: true, nullsFirst: false })
       .order('criado_em', { ascending: false });
+  }
+
+  async reorderBusAlerts(orderedIds: string[]) {
+    const { data: existentes, error: fetchError } = await this.client
+      .from('bus_alerts')
+      .select('*')
+      .in('id', orderedIds);
+
+    if (fetchError || !existentes) throw fetchError ?? new Error('Falha ao carregar alertas para reordenar.');
+
+    const porId = new Map(existentes.map(row => [row.id, row]));
+    const rows = orderedIds
+      .map((id, index) => {
+        const row = porId.get(id);
+        return row ? { ...row, ordem: index } : null;
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+
+    const { error } = await this.client.from('bus_alerts').upsert(rows, { onConflict: 'id' });
+    if (error) throw error;
   }
 
   async createBusAlert(payload: {
@@ -340,6 +361,22 @@ export class SupabaseService {
       .maybeSingle();
 
     return data?.preco ?? null;
+  }
+
+  async getBusCachedPriceDetails(origemSlug: string, destinoSlug: string, dataIda: string): Promise<{ preco: number; atualizado_em: string | null } | null> {
+    const { data } = await this.client
+      .from('bus_price_cache')
+      .select('preco, atualizado_em')
+      .eq('origem_slug', origemSlug)
+      .eq('destino_slug', destinoSlug)
+      .eq('data_ida', dataIda)
+      .not('preco', 'is', null)
+      .order('atualizado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!data) return null;
+    return { preco: data.preco, atualizado_em: data.atualizado_em ?? null };
   }
 
   async validateBuserCity(slug: string): Promise<boolean> {
