@@ -920,6 +920,7 @@ export class VoosComponent implements OnInit, OnDestroy {
           await this.loadMinPrices();
           this.showToast(`Coleta atualizada: menor preço encontrado R$ ${job.preco}, mas nenhum voo passou nos filtros deste alerta.`);
         }
+        await this.refreshQuickViewIfOpen(alert);
       });
     } finally {
       this.refreshing = { ...this.refreshing, [alert.id]: false };
@@ -995,6 +996,18 @@ export class VoosComponent implements OnInit, OnDestroy {
   closeQuickView() {
     this.quickViewAlert   = null;
     this.quickViewDetails = null;
+  }
+
+  private async refreshQuickViewIfOpen(alert: Alert) {
+    if (this.quickViewAlert?.id !== alert.id) return;
+    const details = await this.supabase.getMinPriceDetailsForRoute(
+      alert.origem, alert.destino, alert.data_ida,
+      alert.data_volta ?? null,
+      { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+    );
+    this.quickViewDetails = details
+      ? { companhia: details.companhia, atualizado_em: details.atualizado_em }
+      : { companhia: null, atualizado_em: null };
   }
 
   economia(alert: Alert): number {

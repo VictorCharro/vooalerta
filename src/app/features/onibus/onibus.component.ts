@@ -671,6 +671,7 @@ export class OnibusComponent implements OnInit, OnDestroy {
     } else {
       this.showToast('Rota não encontrada ou sem passagens disponíveis.');
     }
+    await this.refreshQuickViewIfOpen(alert);
     this.refreshing = { ...this.refreshing, [alert.id]: false };
   }
 
@@ -833,6 +834,12 @@ export class OnibusComponent implements OnInit, OnDestroy {
   closeQuickView() {
     this.quickViewAlert   = null;
     this.quickViewDetails = null;
+  }
+
+  private async refreshQuickViewIfOpen(alert: BusAlert) {
+    if (this.quickViewAlert?.id !== alert.id) return;
+    const details = await this.supabase.getBusCachedPriceDetails(alert.origem_slug, alert.destino_slug, alert.data_ida);
+    this.quickViewDetails = { atualizado_em: details?.atualizado_em ?? null };
   }
 
   economia(alert: BusAlert): number {

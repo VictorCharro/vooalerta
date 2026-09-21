@@ -60,6 +60,10 @@ h1 { font-size: 26px; margin-bottom: 4px; }
 .price-skeleton { display: block; height: 20px; width: 80px; background: var(--color-border); border-radius: 4px; animation: pulse 1.4s ease infinite; margin-left: auto; }
 @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }
 .card-controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.card-controls .toggle { width: 50px; height: 28px; }
+.card-controls .toggle .thumb { width: 20px; height: 20px; top: 4px; left: 4px; }
+.card-controls .toggle input:checked ~ .thumb { transform: translateX(22px); }
+.card-controls .toggle .track { border-radius: 14px; }
 .open-btn { background: var(--color-bg-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--color-text-muted); text-decoration: none; transition: all var(--transition); }
 .open-btn:hover { border-color: var(--color-accent); color: var(--color-accent); background: var(--color-accent-dim); }
 .open-btn img { width: 16px; height: 16px; }
@@ -78,8 +82,8 @@ h1 { font-size: 26px; margin-bottom: 4px; }
 .toast { background: var(--color-green); color: #fff; padding: 14px 20px; border-radius: var(--radius-md); font-size: 14px; font-weight: 500; box-shadow: var(--shadow-toast); max-width: 320px; }
 
 /* ── Share btn (refresh) ─────────────────────────────────── */
-.share-btn { width: 32px; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--transition); flex-shrink: 0; }
-.share-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.share-btn { width: 36px; height: 36px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-bg-2); color: var(--color-text); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--transition); flex-shrink: 0; }
+.share-btn:hover { border-color: var(--color-accent); color: var(--color-text); background: var(--color-accent-dim); }
 .share-btn.btn-cooldown { width: auto; padding: 0 8px; cursor: not-allowed; opacity: 0.6; }
 .cooldown-label { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
 

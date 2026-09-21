@@ -3,10 +3,11 @@ import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
+import { Password } from 'primeng/password';
 
 @Component({
     selector: 'app-register',
-    imports: [FormsModule, RouterLink],
+    imports: [FormsModule, RouterLink, Password],
     styleUrls: ['../auth.styles.css'],
     template: `
     <div class="auth-page">
@@ -69,15 +70,17 @@ import { SupabaseService } from '@core/services/supabase.service';
                 </div>
                 <div class="form-group" style="margin-top: 14px">
                   <label for="password">Senha</label>
-                  <input
-                    id="password"
-                    type="password"
+                  <p-password
+                    inputId="password"
                     [(ngModel)]="password"
                     name="password"
                     placeholder="mínimo 6 caracteres"
                     autocomplete="new-password"
-                    minlength="6"
-                    required
+                    [toggleMask]="true"
+                    [feedback]="false"
+                    [required]="true"
+                    styleClass="auth-password"
+                    inputStyleClass="auth-password-input"
                     />
                   </div>
                   @if (error) {
