@@ -733,7 +733,18 @@ async function buscarCacheExistente(origem, destino, dataIda, dataVolta) {
   );
 }
 
-async function buscarTodasFontes(origem, destino, dataIda, dataVolta) {
+// O aviso e complementar: se gravar a parcial falhar, a coleta continua e o
+// resultado final ainda e retornado - por isso o erro nao sobe.
+async function avisarFonte(onFonte, voos, nome) {
+  if (!onFonte || voos.length === 0) return;
+  try {
+    await onFonte(voos, nome);
+  } catch (err) {
+    console.warn(`Falha ao gravar resultado parcial de ${nome}: ${err.message}`);
+  }
+}
+
+async function buscarTodasFontes(origem, destino, dataIda, dataVolta, { onFonte } = {}) {
   // Sem lock: quem chama essa funcao agora e sempre um worker que processa
   // um job por vez (fila em refresh_jobs), entao nao ha mais concorrencia
   // pra evitar aqui. O cron (monitor.js) tambem ja e sequencial por conta
@@ -750,6 +761,7 @@ async function buscarTodasFontes(origem, destino, dataIda, dataVolta) {
         preco: maxmilhasFlights[0]?.preco ?? null,
         quantidade: maxmilhasFlights.length
       };
+      await avisarFonte(onFonte, maxmilhasFlights, 'maxmilhas');
     } else {
       warnings.push('maxmilhas: nenhum preco encontrado');
     }
@@ -762,6 +774,7 @@ async function buscarTodasFontes(origem, destino, dataIda, dataVolta) {
     voos.push(...googleResult.voos);
     Object.assign(fontes, googleResult.fontes);
     if (googleResult.warning) warnings.push(googleResult.warning);
+    await avisarFonte(onFonte, googleResult.voos, 'google');
   } catch (err) {
     warnings.push(`google: ${String(err?.message || err).split('\n')[0]}`);
   }
@@ -909,7 +922,11 @@ async function waitForExecutableToSettle(executablePath) {
   }
 }
 
-async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
+// inicioDaColeta permite gravar uma fonte por vez sem que a segunda apague a
+// primeira: a limpeza remove o que e anterior ao inicio do job, nao o que e
+// anterior a esta gravacao. Sem isso, salvar o Google apagaria as linhas da
+// MaxMilhas gravadas minutos antes, na mesma coleta.
+async function salvarCache(voos, origem, destino, dataIda, dataVolta, inicioDaColeta = null) {
   if (voos.length === 0) return;
   assertValidRoute(origem, destino, dataIda, dataVolta);
 
@@ -937,9 +954,10 @@ async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
   await supabase('POST', 'price_cache', rows);
 
   const dataVoltaFilter = dataVolta ? `&data_volta=eq.${encodeURIComponent(dataVolta)}` : '&data_volta=is.null';
+  const limite = inicioDaColeta ?? agora;
   await supabase(
     'DELETE',
-    `price_cache?origem=eq.${encodeURIComponent(origem)}&destino=eq.${encodeURIComponent(destino)}&data_ida=eq.${encodeURIComponent(dataIda)}${dataVoltaFilter}&atualizado_em=lt.${encodeURIComponent(agora)}`
+    `price_cache?origem=eq.${encodeURIComponent(origem)}&destino=eq.${encodeURIComponent(destino)}&data_ida=eq.${encodeURIComponent(dataIda)}${dataVoltaFilter}&atualizado_em=lt.${encodeURIComponent(limite)}`
   );
 }
 
@@ -981,10 +999,15 @@ async function refreshFlightPrice({ origem, destino, data_ida, data_volta }) {
   }
 
   try {
-    const result = await buscarTodasFontes(origem, destino, data_ida, data_volta);
+    // Grava cada fonte assim que ela termina, em vez de esperar as duas: a tela
+    // escuta price_cache por realtime, entao o preco da MaxMilhas ja aparece no
+    // card enquanto o Google ainda esta sendo coletado.
+    const inicioDaColeta = new Date().toISOString();
+    const result = await buscarTodasFontes(origem, destino, data_ida, data_volta, {
+      onFonte: voosDaFonte => salvarCache(voosDaFonte, origem, destino, data_ida, data_volta, inicioDaColeta)
+    });
     const voos = result.voos;
     if (voos.length > 0) {
-      await salvarCache(voos, origem, destino, data_ida, data_volta);
       // O historico e complementar: se falhar, a coleta em si continua valida.
       await registrarHistorico(voos, origem, destino, data_ida, data_volta).catch(err => {
         console.warn('Falha ao registrar historico de preco:', err.message);
@@ -1032,6 +1055,7 @@ module.exports = {
   refreshFlightPrice,
   selectLowestPricesTab,
   salvarCache,
+  avisarFonte,
   registrarHistorico,
   sleep,
   supabase,
