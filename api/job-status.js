@@ -23,7 +23,7 @@ async function handler(req, res) {
   try {
     const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
     const user = token ? await verifyUserToken(token) : null;
-    if (!user?.id) {
+    if (!user?.id || !isValidUuid(user.id)) {
       res.status(401).json({ error: 'Nao autenticado' });
       return;
     }
@@ -34,7 +34,13 @@ async function handler(req, res) {
       return;
     }
 
-    const jobs = await supabase('GET', `refresh_jobs?id=eq.${encodeURIComponent(jobId)}&limit=1`);
+    // Filtra tambem pelo dono: antes bastava ter um job_id valido pra ler o
+    // resultado de qualquer job, de qualquer usuario (#134). Job de outro
+    // usuario cai no mesmo 404 de job inexistente, sem revelar a diferenca.
+    const jobs = await supabase(
+      'GET',
+      `refresh_jobs?id=eq.${encodeURIComponent(jobId)}&user_id=eq.${encodeURIComponent(user.id)}&limit=1`
+    );
     const job = jobs[0];
     if (!job) {
       res.status(404).json({ error: 'Job nao encontrado' });

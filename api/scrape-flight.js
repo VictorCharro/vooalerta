@@ -2,7 +2,8 @@ const {
   supabase,
   verifyUserToken,
   isValidIata,
-  isValidIsoDate
+  isValidIsoDate,
+  isValidUuid
 } = require('../backend/flight_scraper');
 
 const JOB_REUSE_WINDOW_MS = 2 * 60 * 1000; // evita criar job duplicado pra mesma rota em cliques repetidos
@@ -25,7 +26,7 @@ async function handler(req, res) {
   try {
     const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
     const user = token ? await verifyUserToken(token) : null;
-    if (!user?.id) {
+    if (!user?.id || !isValidUuid(user.id)) {
       res.status(401).json({ error: 'Nao autenticado' });
       return;
     }
@@ -55,12 +56,13 @@ async function handler(req, res) {
 
     const existentes = await supabase(
       'GET',
-      `refresh_jobs?origem=eq.${encodeURIComponent(origem)}&destino=eq.${encodeURIComponent(destino)}&data_ida=eq.${encodeURIComponent(data_ida)}${dataVoltaFilter}&status=in.(pending,processing)&criado_em=gte.${janela}&order=criado_em.desc&limit=1`
+      `refresh_jobs?user_id=eq.${encodeURIComponent(user.id)}&origem=eq.${encodeURIComponent(origem)}&destino=eq.${encodeURIComponent(destino)}&data_ida=eq.${encodeURIComponent(data_ida)}${dataVoltaFilter}&status=in.(pending,processing)&criado_em=gte.${janela}&order=criado_em.desc&limit=1`
     );
 
     let job = existentes[0];
     if (!job) {
       const criados = await supabase('POST', 'refresh_jobs', {
+        user_id: user.id,
         origem,
         destino,
         data_ida,
