@@ -6,7 +6,8 @@
 const {
   refreshFlightPrice,
   sleep,
-  supabase
+  supabase,
+  closeSharedBrowser
 } = require('./flight_scraper');
 
 async function sendWhatsApp(phone, message, callmebotKey) {
@@ -170,7 +171,17 @@ async function main() {
   console.log('\nMonitoramento concluido');
 }
 
-main().catch(err => {
-  console.error('Erro fatal:', err);
-  process.exit(1);
-});
+// O worker (Render) e um processo de vida longa e mantem o Chromium vivo de
+// proposito, mas aqui e uma rodada unica do cron: sem fechar o browser, o
+// processo nunca encerra e o GitHub Actions cancela o job por timeout. O
+// exit(0) explicito tambem descarta conexoes HTTP ainda em pool.
+main()
+  .then(async () => {
+    await closeSharedBrowser().catch(() => {});
+    process.exit(0);
+  })
+  .catch(async err => {
+    console.error('Erro fatal:', err);
+    await closeSharedBrowser().catch(() => {});
+    process.exit(1);
+  });
