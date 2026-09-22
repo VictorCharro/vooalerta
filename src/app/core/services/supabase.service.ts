@@ -87,6 +87,25 @@ export class SupabaseService {
         .eq('id', session.user.id);
   }
 
+  // Criterio unico dos filtros do alerta, usado pelas duas consultas de preco.
+  // Campo nulo significa "nao sei", e nao "serve": se o horario de partida ou
+  // as escalas do voo sao desconhecidos, nao da pra afirmar que ele atende ao
+  // filtro, entao ele fica de fora (#143, #145, #146). Estava duplicado nas
+  // duas consultas e elas divergiram - o detalhe do alerta continuou com o
+  // criterio antigo e mostrava preco diferente do card pro mesmo alerta.
+  private aplicaFiltrosDoAlerta<T extends { horario_partida: string | null; escalas: number | null }>(
+    rows: T[],
+    options: { horarioMinimo?: string | null; soDireto?: boolean }
+  ): T[] {
+    const horarioMinimo = options.horarioMinimo && options.horarioMinimo !== '00:00'
+      ? options.horarioMinimo
+      : null;
+
+    return rows
+      .filter(row => !horarioMinimo || (row.horario_partida !== null && row.horario_partida >= horarioMinimo))
+      .filter(row => !options.soDireto || row.escalas === 0);
+  }
+
   // Antes eram duas queries identicas (getMinPriceForRoute +
   // getMinPriceLinkForRoute) chamadas sempre em par - mesma tabela, mesmo
   // filtro, mesma ordenacao, so mudando as colunas do select. Unificadas
@@ -112,18 +131,7 @@ export class SupabaseService {
         .order('preco', { ascending: true })
         .limit(200);
 
-    const horarioMinimo = options.horarioMinimo && options.horarioMinimo !== '00:00'
-      ? options.horarioMinimo
-      : null;
-    // Com horario minimo definido, linhas sem horario conhecido ficam de fora:
-    // o preco "a partir de" da aba do Google e todas as linhas da MaxMilhas
-    // salvam horario_partida null, e nao da pra garantir que esses precos sao
-    // de um voo que parte depois do horario pedido - antes elas passavam
-    // sempre e furavam o filtro, mostrando o preco de um voo da manha num
-    // alerta que so aceitava voos da noite.
-    const rows = (data ?? [])
-      .filter(row => !horarioMinimo || (row.horario_partida !== null && row.horario_partida >= horarioMinimo))
-      .filter(row => !options.soDireto || row.escalas === null || row.escalas === 0)
+    const rows = this.aplicaFiltrosDoAlerta(data ?? [], options)
       .filter((row): row is typeof row & { preco: number } => typeof row.preco === 'number');
 
     if (rows.length === 0) return { preco: null, link: null };
@@ -153,12 +161,7 @@ export class SupabaseService {
         .order('preco', { ascending: true })
         .limit(200);
 
-    const horarioMinimo = options.horarioMinimo && options.horarioMinimo !== '00:00'
-      ? options.horarioMinimo
-      : null;
-    const row = (data ?? [])
-      .filter(row => !horarioMinimo || row.horario_partida === null || row.horario_partida >= horarioMinimo)
-      .filter(row => !options.soDireto || row.escalas === null || row.escalas === 0)
+    const row = this.aplicaFiltrosDoAlerta(data ?? [], options)
       .find(row => typeof row.preco === 'number');
 
     if (!row) return null;
