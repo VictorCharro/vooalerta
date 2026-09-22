@@ -193,10 +193,8 @@ async function buscarGoogleFlightsSerpApi(origem, destino, dataIda, dataVolta) {
   if (flights.length === 0) return [];
 
   const lowestPrice = Math.min(...flights.map(flight => flight.preco));
-  return [
-    createAdvertisedPriceFlight(lowestPrice, link),
-    ...flights
-  ].sort((a, b) => a.preco - b.preco);
+  return comPrecoAnunciado(lowestPrice, flights, link)
+    .sort((a, b) => a.preco - b.preco);
 }
 
 function normalizeText(text) {
@@ -374,6 +372,19 @@ function createAdvertisedPriceFlight(advertisedPrice, link) {
     link
   };
 }
+
+// O preco anunciado ("a partir de" da aba Menores Precos) so precisa virar
+// uma linha propria quando nenhum voo coletado tem exatamente aquele valor.
+// Quando algum tem - o caso comum - essa linha era um orfao sem horario,
+// companhia nem escalas, que furava os filtros de horario/so-direto (#143,
+// #146) e ainda disputava o desempate por preco, fazendo a companhia exibida
+// no detalhe do alerta virar sorteio. Mantida so quando e informacao nova:
+// ai ela significa "existe algo mais barato que nao conseguimos identificar".
+function comPrecoAnunciado(advertisedPrice, flights, link) {
+  if (flights.some(flight => flight.preco === advertisedPrice)) return flights;
+  return [createAdvertisedPriceFlight(advertisedPrice, link), ...flights];
+}
+
 
 async function collectFlightRows(page, origem, destino, link) {
   await page.waitForSelector('li.pIav2d', { timeout: 15000 }).catch(() => {});
@@ -762,10 +773,9 @@ async function buscarGoogleFlightsPlaywrightOnce(url, origem, destino) {
       throw new Error('Nao foi possivel ler o valor exibido na aba Menores precos.');
     }
 
-    return [
-      createAdvertisedPriceFlight(advertisedPrice, url),
-      ...flights.filter(flight => flight.preco >= advertisedPrice)
-    ].sort((a, b) => a.preco - b.preco);
+    const voosValidos = flights.filter(flight => flight.preco >= advertisedPrice);
+    return comPrecoAnunciado(advertisedPrice, voosValidos, url)
+      .sort((a, b) => a.preco - b.preco);
   } finally {
     await page?.close().catch(() => {});
     if (IS_VERCEL) await browser.close().catch(() => {});
@@ -987,6 +997,7 @@ module.exports = {
   collectFlightRows,
   buscarCacheExistente,
   createAdvertisedPriceFlight,
+  comPrecoAnunciado,
   createStealthPage,
   getLowestPricesSnapshot,
   launchBrowser,
