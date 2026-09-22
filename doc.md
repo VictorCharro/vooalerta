@@ -247,7 +247,7 @@ Redesign em andamento baseado no Figma, migrando de CSS custom pra **PrimeNG** (
 --color-amber:        #D17300
 ```
 
-`providePrimeNG` é registrado em `app.config.ts` com `options.darkModeSelector: false` — o app só tem o tema escuro do Figma por enquanto (o toggle de tema claro/escuro existente é legado e está **temporariamente desabilitado** na sidebar, junto com o botão de favoritos, até serem implementados de verdade).
+`providePrimeNG` é registrado em `app.config.ts` com `options.darkModeSelector: false`. O app só tem tema escuro — o toggle de tema claro/escuro e as variáveis `html[data-theme="light"]` foram removidos de vez (não era usado e não estava nos planos ter tema claro). O botão de favoritos na sidebar continua desabilitado, até ser implementado de verdade.
 
 Fonte `Mulish` (Google Fonts, carregada em `src/index.html`) é usada especificamente no título de saudação ("Olá, {nome}! Qual será sua próxima viagem?") das páginas de Voos e Ônibus; o resto do texto continua em Inter (`--font-display`/`--font-body`).
 

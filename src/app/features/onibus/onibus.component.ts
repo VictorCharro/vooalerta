@@ -30,8 +30,7 @@ interface BusAlert {
     template: `
     <div class="layout">
     
-      <app-sidebar active="onibus" [userEmail]="userEmail" [isDark]="isDark"
-        (themeChange)="isDark = $event"
+      <app-sidebar active="onibus" [userEmail]="userEmail"
         (profileSaved)="onProfileSaved($event)">
       </app-sidebar>
     
@@ -567,7 +566,6 @@ export class OnibusComponent implements OnInit, OnDestroy {
   saving       = false;
   formError    = '';
   userEmail    = '';
-  isDark       = true;
   toasts:      string[] = [];
   cachedPrices: Record<string, number> = {};
   pricesLoading = false;
@@ -612,7 +610,6 @@ export class OnibusComponent implements OnInit, OnDestroy {
   constructor(public router: Router, private supabase: SupabaseService) {}
 
   async ngOnInit() {
-    this.isDark = (localStorage.getItem('theme') ?? 'dark') === 'dark';
     const [user, profileResult] = await Promise.all([
       this.supabase.getUser(),
       this.supabase.getProfile()

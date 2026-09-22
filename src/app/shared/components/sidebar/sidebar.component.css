@@ -19,11 +19,8 @@
 .nav-icon { width: 22px; height: 22px; object-fit: contain; flex-shrink: 0; }
 .nav-label { flex: 1; text-align: center; }
 .sidebar-bottom { display: flex; flex-direction: column; gap: 12px; }
-.sidebar-user { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.theme-btn { width: 46px; height: 46px; padding: 0; border-radius: var(--radius-lg); background: var(--color-bg-3); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; box-shadow: var(--shadow-hard-gray); }
-.theme-btn img { width: 20px; height: 20px; }
-.theme-btn:hover { background: var(--color-border-hover); }
-.sidebar-logout { width: 46px; height: 46px; padding: 0; border-radius: var(--radius-lg); background: var(--color-bg-3) !important; color: var(--color-text) !important; border: none; font-size: 12px; font-weight: 600; cursor: pointer; flex-shrink: 0; box-shadow: var(--shadow-hard-gray); }
+.sidebar-user { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.sidebar-logout { width: 100%; height: 46px; padding: 0; border-radius: var(--radius-lg); background: var(--color-bg-3) !important; color: var(--color-text) !important; border: none; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; box-shadow: var(--shadow-hard-gray); }
 .sidebar-logout:hover { background: var(--color-accent) !important; color: #fff !important; }
 
 /* ── Modal perfil ─────────────────────────────────────────── */

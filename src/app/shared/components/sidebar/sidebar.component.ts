@@ -32,10 +32,6 @@ import { ButtonDirective } from 'primeng/button';
       </div>
       <div class="sidebar-bottom">
         <div class="sidebar-user">
-          <button pButton class="theme-btn" [rounded]="true" text severity="secondary" disabled
-            (click)="toggleTheme()" title="Em breve">
-            <img src="assets/icons/icon_lightmode.png" alt="" />
-          </button>
           <button pButton class="sidebar-logout" severity="primary" (click)="logout()">Sair</button>
         </div>
       </div>
@@ -124,8 +120,6 @@ import { ButtonDirective } from 'primeng/button';
 export class SidebarComponent implements OnInit {
   @Input() active: 'voos' | 'onibus' = 'voos';
   @Input() userEmail = '';
-  @Input() isDark = true;
-  @Output() themeChange = new EventEmitter<boolean>();
   @Output() profileSaved = new EventEmitter<{ whatsapp: string; nome: string }>();
 
   showProfileModal = false;
@@ -138,14 +132,6 @@ export class SidebarComponent implements OnInit {
   constructor(public router: Router, private supabase: SupabaseService) {}
 
   ngOnInit() {}
-
-  toggleTheme() {
-    this.isDark = !this.isDark;
-    const theme = this.isDark ? 'dark' : 'light';
-    localStorage.setItem('theme', theme);
-    document.documentElement.setAttribute('data-theme', theme);
-    this.themeChange.emit(this.isDark);
-  }
 
   async logout() {
     await this.supabase.signOut();

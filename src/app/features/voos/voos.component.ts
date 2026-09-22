@@ -20,8 +20,7 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
     template: `
     <div class="layout">
     
-      <app-sidebar active="voos" [userEmail]="userEmail" [isDark]="isDark"
-        (themeChange)="isDark = $event"
+      <app-sidebar active="voos" [userEmail]="userEmail"
         (profileSaved)="onProfileSaved($event)">
       </app-sidebar>
     
@@ -655,8 +654,6 @@ export class VoosComponent implements OnInit, OnDestroy {
   private cooldownNow = Date.now();
   private readonly COOLDOWN_MS = 30 * 60 * 1000;
 
-  isDark = true;
-
   origens: string[] = [];
   origenInput = '';
 
@@ -685,7 +682,6 @@ export class VoosComponent implements OnInit, OnDestroy {
   ) {}
 
   async ngOnInit() {
-    this.isDark = (localStorage.getItem('theme') ?? 'dark') === 'dark';
     const [user, profileResult] = await Promise.all([
       this.supabase.getUser(),
       this.supabase.getProfile()
