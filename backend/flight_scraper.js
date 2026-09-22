@@ -213,6 +213,24 @@ function parsePrice(text) {
   return Number.isFinite(price) && price > 0 && price < 100000 ? price : null;
 }
 
+// O nome da companhia vem sujo da linha do Google: "LATAM . Operado por Latam
+// Airlines Brasil" (o separador some no innerText, virando "LATAMOperado por
+// ..."), e voos que chegam no dia seguinte trazem o marcador "+1" colado.
+function limparCompanhia(texto) {
+  if (!texto) return null;
+
+  const nome = normalizeText(texto)
+    .replace(/^\+\d+\s*/, '')              // "+1 Gol" -> "Gol"
+    .split('·')[0]                     // corta no separador, quando ele sobrevive
+    .replace(/Operado por.*$/i, '')       // "LATAMOperado por ..." -> "LATAM"
+    .trim();
+
+  // Nao e companhia: o Google usa essa linha pra combinacao de bilhetes avulsos.
+  if (/^Passagens separadas/i.test(nome)) return null;
+
+  return nome || null;
+}
+
 function parseFlightRow(text, origem, destino, link) {
   const normalized = normalizeText(text);
   const routeRegex = new RegExp(`${origem}\\s*-\\s*${destino}`, 'i');
@@ -225,15 +243,18 @@ function parseFlightRow(text, origem, destino, link) {
   const afterTimes = normalized.slice(timeMatch.index + timeMatch[0].length).trim();
   const durationMatch = afterTimes.match(/(\d+)h(?:\s*(\d+))?\s*min/i);
   const companhia = durationMatch
-    ? afterTimes.slice(0, durationMatch.index).trim() || null
+    ? limparCompanhia(afterTimes.slice(0, durationMatch.index))
     : null;
 
   const duracao_min = durationMatch
     ? Number(durationMatch[1]) * 60 + Number(durationMatch[2] || 0)
     : null;
 
-  const escalasMatch = normalized.match(/(\d+)\s+escala/i);
-  const escalas = /sem escalas/i.test(normalized)
+  // O Google escreve "1 parada"/"2 paradas" (e "Sem escalas" no voo direto).
+  // Procurar so por "escala" deixava todo voo com conexao com escalas null,
+  // que e justamente o valor que fura o filtro de so-direto.
+  const escalasMatch = normalized.match(/(\d+)\s+(?:parada|escala)/i);
+  const escalas = /sem\s+(?:escalas?|paradas?)/i.test(normalized)
     ? 0
     : (escalasMatch ? Number(escalasMatch[1]) : null);
 
@@ -1005,6 +1026,7 @@ module.exports = {
   closeSharedBrowser,
   getVercelChromiumPath,
   parseFlightRow,
+  limparCompanhia,
   parsePrice,
   parseSerpApiTime,
   refreshFlightPrice,
