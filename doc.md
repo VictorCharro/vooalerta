@@ -96,7 +96,9 @@ vooalerta/
         ├── 013_profiles_nome.sql                 # coluna nome em profiles + trigger, usada no "Olá, {nome}!" (numeração colidiu com a de cima, ambas coexistem sem problema)
         ├── 014_limpar_cache_antigo_grant_e_cron.sql  # grant explícito + tenta agendar limpar_cache_antigo() via pg_cron (a cada hora); acionamento garantido é a chamada do RPC ao final de cada rodada do monitor.js
         ├── 015_drop_scrape_lock.sql              # remove a tabela órfã scrape_lock (ver 008/009/010)
-        └── 016_bus_alerts_ordem.sql              # coluna ordem em bus_alerts, mesmo drag-and-drop da tela de Ônibus
+        ├── 016_bus_alerts_ordem.sql              # coluna ordem em bus_alerts, mesmo drag-and-drop da tela de Ônibus
+        ├── 017_refresh_jobs_user_id.sql          # coluna user_id em refresh_jobs — o dono do job, pra /api/job-status não entregar job de outro usuário
+        └── 018_price_history.sql                 # tabela price_history (append-only) — histórico de preço por rota, que o price_cache não guarda
 ```
 
 ---
@@ -121,9 +123,10 @@ vooalerta/
 ### Tabelas de voo
 - **`alerts`** — alertas do usuário (origem IATA, destino IATA, data_ida, data_volta, meta, horario_minimo, so_direto, whatsapp, ativo, ordem). `ordem` guarda a posição do card definida no arrastar-e-soltar (null = ordena por `criado_em`). RLS: cada usuário só vê/edita os próprios; leitura pública por ID liberada (página de share).
 - **`price_cache`** — voos coletados no Google Flights e na MaxMilhas (preco, companhia, horario_partida, horario_chegada, escalas, link, etc.). Uma rota/data tem várias linhas: uma por voo, mais uma linha "a partir de" do Google sem horário. RLS: leitura pública, escrita só via `service_role`. Linhas com mais de 24h sem atualização são apagadas por `limpar_cache_antigo()`, chamada ao final de cada rodada do `monitor.js` (e, se `pg_cron` estiver disponível no projeto, também a cada hora — migration 014).
+- **`price_history`** — append-only: uma linha por coleta bem-sucedida, com o menor preço e a fonte vencedora (`maxmilhas`/`google`). Existe porque o `price_cache` guarda só a foto do momento — a cada coleta as linhas da rota são substituídas e o histórico se perderia. É a base pro gráfico de tendência e pro alerta de queda (#149). RLS igual à do `price_cache`: leitura pública, escrita só via `service_role`.
 - **`notifications`** — controle anti-spam 6h por alerta
 - **`profiles`** — whatsapp + callmebot_key por usuário
-- **`refresh_jobs`** — fila de atualização manual (status `pending` → `processing` → `done`/`error`, com preco/link/fontes do resultado). Sem policies públicas: só `service_role` lê/escreve (via `api/*` e worker).
+- **`refresh_jobs`** — fila de atualização manual (status `pending` → `processing` → `done`/`error`, com preco/link/fontes do resultado). Tem `user_id` (o dono do job): `/api/job-status` filtra por ele, então ninguém lê o resultado de job alheio, e o reaproveitamento de job em cliques repetidos é por rota **e** por usuário. Sem policies públicas: só `service_role` lê/escreve (via `api/*` e worker).
 
 ### Tabelas de ônibus (separadas, sem conflito)
 - **`bus_alerts`** — alertas do usuário (origem/destino nome + slug Buser, meta, whatsapp)
@@ -182,7 +185,7 @@ O backend lê as chaves de variáveis de ambiente (não há `dotenv`). Um `.env`
 - Cache: reutiliza dados com menos de 3h30 de idade (evita duplicar em disparo manual logo após o cron). `salvarCache` insere as linhas novas **antes** de apagar as antigas da rota, pra nunca haver janela sem preço nem perda do cache se o insert falhar.
 - Filtros por alerta (valem igual na tela — `getMinPriceRowForRoute` — e na notificação — `monitor.js`):
   - `horario_minimo` — **só da ida**. Com horário definido, só contam linhas com `horario_partida` conhecido e `>=` ao pedido; linhas sem horário (a "a partir de" do Google) ficam de fora. Se nenhum voo coletado qualificar, a rota fica sem preço.
-  - `so_direto` — ⚠️ ainda deixa passar linhas com `escalas` nulo (a "a partir de" do Google). Mesmo bug que foi corrigido no horário (#143), pendente.
+  - `so_direto` — exige `escalas` conhecido e igual a zero. Corrigido no `monitor.js` (notificação) pela #146; **a tela ainda usa o critério antigo** e deixa passar linhas com `escalas` nulo, então card e notificação podem divergir em alertas com só-direto até a parte de frontend da #146 ser feita.
 - Todos os parâmetros que entram em filtros do PostgREST (`origem`, `destino`, datas, `job_id`) são validados (IATA de 3 letras, `AAAA-MM-DD`, uuid) e codificados antes de montar a query, já que essas chamadas rodam com `service_role`.
 - Rodar manualmente: ver seção "Rodando local" acima — precisa de `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SERPAPI_KEY` como variáveis de ambiente, depois `npx playwright install chromium && node backend/monitor.js`
 

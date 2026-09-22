@@ -912,6 +912,28 @@ async function salvarCache(voos, origem, destino, dataIda, dataVolta) {
   );
 }
 
+// Append-only: uma linha por coleta bem-sucedida, com o menor preco e a
+// fonte que venceu (#149). price_cache guarda so a foto do momento, entao
+// sem isso o historico se perde a cada coleta.
+async function registrarHistorico(voos, origem, destino, dataIda, dataVolta) {
+  if (voos.length === 0) return;
+  assertValidRoute(origem, destino, dataIda, dataVolta);
+
+  const menor = voos[0];
+  if (!Number.isFinite(menor.preco)) return;
+
+  const fonte = /maxmilhas/i.test(menor.link || '') ? 'maxmilhas' : 'google';
+
+  await supabase('POST', 'price_history', {
+    origem,
+    destino,
+    data_ida: dataIda,
+    data_volta: dataVolta || null,
+    preco: menor.preco,
+    fonte
+  });
+}
+
 function cacheRowParaResposta(row) {
   return {
     preco: row.preco,
@@ -932,6 +954,10 @@ async function refreshFlightPrice({ origem, destino, data_ida, data_volta }) {
     const voos = result.voos;
     if (voos.length > 0) {
       await salvarCache(voos, origem, destino, data_ida, data_volta);
+      // O historico e complementar: se falhar, a coleta em si continua valida.
+      await registrarHistorico(voos, origem, destino, data_ida, data_volta).catch(err => {
+        console.warn('Falha ao registrar historico de preco:', err.message);
+      });
     }
 
     return {
@@ -973,6 +999,7 @@ module.exports = {
   refreshFlightPrice,
   selectLowestPricesTab,
   salvarCache,
+  registrarHistorico,
   sleep,
   supabase,
   isValidIata,
