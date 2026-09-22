@@ -3,26 +3,44 @@ import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
+import { Password } from 'primeng/password';
 
 @Component({
     selector: 'app-register',
-    imports: [FormsModule, RouterLink],
+    imports: [FormsModule, RouterLink, Password],
     styleUrls: ['../auth.styles.css'],
     template: `
     <div class="auth-page">
       <div class="auth-box fade-up">
     
         <div class="auth-brand">
-          <div class="auth-brand-icon">✈</div>
+          <div class="auth-brand-icon">
+            <img src="assets/icons/icon_aviao.png" alt="" />
+          </div>
           <span class="auth-brand-name">Viagem Alerta</span>
         </div>
     
-        <h1 class="auth-title">Criar conta</h1>
+        <div class="auth-heading">
+          <div class="auth-heading-bar"></div>
+          <h1 class="auth-title">Criar conta</h1>
+        </div>
         <p class="auth-subtitle">Defina suas rotas e meta de preço — a gente avisa no WhatsApp.</p>
     
         @if (!success) {
           <form (ngSubmit)="onSubmit()">
             <div class="form-group">
+              <label for="nome">Nome</label>
+              <input
+                id="nome"
+                type="text"
+                [(ngModel)]="nome"
+                name="nome"
+                placeholder="Seu nome"
+                autocomplete="name"
+                required
+                />
+              </div>
+              <div class="form-group" style="margin-top: 14px">
               <label for="email">E-mail</label>
               <input
                 id="email"
@@ -52,15 +70,17 @@ import { SupabaseService } from '@core/services/supabase.service';
                 </div>
                 <div class="form-group" style="margin-top: 14px">
                   <label for="password">Senha</label>
-                  <input
-                    id="password"
-                    type="password"
+                  <p-password
+                    inputId="password"
                     [(ngModel)]="password"
                     name="password"
                     placeholder="mínimo 6 caracteres"
                     autocomplete="new-password"
-                    minlength="6"
-                    required
+                    [toggleMask]="true"
+                    [feedback]="false"
+                    [required]="true"
+                    styleClass="auth-password"
+                    inputStyleClass="auth-password-input"
                     />
                   </div>
                   @if (error) {
@@ -109,6 +129,7 @@ import { SupabaseService } from '@core/services/supabase.service';
   `]
 })
 export class RegisterComponent {
+  nome     = '';
   email    = '';
   password = '';
   whatsapp = '';
@@ -128,7 +149,7 @@ export class RegisterComponent {
       return;
     }
 
-    const { error } = await this.supabase.signUp(this.email, this.password, '55' + this.whatsapp);
+    const { error } = await this.supabase.signUp(this.email, this.password, '55' + this.whatsapp, this.nome);
     if (error) {
       this.error = error.message;
     } else {

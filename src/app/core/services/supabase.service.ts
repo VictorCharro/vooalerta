@@ -24,11 +24,11 @@ export class SupabaseService {
   }
 
   // ── Auth ──────────────────────────────────────────────────
-  async signUp(email: string, password: string, whatsapp: string) {
+  async signUp(email: string, password: string, whatsapp: string, nome: string) {
     return this.client.auth.signUp({
       email,
       password,
-      options: {data: {whatsapp}}
+      options: {data: {whatsapp, nome}}
     });
   }
 
@@ -77,7 +77,7 @@ export class SupabaseService {
     return { data, error };
   }
 
-  async updateProfile(changes: { whatsapp?: string; callmebot_key?: string }) {
+  async updateProfile(changes: { whatsapp?: string; callmebot_key?: string; nome?: string }) {
     const { data: { session } } = await this.client.auth.getSession();
     if (!session) return { data: null, error: new Error('Não autenticado') };
 
@@ -130,6 +130,39 @@ export class SupabaseService {
 
     const menor = rows.reduce((min, row) => row.preco < min.preco ? row : min);
     return { preco: menor.preco, link: menor.link ?? null };
+  }
+
+  async getMinPriceDetailsForRoute(
+    origem: string,
+    destino: string,
+    dataIda: string,
+    dataVolta: string | null = null,
+    options: { horarioMinimo?: string | null; soDireto?: boolean } = {}
+  ): Promise<{ preco: number; companhia: string | null; atualizado_em: string | null } | null> {
+    let query = this.client
+        .from('price_cache')
+        .select('preco, companhia, atualizado_em, horario_partida, escalas')
+        .eq('origem', origem)
+        .eq('destino', destino)
+        .eq('data_ida', dataIda)
+        .not('preco', 'is', null);
+
+    query = dataVolta ? query.eq('data_volta', dataVolta) : query.is('data_volta', null);
+
+    const { data } = await query
+        .order('preco', { ascending: true })
+        .limit(200);
+
+    const horarioMinimo = options.horarioMinimo && options.horarioMinimo !== '00:00'
+      ? options.horarioMinimo
+      : null;
+    const row = (data ?? [])
+      .filter(row => !horarioMinimo || row.horario_partida === null || row.horario_partida >= horarioMinimo)
+      .filter(row => !options.soDireto || row.escalas === null || row.escalas === 0)
+      .find(row => typeof row.preco === 'number');
+
+    if (!row) return null;
+    return { preco: row.preco, companhia: row.companhia ?? null, atualizado_em: row.atualizado_em ?? null };
   }
 
   async enqueueFlightRefresh(origem: string, destino: string, dataIda: string, dataVolta?: string | null): Promise<{ jobId: string | null }> {
@@ -275,7 +308,28 @@ export class SupabaseService {
     return this.client
       .from('bus_alerts')
       .select('*')
+      .order('ordem', { ascending: true, nullsFirst: false })
       .order('criado_em', { ascending: false });
+  }
+
+  async reorderBusAlerts(orderedIds: string[]) {
+    const { data: existentes, error: fetchError } = await this.client
+      .from('bus_alerts')
+      .select('*')
+      .in('id', orderedIds);
+
+    if (fetchError || !existentes) throw fetchError ?? new Error('Falha ao carregar alertas para reordenar.');
+
+    const porId = new Map(existentes.map(row => [row.id, row]));
+    const rows = orderedIds
+      .map((id, index) => {
+        const row = porId.get(id);
+        return row ? { ...row, ordem: index } : null;
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+
+    const { error } = await this.client.from('bus_alerts').upsert(rows, { onConflict: 'id' });
+    if (error) throw error;
   }
 
   async createBusAlert(payload: {
@@ -313,6 +367,22 @@ export class SupabaseService {
       .maybeSingle();
 
     return data?.preco ?? null;
+  }
+
+  async getBusCachedPriceDetails(origemSlug: string, destinoSlug: string, dataIda: string): Promise<{ preco: number; atualizado_em: string | null } | null> {
+    const { data } = await this.client
+      .from('bus_price_cache')
+      .select('preco, atualizado_em')
+      .eq('origem_slug', origemSlug)
+      .eq('destino_slug', destinoSlug)
+      .eq('data_ida', dataIda)
+      .not('preco', 'is', null)
+      .order('atualizado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!data) return null;
+    return { preco: data.preco, atualizado_em: data.atualizado_em ?? null };
   }
 
   async validateBuserCity(slug: string): Promise<boolean> {

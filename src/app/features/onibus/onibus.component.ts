@@ -5,6 +5,8 @@ import { Router } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
 import { DatePickerComponent } from '@shared/components/date-picker/date-picker.component';
 import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
+import { ButtonDirective } from 'primeng/button';
+import { InputNumber } from 'primeng/inputnumber';
 
 interface BusAlert {
   id: string;
@@ -23,13 +25,12 @@ interface BusAlert {
 
 @Component({
     selector: 'app-onibus',
-    imports: [CommonModule, FormsModule, DatePickerComponent, SidebarComponent],
+    imports: [CommonModule, FormsModule, DatePickerComponent, SidebarComponent, ButtonDirective, InputNumber],
     styleUrls: ['./onibus.component.css'],
     template: `
     <div class="layout">
     
-      <app-sidebar active="onibus" [userEmail]="userEmail" [isDark]="isDark"
-        (themeChange)="isDark = $event"
+      <app-sidebar active="onibus" [userEmail]="userEmail"
         (profileSaved)="onProfileSaved($event)">
       </app-sidebar>
     
@@ -52,17 +53,26 @@ interface BusAlert {
               (meta: R$&nbsp;{{ a.meta | number:'1.0-0' }})
             </div>
           }
-          <div class="page-header fade-up">
-            <div>
-              <h1>Ônibus</h1>
+          <div class="greeting-header fade-up">
+            <div class="greeting-bar"></div>
+            <div class="greeting-text">
+              <h1>Olá, {{ firstName }}! Qual será sua próxima viagem?</h1>
               @if (!loading) {
                 <p class="page-sub">
-                  {{ alerts.length }} rota{{ alerts.length !== 1 ? 's' : '' }} monitorada{{ alerts.length !== 1 ? 's' : '' }}
+                  {{ alerts.length }} Rota{{ alerts.length !== 1 ? 's' : '' }} Monitorada{{ alerts.length !== 1 ? 's' : '' }}
                 </p>
               }
             </div>
-            <button class="btn-primary" (click)="openModal()">+ Novo alerta</button>
+            <div class="greeting-actions">
+              <button pButton severity="primary" class="favorite-btn" disabled aria-label="Favoritos" title="Em breve">
+                <img src="assets/icons/icon_favorito.png" alt="" />
+              </button>
+              <button pButton severity="primary" class="new-alert-btn" (click)="openModal()">+ Novo Alerta</button>
+            </div>
           </div>
+          <div class="content-row">
+          <div class="list-column">
+          <h2 class="list-heading">Ônibus</h2>
           <!-- Loading -->
           @if (loading) {
             <div class="center-state">
@@ -72,10 +82,9 @@ interface BusAlert {
           <!-- Empty state -->
           @if (!loading && alerts.length === 0) {
             <div class="empty-state fade-up">
-              <div class="empty-icon">—</div>
+              <img class="empty-icon" src="assets/icons/icon_onibus.png" alt="" />
               <h3>Nenhum alerta de ônibus</h3>
               <p>Crie um alerta e receba no WhatsApp quando a passagem cair.</p>
-              <button class="btn-primary" (click)="openModal()" style="margin-top:20px">Criar primeiro alerta</button>
             </div>
           }
           <!-- Cards de alertas -->
@@ -84,9 +93,20 @@ interface BusAlert {
               @for (alert of alerts; track alert; let i = $index) {
                 <div
                   class="alert-card fade-up"
+                  [draggable]="true"
+                  (dragstart)="onDragStart($event, i)"
+                  (dragover)="onDragOver($event, i)"
+                  (dragleave)="onDragLeave(i)"
+                  (drop)="onDrop($event, i)"
+                  (dragend)="onDragEnd()"
                   [style.animation-delay]="(i * 0.04) + 's'"
                   [class.card-inactive]="!alert.ativo"
+                  [class.is-dragging]="dragIndex === i"
+                  [class.is-drag-over]="dragOverIndex === i && dragIndex !== i"
                   >
+                  <span class="drag-handle" title="Arrastar pra reordenar" (pointerdown)="onHandleGrab()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.2" fill="currentColor" stroke="none"/></svg>
+                  </span>
                   <div class="card-route">
                     <div class="route-iata">
                       <span class="city-name">{{ alert.origem }}</span>
@@ -150,7 +170,7 @@ interface BusAlert {
                       <span class="thumb"></span>
                     </label>
                     <a [href]="buildBuserUrl(alert)" target="_blank" rel="noopener" class="open-btn" title="Abrir no Buser">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                      <img src="assets/icons/icon_copy.png" alt="" />
                     </a>
                     <button class="share-btn"
                       (click)="refreshPrice(alert)"
@@ -168,14 +188,108 @@ interface BusAlert {
                         }
                       }
                     </button>
-                    <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">›</button>
+                    <button class="chevron-btn" [class.active]="quickViewAlert?.id === alert.id" (click)="openQuickView(alert)" title="Ver detalhes">
+                      <img src="assets/icons/icon_expandir.png" alt="" />
+                    </button>
+                    <button class="card-favorite-btn" disabled title="Em breve" aria-label="Favoritar">
+                      <img src="assets/icons/icon_favorito.png" alt="" />
+                    </button>
                   </div>
                 </div>
               }
             </div>
           }
+          </div>
+          <!-- ══ PAINEL RÁPIDO ══ -->
+          @if (quickViewAlert) {
+            <aside class="quick-panel fade-up">
+              <div class="qp-header">
+                <div class="qp-badge">
+                  <img src="assets/icons/icon_onibus.png" alt="" />
+                </div>
+                <div class="qp-route">
+                  <img class="qp-route-icon" src="assets/icons/icon_local.png" alt="" />
+                  <span>{{ quickViewAlert.origem }}</span>
+                  <span class="qp-route-arrow">⟶</span>
+                  <span>{{ quickViewAlert.destino }}</span>
+                </div>
+              </div>
+              <div class="qp-body">
+              <div class="qp-row">
+                <div class="qp-item">
+                  <img src="assets/icons/icon_data.png" alt="" />
+                  <div>
+                    <span class="qp-label">Ida:</span>
+                    <span class="qp-value">{{ quickViewAlert.data_ida | date:'dd/MM/yyyy' }}</span>
+                  </div>
+                </div>
+                <div class="qp-item qp-item-noicon">
+                  <div>
+                    <span class="qp-label">volta:</span>
+                    <span class="qp-value">{{ (quickViewAlert.data_volta || quickViewAlert.data_ida) | date:'dd/MM/yyyy' }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="qp-row">
+                <div class="qp-item">
+                  <img src="assets/icons/icon_preco.png" alt="" />
+                  <div>
+                    <span class="qp-label">Preço Atual:</span>
+                    <span class="qp-value">
+                      @if (getCachedPrice(quickViewAlert) !== null) {
+                        R$&nbsp;{{ getCachedPrice(quickViewAlert) | number:'1.0-0' }}
+                      }
+                      @if (getCachedPrice(quickViewAlert) === null) {
+                        —
+                      }
+                    </span>
+                  </div>
+                </div>
+                <div class="qp-item qp-item-noicon">
+                  <div>
+                    <span class="qp-label">Sua Meta:</span>
+                    <span class="qp-value">R$&nbsp;{{ quickViewAlert.meta | number:'1.0-0' }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="qp-item">
+                <img src="assets/icons/icon_economia.png" alt="" />
+                <div>
+                  <span class="qp-label">O quanto você Economiza:</span>
+                  <span class="qp-value">R$&nbsp;{{ economia(quickViewAlert) | number:'1.0-0' }}</span>
+                </div>
+              </div>
+              <div class="qp-item">
+                <img src="assets/icons/icon_atualizado.png" alt="" />
+                <div>
+                  <span class="qp-label">Última atualização:</span>
+                  <span class="qp-value">
+                    @if (quickViewLoading) { — }
+                    @if (!quickViewLoading) {
+                      {{ quickViewDetails?.atualizado_em ? timeAgo(quickViewDetails!.atualizado_em!) : 'Sem dados' }}
+                    }
+                  </span>
+                </div>
+              </div>
+              <div class="qp-item">
+                <img src="assets/icons/icon_whatsApp.png" alt="" />
+                <div>
+                  <span class="qp-label">WhatsApp:</span>
+                  <span class="qp-value">{{ quickViewAlert.ativo ? 'Ativo' : 'Inativo' }}</span>
+                </div>
+              </div>
+              <div class="qp-actions">
+                <button type="button" class="btn-edit" (click)="openDetail(quickViewAlert)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="M15 5l4 4"/></svg>
+                  Editar
+                </button>
+              </div>
+              </div>
+            </aside>
+          }
+          </div>
         }
-    
+
         <!-- ══ DETALHE ══ -->
         @if (selectedAlert) {
           <div class="detail-view fade-up">
@@ -271,7 +385,7 @@ interface BusAlert {
                       <div class="form-row" style="margin-top:14px">
                         <div class="form-group">
                           <label for="d-meta">Meta de preço (R$)</label>
-                          <input id="d-meta" type="number" [(ngModel)]="detailForm.meta" name="d_meta" placeholder="150" min="1" required />
+                          <p-inputNumber inputId="d-meta" [(ngModel)]="detailForm.meta" name="d_meta" placeholder="150" [min]="1" [required]="true" [showButtons]="true" styleClass="meta-input" />
                         </div>
                         <div class="form-group">
                           <label for="d-whatsapp">WhatsApp</label>
@@ -389,8 +503,8 @@ interface BusAlert {
                             <div class="form-row" style="margin-top:14px">
                               <div class="form-group">
                                 <label for="bus-meta">Meta de preço (R$)</label>
-                                <input id="bus-meta" type="number" [(ngModel)]="form.meta" name="meta"
-                                  placeholder="150" min="1" required />
+                                <p-inputNumber inputId="bus-meta" [(ngModel)]="form.meta" name="meta"
+                                  placeholder="150" [min]="1" [required]="true" [showButtons]="true" styleClass="meta-input" />
                                 </div>
                                 <div class="form-group">
                                   <label for="bus-whatsapp">WhatsApp</label>
@@ -452,13 +566,22 @@ export class OnibusComponent implements OnInit, OnDestroy {
   saving       = false;
   formError    = '';
   userEmail    = '';
-  isDark       = true;
   toasts:      string[] = [];
   cachedPrices: Record<string, number> = {};
   pricesLoading = false;
   refreshing:   Record<string, boolean> = {};
   selectedAlert: BusAlert | null = null;
+
+  quickViewAlert: BusAlert | null = null;
+  quickViewLoading = false;
+  quickViewDetails: { atualizado_em: string | null } | null = null;
+
+  dragIndex: number | null = null;
+  dragOverIndex: number | null = null;
+  private handleGrabbed = false;
+
   private profileWhatsapp = '';
+  private profileNome = '';
   private realtimeChannel: any;
   private cooldownTick: any;
   private cooldownNow = Date.now();
@@ -471,6 +594,12 @@ export class OnibusComponent implements OnInit, OnDestroy {
   detailForm = this.emptyDetailForm();
   readonly today = new Date().toISOString().split('T')[0];
 
+  get firstName(): string {
+    if (this.profileNome) return this.profileNome.split(' ')[0];
+    const local = this.userEmail.split('@')[0] || '';
+    return local.charAt(0).toUpperCase() + local.slice(1);
+  }
+
   get alertsBelowMeta(): BusAlert[] {
     return this.alerts.filter(a => {
       const p = this.getCachedPrice(a);
@@ -481,11 +610,14 @@ export class OnibusComponent implements OnInit, OnDestroy {
   constructor(public router: Router, private supabase: SupabaseService) {}
 
   async ngOnInit() {
-    this.isDark = (localStorage.getItem('theme') ?? 'dark') === 'dark';
-    const user = await this.supabase.getUser();
-    this.userEmail = user?.email ?? '';
-    const { data: profile } = await this.supabase.getProfile();
+    const [user, profileResult] = await Promise.all([
+      this.supabase.getUser(),
+      this.supabase.getProfile()
+    ]);
+    const profile = profileResult.data;
+    this.userEmail       = user?.email ?? '';
     this.profileWhatsapp = this.stripPrefix(profile?.whatsapp ?? '');
+    this.profileNome     = profile?.nome ?? '';
     await this.loadAlerts();
     this.realtimeChannel = this.supabase.subscribeBusPriceCache(async () => {
       await this.loadCachedPrices();
@@ -536,6 +668,7 @@ export class OnibusComponent implements OnInit, OnDestroy {
     } else {
       this.showToast('Rota não encontrada ou sem passagens disponíveis.');
     }
+    await this.refreshQuickViewIfOpen(alert);
     this.refreshing = { ...this.refreshing, [alert.id]: false };
   }
 
@@ -680,9 +813,106 @@ export class OnibusComponent implements OnInit, OnDestroy {
     alert.ativo = !alert.ativo;
   }
 
+  // ── Painel rápido (ver detalhes) ────────────────────────────
+
+  async openQuickView(alert: BusAlert) {
+    if (this.quickViewAlert?.id === alert.id) {
+      this.closeQuickView();
+      return;
+    }
+    this.quickViewAlert   = alert;
+    this.quickViewDetails = null;
+    this.quickViewLoading = true;
+    const details = await this.supabase.getBusCachedPriceDetails(alert.origem_slug, alert.destino_slug, alert.data_ida);
+    this.quickViewDetails = { atualizado_em: details?.atualizado_em ?? null };
+    this.quickViewLoading = false;
+  }
+
+  closeQuickView() {
+    this.quickViewAlert   = null;
+    this.quickViewDetails = null;
+  }
+
+  private async refreshQuickViewIfOpen(alert: BusAlert) {
+    if (this.quickViewAlert?.id !== alert.id) return;
+    const details = await this.supabase.getBusCachedPriceDetails(alert.origem_slug, alert.destino_slug, alert.data_ida);
+    this.quickViewDetails = { atualizado_em: details?.atualizado_em ?? null };
+  }
+
+  economia(alert: BusAlert): number {
+    const price = this.getCachedPrice(alert);
+    if (price === null || price > alert.meta) return 0;
+    return alert.meta - price;
+  }
+
+  timeAgo(dateStr: string): string {
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'Agora mesmo';
+    if (mins < 60) return `Há ${mins} minuto${mins !== 1 ? 's' : ''}`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `Há ${hours} hora${hours !== 1 ? 's' : ''}`;
+    const days = Math.floor(hours / 24);
+    return `Há ${days} dia${days !== 1 ? 's' : ''}`;
+  }
+
+  // ── Arrastar pra reordenar ───────────────────────────────────
+
+  onHandleGrab() {
+    this.handleGrabbed = true;
+  }
+
+  onDragStart(event: DragEvent, index: number) {
+    if (!this.handleGrabbed) {
+      event.preventDefault();
+      return;
+    }
+    this.dragIndex = index;
+    event.dataTransfer?.setData('text/plain', String(index));
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  onDragOver(event: DragEvent, index: number) {
+    if (this.dragIndex === null) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    this.dragOverIndex = index;
+  }
+
+  onDragLeave(index: number) {
+    if (this.dragOverIndex === index) this.dragOverIndex = null;
+  }
+
+  onDrop(event: DragEvent, index: number) {
+    event.preventDefault();
+    const from = this.dragIndex;
+    this.resetDrag();
+    if (from === null || from === index) return;
+
+    const reordenados = [...this.alerts];
+    const [movido] = reordenados.splice(from, 1);
+    reordenados.splice(index, 0, movido);
+    this.alerts = reordenados;
+
+    this.supabase.reorderBusAlerts(reordenados.map(a => a.id)).catch(err => {
+      console.warn('Falha ao salvar nova ordem dos alertas de ônibus:', err);
+    });
+  }
+
+  onDragEnd() {
+    this.resetDrag();
+  }
+
+  private resetDrag() {
+    this.dragIndex = null;
+    this.dragOverIndex = null;
+    this.handleGrabbed = false;
+  }
+
   // ── Detail ─────────────────────────────────────────────────
 
   openDetail(alert: BusAlert) {
+    this.closeQuickView();
     this.selectedAlert = alert;
     const ufFromSlug = (slug: string) => slug.split('-').pop()?.toUpperCase() ?? '';
     const cityFromSlug = (slug: string) => {
@@ -759,8 +989,9 @@ export class OnibusComponent implements OnInit, OnDestroy {
 
   // ── Util ───────────────────────────────────────────────────
 
-  onProfileSaved(event: { whatsapp: string }) {
+  onProfileSaved(event: { whatsapp: string; nome: string }) {
     if (event.whatsapp) this.profileWhatsapp = event.whatsapp;
+    this.profileNome = event.nome;
   }
 
   showToast(msg: string) {

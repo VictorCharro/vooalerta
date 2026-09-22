@@ -1,0 +1,17 @@
+/* ============================================================
+   SOMBRAS — tokens de sombra reutilizados pelos componentes
+   redesenhados (sidebar, voos, ônibus). Mesmos valores usados
+   antes como literais, só centralizados aqui.
+   ============================================================ */
+
+:root {
+  /* Sombra "dura" (sem blur) projetada embaixo de botões/pills */
+  --shadow-hard-pink: 0 4px 0 0 var(--color-accent-hover);
+  --shadow-hard-gray: 0 4px 0 0 var(--color-border);
+
+  /* Sombra suave, com blur, usada nas faixas do painel de detalhes */
+  --shadow-soft: 0 3px 4px rgba(0, 0, 0, .4);
+
+  /* Sombra dos toasts */
+  --shadow-toast: 0 4px 16px rgba(0, 0, 0, .25);
+}

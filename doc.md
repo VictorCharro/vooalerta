@@ -8,7 +8,7 @@ Documentação de referência do projeto. Atualizar sempre que houver mudanças 
 
 Aplicação de alertas de preço para **voos** e **ônibus (Buser)**. O usuário cadastra uma rota + meta de preço e recebe notificação no WhatsApp quando o preço cai abaixo da meta.
 
-- **Frontend:** Angular 21 standalone, Supabase JS client
+- **Frontend:** Angular 21 standalone, PrimeNG (tema customizado) + Supabase JS client
 - **Backend:** Node.js — cron via GitHub Actions, worker sempre ligado no Render (fila de atualização manual) e Vercel Functions leves (enfileirar/consultar job)
 - **Fontes de preço (voos):** MaxMilhas e Google Flights (Playwright, SerpAPI como fallback)
 - **Banco:** Supabase (Postgres + RLS + Realtime)
@@ -23,20 +23,24 @@ Aplicação de alertas de preço para **voos** e **ônibus (Buser)**. O usuário
 vooalerta/
 ├── src/
 │   ├── environments/                      # environment.ts / environment.prod.ts — gitignored, gerados no build (Vercel) ou preenchidos localmente
+│   ├── assets/icons/                      # Ícones PNG exportados do Figma (avião, ônibus, perfil, favorito, lightmode, etc.)
 │   ├── styles/
-│   │   ├── theme.css       # Variáveis CSS (cores, espaçamentos, radius)
+│   │   ├── theme.css       # Variáveis CSS (cores, espaçamentos, radius) — paleta do Figma
+│   │   ├── shadows.css     # Tokens de sombra (--shadow-hard-pink/gray, --shadow-soft, --shadow-toast)
 │   │   ├── base.css
-│   │   ├── components.css  # btn-primary, btn-ghost, btn-icon, inputs, error-box, toggle, etc.
-│   │   └── main.css
+│   │   ├── components.css  # btn-primary, btn-ghost, btn-icon, inputs, error-box, toggle, etc. (legado, pré-PrimeNG)
+│   │   └── main.css        # @import theme → shadows → base → components
 │   └── app/
 │       ├── app.routes.ts                  # Rotas Angular
-│       ├── app.config.ts
+│       ├── app.config.ts                  # providePrimeNG com o preset customizado
 │       ├── core/
 │       │   ├── guards/auth.guard.ts       # authGuard + guestGuard
 │       │   ├── theme/vooalerta-preset.ts  # preset de tema do PrimeNG
 │       │   ├── models/
 │       │   │   ├── alert.model.ts         # Interface Alert (voos)
 │       │   │   └── user.model.ts
+│       │   ├── theme/
+│       │   │   └── vooalerta-preset.ts    # Preset PrimeNG (definePreset sobre Aura) com as cores do Figma
 │       │   └── services/
 │       │       └── supabase.service.ts    # Toda comunicação com Supabase
 │       ├── features/
@@ -88,9 +92,11 @@ vooalerta/
         ├── 008_scrape_lock.sql / 009_scrape_lock_rename_column.sql / 010_maxmilhas_lock.sql  # OBSOLETAS — criavam a tabela scrape_lock (lock por linha única). Substituídas pela fila em refresh_jobs (011). Removidas pela 015.
         ├── 011_refresh_jobs.sql                  # fila de atualização manual de preços — processada pelo worker (Render), não mais dentro da function da Vercel
         ├── 012_refresh_jobs_grant_delete.sql     # grant de delete em refresh_jobs pra service_role (limpeza de jobs antigos)
-        ├── 013_alerts_ordem.sql                  # coluna ordem em alerts, pro drag-and-drop de reordenar os cards
+        ├── 013_alerts_ordem.sql                  # coluna ordem em alerts, pro drag-and-drop de reordenar os cards de voo
+        ├── 013_profiles_nome.sql                 # coluna nome em profiles + trigger, usada no "Olá, {nome}!" (numeração colidiu com a de cima, ambas coexistem sem problema)
         ├── 014_limpar_cache_antigo_grant_e_cron.sql  # grant explícito + tenta agendar limpar_cache_antigo() via pg_cron (a cada hora); acionamento garantido é a chamada do RPC ao final de cada rodada do monitor.js
-        └── 015_drop_scrape_lock.sql              # remove a tabela órfã scrape_lock (ver 008/009/010)
+        ├── 015_drop_scrape_lock.sql              # remove a tabela órfã scrape_lock (ver 008/009/010)
+        └── 016_bus_alerts_ordem.sql              # coluna ordem em bus_alerts, mesmo drag-and-drop da tela de Ônibus
 ```
 
 ---
@@ -225,22 +231,46 @@ Isso elimina de vez o teto de 60s pro scraping em si (o worker não tem esse lim
 
 ## Design system
 
-Todas as páginas usam variáveis CSS de `src/styles/theme.css`. As principais:
+Redesign em andamento baseado no Figma, migrando de CSS custom pra **PrimeNG** (`primeng`, `@primeuix/themes`, `primeicons`). Paleta em `src/styles/theme.css` (variáveis CSS) e espelhada no preset do PrimeNG (`src/app/core/theme/vooalerta-preset.ts`, `definePreset` sobre o tema Aura):
 
 ```css
---color-accent: #7c6dfa        /* roxo — botões primários, nav ativo */
---color-green:  #2dd4a0        /* preço abaixo da meta */
---color-red:    #f0605a        /* preço acima da meta */
---color-bg-2:   #111118        /* fundo de cards e sidebar */
---color-bg-3:   #18181f        /* fundo de inputs */
+--color-accent:       #C6194D   /* rosa — botões primários, nav ativo */
+--color-accent-hover: #6F132F   /* rosa sombra — hover/shadow projetada */
+--color-bg:           #111010   /* preto — fundo da sidebar */
+--color-bg-2:         #161616   /* cinza chumbo — fundo da área principal */
+--color-bg-3:         #242323   /* cinza claro — cards, inputs, botões inativos da sidebar */
+--color-border:       #232021   /* cinza claro sombra — bordas e sombra projetada dos botões inativos */
+--color-text:         #E8E8E8   /* branco */
+--color-text-muted:   #8B8B8B   /* texto de rotas/labels */
+--color-green:        #09AE00   /* preço abaixo da meta */
+--color-red:          #BB070A   /* preço acima da meta */
+--color-amber:        #D17300
 ```
 
-Tema claro disponível via `html[data-theme="light"]`, toggled por `localStorage('theme')`.
+`providePrimeNG` é registrado em `app.config.ts` com `options.darkModeSelector: false`. O app só tem tema escuro — o toggle de tema claro/escuro e as variáveis `html[data-theme="light"]` foram removidos de vez (não era usado e não estava nos planos ter tema claro). O botão de favoritos na sidebar continua desabilitado, até ser implementado de verdade.
 
-Classes globais reutilizáveis em `src/styles/components.css`: `btn-primary`, `btn-ghost`, `btn-icon`, `spinner`, `error-box`, `success-box`, `form-hint`, `toggle` (switch).
+Fonte `Mulish` (Google Fonts, carregada em `src/index.html`) é usada especificamente no título de saudação ("Olá, {nome}! Qual será sua próxima viagem?") das páginas de Voos e Ônibus; o resto do texto continua em Inter (`--font-display`/`--font-body`).
+
+**Sombras — tokens em `src/styles/shadows.css`** (importado em `main.css` depois de `theme.css`): não usar valores literais de sombra direto no CSS de componente, usar os tokens.
+```css
+--shadow-hard-pink: 0 4px 0 0 var(--color-accent-hover);  /* bloco solido, sem blur — pills/botoes rosa/ativos */
+--shadow-hard-gray: 0 4px 0 0 var(--color-border);         /* idem, elementos cinza/inativos */
+--shadow-soft:      0 3px 4px rgba(0, 0, 0, .4);            /* com blur — faixas do painel de detalhes */
+--shadow-toast:     0 4px 16px rgba(0, 0, 0, .25);          /* toasts */
+```
+
+**Ícones:** os PNGs de `src/assets/icons/` (exportados do Figma) substituem emojis/glifos nos elementos redesenhados (logo, nav da sidebar, botões de ação, estado vazio, painel de detalhes). Ícones genéricos ainda não redesenhados podem usar PrimeIcons.
+
+**Status do redesign (por tela):**
+- **Voos** e **Ônibus**: mesmo design nas duas — cabeçalho de saudação, estado vazio, lista de cards (com drag-and-drop pra reordenar — coluna `ordem` em `alerts`/`bus_alerts`) e painel rápido de detalhes (`.content-row`/`.list-column`/`.quick-panel`/`.qp-*`, aberto pelo botão `»` do card) já redesenhados. O painel rápido do Ônibus não mostra "Companhia Aérea" (não existe nesse domínio); os outros campos são iguais aos de Voos. Modal de novo alerta/perfil e a tela de edição completa (aberta pelo botão "Editar" do painel) **ainda não foram redesenhados** — mantêm o CSS legado (`components.css`, classes `btn-primary`, `.section-title`, etc.).
+- **Sidebar**: totalmente redesenhada (marca, nav com `pButton`, tema e sair). Modal de perfil embutido nela continua com o layout legado.
+- **Login/Register/Share**: ainda não redesenhados.
+
+Classes globais legadas em `src/styles/components.css` (`btn-primary`, `btn-ghost`, `btn-icon`, `spinner`, `error-box`, `success-box`, `form-hint`, `toggle`) continuam em uso nas partes ainda não migradas — não remover até o redesign cobrir tudo.
 - O `.toggle` global (`components.css`) é a única definição — não duplicar em CSS de componente.
-- Botão `.open-btn` (link externo) presente nos cards de voos e ônibus (Buser); também no detalhe de ambas as páginas. Em voos, o link aponta pro site da fonte que deu o menor preço (Google Flights ou MaxMilhas).
-- Cards de voo podem ser reordenados arrastando pela alça (HTML5 drag-and-drop nativo — o CDK do Angular foi abandonado porque o preview do arraste travava no canto da tela). A nova ordem é salva em `alerts.ordem`.
+- Atenção ao nome de classe `.section-title`: já existe (legado, uppercase/muted) nos cabeçalhos do modal/painel de detalhe de Voos e Ônibus. O título de lista novo usa `.list-heading` propositalmente para não colidir.
+- Botão `.open-btn` presente nos cards de voos e ônibus (Buser); também no detalhe de ambas as páginas. Em voos, o link aponta pro site da fonte que deu o menor preço (Google Flights ou MaxMilhas).
+- Cards de voo e de ônibus podem ser reordenados arrastando pela alça (HTML5 drag-and-drop nativo — o CDK do Angular foi abandonado porque o preview do arraste travava no canto da tela). A nova ordem é salva em `alerts.ordem` / `bus_alerts.ordem`.
 
 ---
 

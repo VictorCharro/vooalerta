@@ -3,21 +3,27 @@ import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
+import { Password } from 'primeng/password';
 
 @Component({
     selector: 'app-login',
-    imports: [FormsModule, RouterLink],
+    imports: [FormsModule, RouterLink, Password],
     styleUrls: ['../auth.styles.css'],
     template: `
     <div class="auth-page">
       <div class="auth-box fade-up">
     
         <div class="auth-brand">
-          <div class="auth-brand-icon">✈</div>
+          <div class="auth-brand-icon">
+            <img src="assets/icons/icon_aviao.png" alt="" />
+          </div>
           <span class="auth-brand-name">Viagem Alerta</span>
         </div>
     
-        <h1 class="auth-title">Boas-vindas de volta</h1>
+        <div class="auth-heading">
+          <div class="auth-heading-bar"></div>
+          <h1 class="auth-title">Boas-vindas de volta</h1>
+        </div>
         <p class="auth-subtitle">Acompanhe suas rotas e receba alertas no WhatsApp.</p>
     
         <form (ngSubmit)="onSubmit()">
@@ -36,21 +42,18 @@ import { SupabaseService } from '@core/services/supabase.service';
     
             <div class="form-group" style="margin-top: 14px">
               <label for="password">Senha</label>
-              <div class="password-wrap">
-                <input
-                  id="password"
-                  [type]="showPwd ? 'text' : 'password'"
-                  [(ngModel)]="password"
-                  name="password"
-                  placeholder="••••••••"
-                  autocomplete="current-password"
-                  required
-                  />
-                  <button type="button" class="eye-btn" (click)="showPwd = !showPwd"
-                    [attr.aria-label]="showPwd ? 'Ocultar senha' : 'Mostrar senha'">
-                    {{ showPwd ? '○' : '●' }}
-                  </button>
-                </div>
+              <p-password
+                inputId="password"
+                [(ngModel)]="password"
+                name="password"
+                placeholder="••••••••"
+                autocomplete="current-password"
+                [toggleMask]="true"
+                [feedback]="false"
+                [required]="true"
+                styleClass="auth-password"
+                inputStyleClass="auth-password-input"
+                />
               </div>
     
               @if (error) {
@@ -77,7 +80,6 @@ import { SupabaseService } from '@core/services/supabase.service';
 export class LoginComponent {
   email    = '';
   password = '';
-  showPwd  = false;
   loading  = false;
   error    = '';
 

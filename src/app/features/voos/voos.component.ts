@@ -8,18 +8,19 @@ import { AirportSearchComponent } from '@shared/components/airport-search/airpor
 import { DatePickerComponent } from '@shared/components/date-picker/date-picker.component';
 import { TimePickerComponent } from '@shared/components/time-picker/time-picker.component';
 import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
+import { ButtonDirective } from 'primeng/button';
+import { InputNumber } from 'primeng/inputnumber';
 
 type JobStatus = { status: string; preco: number | null; link?: string; warning?: string; error?: string };
 
 @Component({
     selector: 'app-voos',
-    imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent],
+    imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent, ButtonDirective, InputNumber],
     styleUrls: ['./voos.component.css'],
     template: `
     <div class="layout">
     
-      <app-sidebar active="voos" [userEmail]="userEmail" [isDark]="isDark"
-        (themeChange)="isDark = $event"
+      <app-sidebar active="voos" [userEmail]="userEmail"
         (profileSaved)="onProfileSaved($event)">
       </app-sidebar>
     
@@ -35,17 +36,26 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
     
         <!-- ══ LISTA ══ -->
         @if (!selectedAlert) {
-          <div class="page-header fade-up">
-            <div>
-              <h1>Voos</h1>
+          <div class="greeting-header fade-up">
+            <div class="greeting-bar"></div>
+            <div class="greeting-text">
+              <h1>Olá, {{ firstName }}! Qual será sua próxima viagem?</h1>
               @if (!loading) {
                 <p class="page-sub">
-                  {{ alerts.length }} rota{{ alerts.length !== 1 ? 's' : '' }} monitorada{{ alerts.length !== 1 ? 's' : '' }}
+                  {{ alerts.length }} Rota{{ alerts.length !== 1 ? 's' : '' }} Monitorada{{ alerts.length !== 1 ? 's' : '' }}
                 </p>
               }
             </div>
-            <button class="btn-primary" (click)="openModal()">+ Novo alerta</button>
+            <div class="greeting-actions">
+              <button pButton severity="primary" class="favorite-btn" disabled aria-label="Favoritos" title="Em breve">
+                <img src="assets/icons/icon_favorito.png" alt="" />
+              </button>
+              <button pButton severity="primary" class="new-alert-btn" (click)="openModal()">+ Novo Alerta</button>
+            </div>
           </div>
+          <div class="content-row">
+          <div class="list-column" [class.list-column-narrow]="quickViewAlert">
+          <h2 class="list-heading">Voos</h2>
           <!-- Aviso callmebot_key ausente -->
           @if (missingCallmebotKey) {
             <div class="warn-banner fade-up">
@@ -69,10 +79,9 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
           <!-- Empty state -->
           @if (!loading && alerts.length === 0) {
             <div class="empty-state fade-up">
-              <div class="empty-icon">✈</div>
+              <img class="empty-icon" src="assets/icons/icon_aviaoSemRotas.png" alt="" />
               <h3>Nenhum alerta ainda</h3>
               <p>Crie seu primeiro alerta e receba no WhatsApp quando o preço cair.</p>
-              <button class="btn-primary" (click)="openModal()" style="margin-top:20px">Criar primeiro alerta</button>
             </div>
           }
           <!-- Alert cards -->
@@ -158,7 +167,7 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
                       <span class="thumb"></span>
                     </label>
                     <a [href]="getMinLink(alert)" target="_blank" class="open-btn" title="Abrir oferta">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                      <img src="assets/icons/icon_copy.png" alt="" />
                     </a>
                     <button class="refresh-btn"
                       (click)="refreshPrice(alert)"
@@ -176,14 +185,118 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
                         }
                       }
                     </button>
-                    <button class="chevron-btn" (click)="openDetail(alert)" title="Ver detalhes">›</button>
+                    <button class="chevron-btn" [class.active]="quickViewAlert?.id === alert.id" (click)="openQuickView(alert)" title="Ver detalhes">
+                    <img src="assets/icons/icon_expandir.png" alt="" />
+                  </button>
+                  <button class="card-favorite-btn" disabled title="Em breve" aria-label="Favoritar">
+                    <img src="assets/icons/icon_favorito.png" alt="" />
+                  </button>
                   </div>
                 </div>
               }
             </div>
           }
+          </div>
+          <!-- ══ PAINEL RÁPIDO ══ -->
+          @if (quickViewAlert) {
+            <aside class="quick-panel fade-up">
+              <div class="qp-header">
+                <div class="qp-badge">
+                  <img src="assets/icons/icon_aviao.png" alt="" />
+                </div>
+                <div class="qp-route">
+                  <img class="qp-route-icon" src="assets/icons/icon_local.png" alt="" />
+                  <span>{{ quickViewAlert.origem }}</span>
+                  <span class="qp-route-arrow">⟶</span>
+                  <span>{{ quickViewAlert.destino }}</span>
+                </div>
+              </div>
+              <div class="qp-body">
+              <div class="qp-row">
+                <div class="qp-item">
+                  <img src="assets/icons/icon_data.png" alt="" />
+                  <div>
+                    <span class="qp-label">Ida:</span>
+                    <span class="qp-value">{{ quickViewAlert.data_ida | date:'dd/MM/yyyy' }}</span>
+                  </div>
+                </div>
+                <div class="qp-item qp-item-noicon">
+                  <div>
+                    <span class="qp-label">volta:</span>
+                    <span class="qp-value">{{ (quickViewAlert.data_volta || quickViewAlert.data_ida) | date:'dd/MM/yyyy' }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="qp-row">
+                <div class="qp-item">
+                  <img src="assets/icons/icon_preco.png" alt="" />
+                  <div>
+                    <span class="qp-label">Preço Atual:</span>
+                    <span class="qp-value">
+                      @if (getMinPrice(quickViewAlert) !== null) {
+                        R$&nbsp;{{ getMinPrice(quickViewAlert) | number:'1.0-0' }}
+                      }
+                      @if (getMinPrice(quickViewAlert) === null) {
+                        —
+                      }
+                    </span>
+                  </div>
+                </div>
+                <div class="qp-item qp-item-noicon">
+                  <div>
+                    <span class="qp-label">Sua Meta:</span>
+                    <span class="qp-value">R$&nbsp;{{ quickViewAlert.meta | number:'1.0-0' }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="qp-item">
+                <img src="assets/icons/icon_economia.png" alt="" />
+                <div>
+                  <span class="qp-label">O quanto você Economiza:</span>
+                  <span class="qp-value">R$&nbsp;{{ economia(quickViewAlert) | number:'1.0-0' }}</span>
+                </div>
+              </div>
+              <div class="qp-item">
+                <img src="assets/icons/icon_aviao.png" alt="" />
+                <div>
+                  <span class="qp-label">Companhia Aérea:</span>
+                  <span class="qp-value">
+                    @if (quickViewLoading) { — }
+                    @if (!quickViewLoading) { {{ quickViewDetails?.companhia || 'Não informada' }} }
+                  </span>
+                </div>
+              </div>
+              <div class="qp-item">
+                <img src="assets/icons/icon_atualizado.png" alt="" />
+                <div>
+                  <span class="qp-label">Última atualização:</span>
+                  <span class="qp-value">
+                    @if (quickViewLoading) { — }
+                    @if (!quickViewLoading) {
+                      {{ quickViewDetails?.atualizado_em ? timeAgo(quickViewDetails!.atualizado_em!) : 'Sem dados' }}
+                    }
+                  </span>
+                </div>
+              </div>
+              <div class="qp-item">
+                <img src="assets/icons/icon_whatsApp.png" alt="" />
+                <div>
+                  <span class="qp-label">WhatsApp:</span>
+                  <span class="qp-value">{{ quickViewAlert.ativo ? 'Ativo' : 'Inativo' }}</span>
+                </div>
+              </div>
+              <div class="qp-actions">
+                <button type="button" class="btn-edit" (click)="openDetail(quickViewAlert)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="M15 5l4 4"/></svg>
+                  Editar
+                </button>
+              </div>
+              </div>
+            </aside>
+          }
+          </div>
         }
-    
+
         <!-- ══ DETALHE ══ -->
         @if (selectedAlert) {
           <div class="detail-view fade-up">
@@ -291,8 +404,8 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
                   <div class="form-row" style="margin-top:14px">
                     <div class="form-group">
                       <label for="d-meta">Meta de preço (R$)</label>
-                      <input id="d-meta" type="number" [(ngModel)]="form.meta" name="d_meta"
-                        placeholder="3000" min="1" required />
+                      <p-inputNumber inputId="d-meta" [(ngModel)]="form.meta" name="d_meta"
+                        placeholder="3000" [min]="1" [required]="true" [showButtons]="true" styleClass="meta-input" />
                       </div>
                       <div class="form-group">
                         <label for="d-horario">Horário a partir de <span class="form-optional">(opcional)</span></label>
@@ -455,8 +568,8 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
                   <div class="form-row" style="margin-top:14px">
                     <div class="form-group">
                       <label for="m-meta">Meta de preço (R$)</label>
-                      <input id="m-meta" type="number" [(ngModel)]="form.meta" name="meta"
-                        placeholder="3000" min="1" required />
+                      <p-inputNumber inputId="m-meta" [(ngModel)]="form.meta" name="meta"
+                        placeholder="3000" [min]="1" [required]="true" [showButtons]="true" styleClass="meta-input" />
                       </div>
                       <div class="form-group">
                         <label for="m-horario">
@@ -522,8 +635,13 @@ export class VoosComponent implements OnInit, OnDestroy {
 
   selectedAlert: Alert | null = null;
 
+  quickViewAlert: Alert | null = null;
+  quickViewLoading = false;
+  quickViewDetails: { companhia: string | null; atualizado_em: string | null } | null = null;
+
   missingCallmebotKey = false;
   profileWhatsapp     = '';
+  profileNome         = '';
 
   minPrices:        Record<string, number> = {};
   minLinks:         Record<string, string> = {};
@@ -536,8 +654,6 @@ export class VoosComponent implements OnInit, OnDestroy {
   private cooldownNow = Date.now();
   private readonly COOLDOWN_MS = 30 * 60 * 1000;
 
-  isDark = true;
-
   origens: string[] = [];
   origenInput = '';
 
@@ -545,6 +661,12 @@ export class VoosComponent implements OnInit, OnDestroy {
   readonly today = new Date().toISOString().split('T')[0];
 
   get activeCount() { return this.alerts.filter(a => a.ativo).length; }
+
+  get firstName(): string {
+    if (this.profileNome) return this.profileNome.split(' ')[0];
+    const local = this.userEmail.split('@')[0] || '';
+    return local.charAt(0).toUpperCase() + local.slice(1);
+  }
 
   get alertsBelowMeta(): Alert[] {
     return this.alerts.filter(a => {
@@ -560,13 +682,16 @@ export class VoosComponent implements OnInit, OnDestroy {
   ) {}
 
   async ngOnInit() {
-    this.isDark = (localStorage.getItem('theme') ?? 'dark') === 'dark';
-    const user = await this.supabase.getUser();
-    this.userEmail = user?.email ?? '';
-    await this.loadAlerts();
-    const { data: profile } = await this.supabase.getProfile();
+    const [user, profileResult] = await Promise.all([
+      this.supabase.getUser(),
+      this.supabase.getProfile()
+    ]);
+    const profile = profileResult.data;
+    this.userEmail           = user?.email ?? '';
     this.missingCallmebotKey = !profile?.callmebot_key;
     this.profileWhatsapp     = this.stripPrefix(profile?.whatsapp ?? '');
+    this.profileNome         = profile?.nome ?? '';
+    await this.loadAlerts();
 
     // Uma coleta salva dezenas de linhas em price_cache (DELETE + INSERT em
     // lote), e cada linha dispara um evento de realtime separado. Sem o
@@ -791,6 +916,7 @@ export class VoosComponent implements OnInit, OnDestroy {
           await this.loadMinPrices();
           this.showToast(`Coleta atualizada: menor preço encontrado R$ ${job.preco}, mas nenhum voo passou nos filtros deste alerta.`);
         }
+        await this.refreshQuickViewIfOpen(alert);
       });
     } finally {
       this.refreshing = { ...this.refreshing, [alert.id]: false };
@@ -821,8 +947,9 @@ export class VoosComponent implements OnInit, OnDestroy {
     return 'Atualizar preço agora';
   }
 
-  onProfileSaved(event: { whatsapp: string }) {
+  onProfileSaved(event: { whatsapp: string; nome: string }) {
     if (event.whatsapp) this.profileWhatsapp = event.whatsapp;
+    this.profileNome = event.nome;
   }
 
   openModal() {
@@ -843,7 +970,61 @@ export class VoosComponent implements OnInit, OnDestroy {
     this.origens = this.origens.filter(x => x !== o);
   }
 
+  async openQuickView(alert: Alert) {
+    if (this.quickViewAlert?.id === alert.id) {
+      this.closeQuickView();
+      return;
+    }
+    this.quickViewAlert   = alert;
+    this.quickViewDetails = null;
+    this.quickViewLoading = true;
+    const details = await this.supabase.getMinPriceDetailsForRoute(
+      alert.origem, alert.destino, alert.data_ida,
+      alert.data_volta ?? null,
+      { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+    );
+    this.quickViewDetails = details
+      ? { companhia: details.companhia, atualizado_em: details.atualizado_em }
+      : { companhia: null, atualizado_em: null };
+    this.quickViewLoading = false;
+  }
+
+  closeQuickView() {
+    this.quickViewAlert   = null;
+    this.quickViewDetails = null;
+  }
+
+  private async refreshQuickViewIfOpen(alert: Alert) {
+    if (this.quickViewAlert?.id !== alert.id) return;
+    const details = await this.supabase.getMinPriceDetailsForRoute(
+      alert.origem, alert.destino, alert.data_ida,
+      alert.data_volta ?? null,
+      { horarioMinimo: alert.horario_minimo, soDireto: alert.so_direto }
+    );
+    this.quickViewDetails = details
+      ? { companhia: details.companhia, atualizado_em: details.atualizado_em }
+      : { companhia: null, atualizado_em: null };
+  }
+
+  economia(alert: Alert): number {
+    const price = this.getMinPrice(alert);
+    if (price === null || price > alert.meta) return 0;
+    return alert.meta - price;
+  }
+
+  timeAgo(dateStr: string): string {
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'Agora mesmo';
+    if (mins < 60) return `Há ${mins} minuto${mins !== 1 ? 's' : ''}`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `Há ${hours} hora${hours !== 1 ? 's' : ''}`;
+    const days = Math.floor(hours / 24);
+    return `Há ${days} dia${days !== 1 ? 's' : ''}`;
+  }
+
   openDetail(alert: Alert) {
+    this.closeQuickView();
     this.selectedAlert = alert;
     this.editingId = alert.id!;
     this.form = {

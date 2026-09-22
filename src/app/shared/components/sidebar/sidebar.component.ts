@@ -3,41 +3,40 @@ import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
+import { ButtonDirective } from 'primeng/button';
 
 @Component({
     selector: 'app-sidebar',
-    imports: [FormsModule],
+    imports: [FormsModule, ButtonDirective],
     styleUrls: ['./sidebar.component.css'],
     template: `
     <aside class="sidebar">
       <div class="sidebar-top">
         <div class="brand">
-          <div class="brand-icon">✈</div>
+          <div class="brand-icon">
+            <img src="assets/icons/icon_aviao.png" alt="" />
+          </div>
           <span class="brand-name">Viagem Alerta</span>
         </div>
         <nav class="sidebar-nav">
-          <button class="nav-item" [class.active]="active === 'voos'" (click)="router.navigate(['/voos'])">
-            <span class="nav-icon">◫</span> Voos
+          <button pButton severity="primary" class="nav-item" [class.active]="active === 'voos'" (click)="router.navigate(['/voos'])">
+            <img class="nav-icon" src="assets/icons/icon_aviao.png" alt="" /><span class="nav-label">Voos</span>
           </button>
-          <button class="nav-item" [class.active]="active === 'onibus'" (click)="router.navigate(['/onibus'])">
-            <span class="nav-icon">⊟</span> Ônibus
+          <button pButton severity="primary" class="nav-item" [class.active]="active === 'onibus'" (click)="router.navigate(['/onibus'])">
+            <img class="nav-icon" src="assets/icons/icon_onibus.png" alt="" /><span class="nav-label">Ônibus</span>
           </button>
-          <button class="nav-item" (click)="openProfileModal()">
-            <span class="nav-icon">◯</span> Perfil
+          <button pButton severity="primary" class="nav-item" (click)="openProfileModal()">
+            <img class="nav-icon" src="assets/icons/icon_perfil.png" alt="" /><span class="nav-label">Perfil</span>
           </button>
         </nav>
       </div>
       <div class="sidebar-bottom">
-        <button class="theme-btn" (click)="toggleTheme()" [title]="isDark ? 'Modo claro' : 'Modo escuro'">
-          {{ isDark ? '☀' : '☾' }} {{ isDark ? 'Modo claro' : 'Modo escuro' }}
-        </button>
         <div class="sidebar-user">
-          <span class="user-email">{{ userEmail }}</span>
-          <button class="btn-ghost sidebar-logout" (click)="logout()">Sair</button>
+          <button pButton class="sidebar-logout" severity="primary" (click)="logout()">Sair</button>
         </div>
       </div>
     </aside>
-    
+
     <!-- ── Modal perfil ── -->
     @if (showProfileModal) {
       <div class="modal-overlay" (click)="onOverlayClick($event)">
@@ -54,6 +53,11 @@ import { SupabaseService } from '@core/services/supabase.service';
           @if (!profileLoading) {
             <form (ngSubmit)="saveProfile()">
               <div class="form-group">
+                <label for="p-nome">Nome</label>
+                <input id="p-nome" type="text" [(ngModel)]="profileForm.nome" name="nome"
+                  placeholder="Seu nome" />
+              </div>
+              <div class="form-group" style="margin-top:14px">
                 <label>E-mail</label>
                 <input type="email" [value]="userEmail" disabled style="opacity:.45;cursor:not-allowed" />
               </div>
@@ -88,7 +92,7 @@ import { SupabaseService } from '@core/services/supabase.service';
                       <a class="btn-whatsapp"
                         href="https://wa.me/34644815878?text=I%20allow%20callmebot%20to%20send%20me%20messages"
                         target="_blank" rel="noopener">
-                        📲 Ativar CallMeBot
+                        Ativar CallMeBot
                       </a>
                     }
                     @if (profileForm.callmebot_key) {
@@ -116,28 +120,18 @@ import { SupabaseService } from '@core/services/supabase.service';
 export class SidebarComponent implements OnInit {
   @Input() active: 'voos' | 'onibus' = 'voos';
   @Input() userEmail = '';
-  @Input() isDark = true;
-  @Output() themeChange = new EventEmitter<boolean>();
-  @Output() profileSaved = new EventEmitter<{ whatsapp: string }>();
+  @Output() profileSaved = new EventEmitter<{ whatsapp: string; nome: string }>();
 
   showProfileModal = false;
   profileLoading   = false;
   profileSaving    = false;
   profileError     = '';
   profileSuccess   = false;
-  profileForm      = { whatsapp: '', callmebot_key: '' };
+  profileForm      = { nome: '', whatsapp: '', callmebot_key: '' };
 
   constructor(public router: Router, private supabase: SupabaseService) {}
 
   ngOnInit() {}
-
-  toggleTheme() {
-    this.isDark = !this.isDark;
-    const theme = this.isDark ? 'dark' : 'light';
-    localStorage.setItem('theme', theme);
-    document.documentElement.setAttribute('data-theme', theme);
-    this.themeChange.emit(this.isDark);
-  }
 
   async logout() {
     await this.supabase.signOut();
@@ -151,6 +145,7 @@ export class SidebarComponent implements OnInit {
     this.profileLoading   = true;
     const { data } = await this.supabase.getProfile();
     this.profileForm = {
+      nome:          data?.nome ?? '',
       whatsapp:      this.stripPrefix(data?.whatsapp ?? ''),
       callmebot_key: data?.callmebot_key ?? ''
     };
@@ -175,6 +170,7 @@ export class SidebarComponent implements OnInit {
     }
 
     const { error } = await this.supabase.updateProfile({
+      nome:          this.profileForm.nome || undefined,
       whatsapp:      this.profileForm.whatsapp ? '55' + this.profileForm.whatsapp : undefined,
       callmebot_key: this.profileForm.callmebot_key || undefined
     });
@@ -185,7 +181,7 @@ export class SidebarComponent implements OnInit {
         : 'Erro ao salvar perfil. Tente novamente.';
     } else {
       this.profileSuccess = true;
-      this.profileSaved.emit({ whatsapp: this.profileForm.whatsapp });
+      this.profileSaved.emit({ whatsapp: this.profileForm.whatsapp, nome: this.profileForm.nome });
     }
     this.profileSaving = false;
   }
