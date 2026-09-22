@@ -73,7 +73,11 @@ async function processarAlerta(alerta, voosCache) {
   }
 
   if (alerta.so_direto) {
-    voosFiltrados = voosFiltrados.filter(v => v.escalas === 0 || v.escalas === null);
+    // Exige escalas conhecido: a linha do preco "a partir de" do Google salva
+    // escalas null e, passando sempre, furava o filtro - a notificacao podia
+    // disparar com o preco de um voo com escala (#146). Mesmo criterio do
+    // filtro de horario (#143).
+    voosFiltrados = voosFiltrados.filter(v => v.escalas === 0);
     console.log(`    Filtro direto: ${voosFiltrados.length} voos`);
   }
 
