@@ -583,6 +583,7 @@ export class OnibusComponent implements OnInit, OnDestroy {
   private profileWhatsapp = '';
   private profileNome = '';
   private realtimeChannel: any;
+  private realtimeDebounce: any;
   private cooldownTick: any;
   private cooldownNow = Date.now();
   private readonly COOLDOWN_MS = 10 * 60 * 1000;
@@ -619,8 +620,12 @@ export class OnibusComponent implements OnInit, OnDestroy {
     this.profileWhatsapp = this.stripPrefix(profile?.whatsapp ?? '');
     this.profileNome     = profile?.nome ?? '';
     await this.loadAlerts();
-    this.realtimeChannel = this.supabase.subscribeBusPriceCache(async () => {
-      await this.loadCachedPrices();
+    // Uma coleta altera varias linhas de bus_price_cache e cada uma dispara um
+    // evento; sem o debounce isso rodava loadCachedPrices() em rajada e os
+    // precos de todos os cards ficavam piscando (#147, mesmo caso dos voos).
+    this.realtimeChannel = this.supabase.subscribeBusPriceCache(() => {
+      clearTimeout(this.realtimeDebounce);
+      this.realtimeDebounce = setTimeout(() => this.loadCachedPrices(), 1000);
     });
     // tick a cada segundo para atualizar o countdown
     this.cooldownTick = setInterval(() => { this.cooldownNow = Date.now(); }, 1000);
@@ -628,6 +633,7 @@ export class OnibusComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.realtimeChannel?.unsubscribe();
+    clearTimeout(this.realtimeDebounce);
     clearInterval(this.cooldownTick);
   }
 
@@ -642,17 +648,13 @@ export class OnibusComponent implements OnInit, OnDestroy {
   async loadCachedPrices() {
     if (!this.alerts.length) return;
     this.pricesLoading = true;
-    const prices: Record<string, number> = {};
-    await Promise.all(
-      this.alerts.map(async (a) => {
-        const key = this.priceKey(a);
-        if (prices[key] === undefined) {
-          const p = await this.supabase.getBusCachedPrice(a.origem_slug, a.destino_slug, a.data_ida);
-          if (p !== null) prices[key] = p;
-        }
-      })
+    this.cachedPrices = await this.supabase.getBusCachedPricesForRoutes(
+      this.alerts.map(a => ({
+        origemSlug: a.origem_slug,
+        destinoSlug: a.destino_slug,
+        dataIda: a.data_ida
+      }))
     );
-    this.cachedPrices = prices;
     this.pricesLoading = false;
   }
 

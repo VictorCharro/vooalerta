@@ -357,19 +357,37 @@ export class SupabaseService {
     return this.client.from('bus_alerts').delete().eq('id', id);
   }
 
-  async getBusCachedPrice(origemSlug: string, destinoSlug: string, dataIda: string): Promise<number | null> {
+  // Uma query so pra todas as rotas da tela, no lugar de uma por rota (#148).
+  // Retorna um mapa com a chave no formato "origem-destino-data", o mesmo
+  // usado por priceKey() na tela de Onibus.
+  async getBusCachedPricesForRoutes(
+    rotas: { origemSlug: string; destinoSlug: string; dataIda: string }[]
+  ): Promise<Record<string, number>> {
+    if (rotas.length === 0) return {};
+
     const { data } = await this.client
       .from('bus_price_cache')
-      .select('preco')
-      .eq('origem_slug', origemSlug)
-      .eq('destino_slug', destinoSlug)
-      .eq('data_ida', dataIda)
+      .select('preco, origem_slug, destino_slug, data_ida, atualizado_em')
+      .in('origem_slug', [...new Set(rotas.map(r => r.origemSlug))])
+      .in('destino_slug', [...new Set(rotas.map(r => r.destinoSlug))])
+      .in('data_ida', [...new Set(rotas.map(r => r.dataIda))])
       .not('preco', 'is', null)
-      .order('atualizado_em', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('atualizado_em', { ascending: false });
 
-    return data?.preco ?? null;
+    // Os tres .in() formam um produto cartesiano, entao podem voltar
+    // combinacoes que ninguem pediu - por isso o filtro pelas rotas reais.
+    const pedidas = new Set(rotas.map(r => `${r.origemSlug}-${r.destinoSlug}-${r.dataIda}`));
+    const precos: Record<string, number> = {};
+
+    for (const row of data ?? []) {
+      const chave = `${row.origem_slug}-${row.destino_slug}-${row.data_ida}`;
+      // Ordenado por atualizado_em desc: a primeira ocorrencia e a mais recente.
+      if (pedidas.has(chave) && precos[chave] === undefined && typeof row.preco === 'number') {
+        precos[chave] = row.preco;
+      }
+    }
+
+    return precos;
   }
 
   async getBusCachedPriceDetails(origemSlug: string, destinoSlug: string, dataIda: string): Promise<{ preco: number; atualizado_em: string | null } | null> {
