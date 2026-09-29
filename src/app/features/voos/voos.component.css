@@ -158,6 +158,7 @@ h1 { font-size: 26px; margin-bottom: 4px; }
 .content-row { display: flex; align-items: flex-start; gap: 24px; }
 .list-column { flex: 1; min-width: 0; }
 .quick-panel { width: 340px; flex-shrink: 0; background: var(--color-bg-3); border-radius: var(--radius-md); padding: 0; overflow: visible; }
+.mobile-quick-panel { display: none; }
 .qp-header { display: flex; align-items: center; gap: 28px; margin: 0 -1px 20px; padding: 20px 0 0; }
 .qp-body { padding: 0 24px 24px; }
 .qp-badge { width: 48px; height: 48px; flex-shrink: 0; background: var(--color-bg-2); border-radius: 0 var(--radius-md) var(--radius-md) 0; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-soft); }
@@ -174,20 +175,3 @@ h1 { font-size: 26px; margin-bottom: 4px; }
 .qp-actions { display: flex; justify-content: center; margin-top: 12px; }
 .btn-edit { display: inline-flex; align-items: center; gap: 8px; height: 44px; background: var(--color-bg); color: var(--color-text); border: none; border-radius: var(--radius-lg); padding: 0 24px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background var(--transition); }
 .btn-edit:hover { background: var(--color-accent); }
-
-/* ── Responsive ──────────────────────────────────────────── */
-@media (max-width: 680px) {
-  .sidebar { width: 100%; height: auto; flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 16px; position: sticky; top: 0; z-index: 10; border-right: none; border-bottom: 1px solid var(--color-border); }
-  .sidebar-top { display: flex; align-items: center; gap: 16px; }
-  .brand { margin-bottom: 0; }
-  .sidebar-nav { flex-direction: row; }
-  .sidebar-bottom { flex-direction: row; align-items: center; gap: 8px; }
-  .user-email { display: none; }
-  .layout { flex-direction: column; }
-  .main { padding: 20px 16px; }
-  .stat-grid { grid-template-columns: repeat(2,1fr); }
-  .alert-card { gap: 12px; padding: 16px; }
-  .iata { font-size: 18px; }
-  .card-price-col { min-width: 90px; }
-  .card-price-value { font-size: 17px; }
-}

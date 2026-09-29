@@ -2,6 +2,7 @@
   "name": "vooalerta-frontend",
   "version": "1.0.0",
   "scripts": {
+    "prestart": "node scripts/ensure-env.js",
     "start": "ng serve",
     "build": "npx ng build",
     "build:prod": "node node_modules/@angular/cli/bin/ng build --configuration production",

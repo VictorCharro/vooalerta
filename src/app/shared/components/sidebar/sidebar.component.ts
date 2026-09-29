@@ -10,7 +10,7 @@ import { ButtonDirective } from 'primeng/button';
     imports: [FormsModule, ButtonDirective],
     styleUrls: ['./sidebar.component.css'],
     template: `
-    <aside class="sidebar">
+    <aside class="sidebar" [class.profile-open]="showProfileModal">
       <div class="sidebar-top">
         <div class="brand">
           <div class="brand-icon">
@@ -19,13 +19,13 @@ import { ButtonDirective } from 'primeng/button';
           <span class="brand-name">Viagem Alerta</span>
         </div>
         <nav class="sidebar-nav">
-          <button pButton severity="primary" class="nav-item" [class.active]="active === 'voos'" (click)="router.navigate(['/voos'])">
+          <button pButton severity="primary" class="nav-item" [class.active]="active === 'voos'" (click)="navigateTo('/voos')">
             <img class="nav-icon" src="assets/icons/icon_aviao.png" alt="" /><span class="nav-label">Voos</span>
           </button>
-          <button pButton severity="primary" class="nav-item" [class.active]="active === 'onibus'" (click)="router.navigate(['/onibus'])">
+          <button pButton severity="primary" class="nav-item" [class.active]="active === 'onibus'" (click)="navigateTo('/onibus')">
             <img class="nav-icon" src="assets/icons/icon_onibus.png" alt="" /><span class="nav-label">Ônibus</span>
           </button>
-          <button pButton severity="primary" class="nav-item" (click)="openProfileModal()">
+          <button pButton severity="primary" class="nav-item mobile-profile-active" (click)="openProfileModal()">
             <img class="nav-icon" src="assets/icons/icon_perfil.png" alt="" /><span class="nav-label">Perfil</span>
           </button>
         </nav>
@@ -41,10 +41,15 @@ import { ButtonDirective } from 'primeng/button';
     @if (showProfileModal) {
       <div class="modal-overlay" (click)="onOverlayClick($event)">
         <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+          <div class="mobile-profile-brand">
+            <div class="brand-icon"><img src="assets/icons/icon_aviao.png" alt="" /></div>
+            <span class="brand-name">Viagem Alerta</span>
+          </div>
           <div class="modal-head">
             <h2 id="profile-modal-title">Meu perfil</h2>
             <button class="btn-icon" (click)="closeProfileModal()" aria-label="Fechar">✕</button>
           </div>
+          <p class="mobile-profile-description">Gerencie seus dados e notificações</p>
           @if (profileLoading) {
             <div class="center-state" style="padding:32px">
               <div class="spinner spinner-dark" style="width:24px;height:24px;border-width:3px"></div>
@@ -72,8 +77,14 @@ import { ButtonDirective } from 'primeng/button';
                 </div>
                 <div class="form-group" style="margin-top:14px">
                   <label for="p-key">CallMeBot API Key</label>
-                  <input id="p-key" type="text" [(ngModel)]="profileForm.callmebot_key" name="callmebot_key"
-                    placeholder="Ex: 123456" />
+                  <div class="profile-key-input">
+                    <input id="p-key" type="text" [(ngModel)]="profileForm.callmebot_key" name="callmebot_key"
+                      [class.key-visible]="profileKeyVisible" placeholder="Ex: 123456" />
+                    <button type="button" class="profile-key-toggle" (click)="profileKeyVisible = !profileKeyVisible"
+                      [attr.aria-label]="profileKeyVisible ? 'Ocultar chave' : 'Mostrar chave'">
+                      {{ profileKeyVisible ? 'Ocultar' : 'Mostrar' }}
+                    </button>
+                  </div>
                     @if (!profileForm.callmebot_key) {
                       <span class="form-hint">
                         Não tem? Envie <strong>I allow callmebot to send me messages</strong> para
@@ -110,6 +121,7 @@ import { ButtonDirective } from 'primeng/button';
                       </button>
                     </div>
                   </div>
+                  <button type="button" class="mobile-profile-logout" (click)="logout()">Sair</button>
                 </form>
               }
             </div>
@@ -127,6 +139,7 @@ export class SidebarComponent implements OnInit {
   profileSaving    = false;
   profileError     = '';
   profileSuccess   = false;
+  profileKeyVisible = false;
   profileForm      = { nome: '', whatsapp: '', callmebot_key: '' };
 
   constructor(public router: Router, private supabase: SupabaseService) {}
@@ -138,8 +151,14 @@ export class SidebarComponent implements OnInit {
     this.router.navigate(['/login']);
   }
 
+  navigateTo(path: '/voos' | '/onibus') {
+    this.closeProfileModal();
+    this.router.navigate([path]);
+  }
+
   async openProfileModal() {
     this.showProfileModal = true;
+    this.profileKeyVisible = false;
     this.profileError     = '';
     this.profileSuccess   = false;
     this.profileLoading   = true;

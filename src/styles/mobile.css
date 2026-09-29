@@ -1,0 +1,168 @@
+/* Layout mobile das telas autenticadas. Regras ficam aqui para preservar o desktop. */
+app-onibus .empty-mobile-action { display: none; }
+app-voos .mobile-profile-location { display: none; }
+
+@media (max-width: 900px) {
+  app-voos .desktop-profile-location { display: none; }
+  app-voos .mobile-profile-location { display: inline; }
+  :is(app-voos, app-onibus) .layout.layout {
+    display: block;
+    min-height: 100dvh;
+    background: var(--color-bg-2);
+  }
+  :is(app-voos, app-onibus) .layout app-sidebar { display: block; width: 100%; }
+  :is(app-voos, app-onibus) .layout .main {
+    width: 100%;
+    padding: 28px 18px calc(112px + env(safe-area-inset-bottom));
+  }
+  :is(app-voos, app-onibus) .layout .greeting-header {
+    display: grid;
+    grid-template-columns: 4px minmax(0, 1fr);
+    column-gap: 14px;
+    row-gap: 22px;
+    margin-bottom: 30px;
+  }
+  :is(app-voos, app-onibus) .layout .greeting-bar { grid-column: 1; grid-row: 1; min-height: 80px; }
+  :is(app-voos, app-onibus) .layout .greeting-text { grid-column: 2; grid-row: 1; }
+  :is(app-voos, app-onibus) .layout .greeting-text h1 {
+    font-size: clamp(21px, 5.5vw, 26px);
+    line-height: 1.2;
+    font-weight: 700;
+    margin: 0 0 9px;
+  }
+  :is(app-voos, app-onibus) .layout .page-sub { font-size: 13px; }
+  :is(app-voos, app-onibus) .layout .greeting-actions {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: row-reverse;
+    width: 100%;
+    gap: 10px;
+  }
+  :is(app-voos, app-onibus) .layout .new-alert-btn { flex: 1; height: 48px; min-width: 0; }
+  :is(app-voos, app-onibus) .layout .favorite-btn { width: 48px; height: 48px; flex: 0 0 48px; background: var(--color-bg-3) !important; box-shadow: none; }
+  :is(app-voos, app-onibus) .layout .favorite-btn img { width: 25px; height: 25px; }
+  :is(app-voos, app-onibus) .layout .list-heading { font-size: 22px; margin-bottom: 16px; }
+  :is(app-voos, app-onibus) .layout .content-row { display: flex; flex-direction: column; gap: 18px; }
+  :is(app-voos, app-onibus) .layout .list-column { width: 100%; }
+  :is(app-voos, app-onibus) .layout .warn-banner,
+  :is(app-voos, app-onibus) .layout .price-banner { display: block; line-height: 1.5; }
+
+  :is(app-voos, app-onibus) .layout .empty-state {
+    min-height: 48dvh;
+    justify-content: center;
+    padding: 44px 14px 28px;
+  }
+  :is(app-voos, app-onibus) .layout .empty-icon {
+    width: 78px;
+    height: 78px;
+    object-fit: contain;
+    margin-bottom: 20px;
+    opacity: .55;
+  }
+  :is(app-voos, app-onibus) .layout .empty-state h3 { font-size: 19px; }
+  :is(app-voos, app-onibus) .layout .empty-state p { max-width: 300px; font-size: 14px; line-height: 1.5; }
+  app-onibus .layout .empty-mobile-action {
+    display: inline-flex;
+    width: 100%;
+    min-height: 48px;
+    margin-top: 26px;
+    padding: 0 16px;
+    background: var(--color-accent);
+    color: #fff;
+    border-radius: var(--radius-md);
+    font-weight: 700;
+  }
+
+  :is(app-voos, app-onibus) .layout .alerts-list { gap: 14px; }
+  :is(app-voos, app-onibus) .layout .alert-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 15px 8px;
+    padding: 18px;
+    border-radius: 16px;
+  }
+  :is(app-voos, app-onibus) .layout .drag-handle { display: none; }
+  :is(app-voos, app-onibus) .layout .card-route { min-width: 0; }
+  :is(app-voos, app-onibus) .layout .route-iata { gap: 5px; flex-wrap: wrap; }
+  app-voos .layout .iata { font-size: 20px; }
+  app-onibus .layout .city-name { font-size: 18px; overflow-wrap: anywhere; }
+  :is(app-voos, app-onibus) .layout .route-sep { font-size: 17px; }
+  :is(app-voos, app-onibus) .layout .route-date { font-size: 11px; line-height: 1.5; margin-top: 6px; }
+  :is(app-voos, app-onibus) .layout .route-countdown { font-size: 11px; margin-top: 4px; }
+  :is(app-voos, app-onibus) .layout .card-price-col { min-width: 94px; align-self: start; }
+  :is(app-voos, app-onibus) .layout .card-price-value { font-size: clamp(17px, 4.5vw, 21px); white-space: nowrap; }
+  :is(app-voos, app-onibus) .layout .card-price-diff { font-size: 11px; }
+  :is(app-voos, app-onibus) .layout .card-controls {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: center;
+    justify-items: center;
+    gap: 6px;
+    padding-top: 14px;
+    border-top: 1px solid var(--color-border-hover);
+  }
+  :is(app-voos, app-onibus) .layout .card-controls .toggle { width: 50px; }
+  :is(app-voos, app-onibus) .layout .card-controls :is(.open-btn, .refresh-btn, .share-btn, .chevron-btn, .card-favorite-btn) {
+    width: 100%;
+    max-width: 50px;
+    height: 44px;
+    min-width: 0;
+    padding: 0;
+  }
+  :is(app-voos, app-onibus) .layout .card-controls :is(.refresh-btn, .share-btn).btn-cooldown { min-width: 44px; }
+  :is(app-voos, app-onibus) .layout .quick-panel { width: 100%; margin: 0; }
+  app-voos .layout .desktop-quick-panel { display: none; }
+  app-voos .layout .mobile-quick-panel { display: block; }
+  :is(app-voos, app-onibus) .layout .qp-body { padding: 0 20px 22px; }
+  :is(app-voos, app-onibus) .layout .qp-route { min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; }
+  :is(app-voos, app-onibus) .layout .qp-item-noicon { padding-left: 0; }
+  :is(app-voos, app-onibus) .layout .toast-container { bottom: 96px; left: 18px; right: 18px; }
+
+  :is(app-voos, app-onibus) .layout .detail-header { flex-wrap: wrap; gap: 6px 14px; }
+  :is(app-voos, app-onibus) .layout .detail-title { font-size: 24px; }
+  :is(app-voos, app-onibus) .layout .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  :is(app-voos, app-onibus) .layout .stat-card { min-width: 0; padding: 13px; }
+  :is(app-voos, app-onibus) .layout .stat-card:last-child { grid-column: 1 / -1; }
+  :is(app-voos, app-onibus) .layout .stat-value { font-size: 20px; overflow-wrap: anywhere; }
+  :is(app-voos, app-onibus) .layout .detail-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  :is(app-voos, app-onibus) .layout .info-section { min-width: 0; padding: 18px; }
+  :is(app-voos, app-onibus) .layout .form-row { display: flex; flex-direction: column; gap: 14px; }
+  :is(app-voos, app-onibus) .layout .form-group { min-width: 0; }
+  :is(app-voos, app-onibus) .layout .detail-actions { gap: 10px; flex-wrap: wrap; }
+  :is(app-voos, app-onibus) .layout .detail-actions button { min-height: 44px; }
+
+  :is(app-voos, app-onibus) .modal-overlay.modal-overlay {
+    z-index: 150;
+    padding: 0;
+    align-items: stretch;
+    background: var(--color-bg-2);
+  }
+  :is(app-voos, app-onibus) .modal-overlay .modal {
+    max-width: none;
+    max-height: 100dvh;
+    min-height: 100dvh;
+    overflow-y: auto;
+    border: 0;
+    border-radius: 0;
+    padding: 22px 18px calc(40px + env(safe-area-inset-bottom));
+  }
+  :is(app-voos, app-onibus) .modal-overlay .modal-head h2 { font-size: 21px; }
+  :is(app-voos, app-onibus) .modal-overlay .form-row { display: flex; flex-direction: column; align-items: stretch !important; gap: 14px; }
+  :is(app-voos, app-onibus) .modal-overlay .form-row:has(.uf-input) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 80px;
+    align-items: end !important;
+  }
+  :is(app-voos, app-onibus) .modal-overlay .form-group { min-width: 0; width: 100%; }
+  :is(app-voos, app-onibus) .modal-overlay .form-group input { min-height: 44px; }
+  :is(app-voos, app-onibus) .modal-overlay .modal-actions { gap: 10px; }
+  :is(app-voos, app-onibus) .modal-overlay .modal-actions button { min-height: 48px; }
+}
+
+@media (max-width: 380px) {
+  :is(app-voos, app-onibus) .layout .alert-card { grid-template-columns: minmax(0, 1fr); }
+  :is(app-voos, app-onibus) .layout .card-price-col { text-align: left; }
+  :is(app-voos, app-onibus) .layout .price-skeleton { margin-left: 0; }
+}

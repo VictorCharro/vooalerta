@@ -62,12 +62,16 @@ Requisitos: Node 20+ e um projeto Supabase com as migrations aplicadas.
 npm install
 ```
 
-**Frontend.** Os arquivos `src/environments/environment*.ts` não vêm no repositório (são gerados no build). Crie-os a partir das variáveis de ambiente:
+**Frontend.** Os arquivos `src/environments/environment*.ts` não vêm no repositório (são gerados no build). Na primeira execução local, gere-os com a URL do projeto e a chave pública `anon`/`publishable` do Supabase. No PowerShell:
 
-```bash
-SUPABASE_URL=... SUPABASE_KEY=... node scripts/generate-env.js
+```powershell
+$env:SUPABASE_URL = 'https://seu-projeto.supabase.co'
+$env:SUPABASE_KEY = 'sua-chave-publica'
+node scripts/generate-env.js
 npm start
 ```
+
+Depois disso, `npm start` reutiliza os arquivos locais. Se estiverem ausentes, ele os gera automaticamente quando as duas variáveis estiverem definidas, ou mostra essas instruções. Não use a chave `service_role`/`secret` no frontend.
 
 **Coleta (monitor de voos ou worker).** Precisa do Chromium do Playwright e das chaves do backend como variáveis de ambiente:
 

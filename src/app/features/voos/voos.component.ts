@@ -59,7 +59,7 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
           <!-- Aviso callmebot_key ausente -->
           @if (missingCallmebotKey) {
             <div class="warn-banner fade-up">
-              ⚠️ Você ainda não cadastrou sua <strong>CallMeBot API Key</strong>. As notificações não serão enviadas. Acesse <strong>Perfil</strong> na sidebar para configurar.
+              ⚠️ Você ainda não cadastrou sua <strong>CallMeBot API Key</strong>. As notificações não serão enviadas. Acesse <strong>Perfil</strong><span class="desktop-profile-location"> na sidebar</span><span class="mobile-profile-location"> na navegação inferior</span> para configurar.
             </div>
           }
           <!-- Banners de alerta de preço -->
@@ -193,13 +193,17 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
                   </button>
                   </div>
                 </div>
+                @if (quickViewAlert?.id === alert.id) {
+                  <ng-container *ngTemplateOutlet="quickPanel; context: { placement: 'mobile' }"></ng-container>
+                }
               }
             </div>
           }
           </div>
           <!-- ══ PAINEL RÁPIDO ══ -->
+          <ng-template #quickPanel let-placement="placement">
           @if (quickViewAlert) {
-            <aside class="quick-panel fade-up">
+            <aside class="quick-panel fade-up" [class.mobile-quick-panel]="placement === 'mobile'" [class.desktop-quick-panel]="placement === 'desktop'">
               <div class="qp-header">
                 <div class="qp-badge">
                   <img src="assets/icons/icon_aviao.png" alt="" />
@@ -293,6 +297,10 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
               </div>
               </div>
             </aside>
+          }
+          </ng-template>
+          @if (quickViewAlert) {
+            <ng-container *ngTemplateOutlet="quickPanel; context: { placement: 'desktop' }"></ng-container>
           }
           </div>
         }

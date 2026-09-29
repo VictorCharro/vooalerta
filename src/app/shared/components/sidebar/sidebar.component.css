@@ -39,6 +39,54 @@
 .center-state { display: flex; justify-content: center; padding: 60px; }
 .btn-whatsapp { display: inline-flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap; height: 42px; padding: 0 20px; background: #0B7A1F; color: #fff; border-radius: var(--radius-md); font-size: 14px; font-weight: 600; text-decoration: none; transition: opacity var(--transition); }
 .btn-whatsapp:hover { opacity: 0.88; }
+.mobile-profile-brand, .mobile-profile-description, .mobile-profile-logout, .profile-key-toggle { display: none; }
+.profile-key-input { position: relative; }
 
 @keyframes fade-up { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }
 .fade-up { animation: fade-up 0.3s ease both; }
+
+@media (max-width: 900px) {
+  :host { display: block; width: 100%; }
+  .sidebar { width: 100%; height: auto; position: static; padding: 18px 18px 0; border: 0; background: var(--color-bg-2); }
+  .sidebar-top { display: block; }
+  .brand { margin: 0; gap: 10px; }
+  .brand-icon { width: 40px; height: 40px; border-radius: 10px; }
+  .brand-icon img { width: 28px; height: 28px; }
+  .brand-name { font-size: 16px; }
+  .sidebar-bottom { display: none; }
+  .sidebar-nav {
+    position: fixed; z-index: 120; left: 12px; right: 12px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    height: 72px; margin: 0; padding: 5px;
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;
+    background: var(--color-bg-3); border: 1px solid var(--color-border-hover);
+    border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,.4);
+  }
+  .nav-item { width: 100%; height: 60px; padding: 5px 2px; gap: 2px; flex-direction: column; justify-content: center; border-radius: 15px; background: transparent !important; box-shadow: none; font-size: 11px; }
+  .nav-icon { width: 21px; height: 21px; }
+  .nav-label { flex: none; }
+  .nav-item.active { background: var(--color-accent) !important; box-shadow: none; }
+  .profile-open .nav-item.active { background: transparent !important; }
+  .profile-open .mobile-profile-active { background: var(--color-accent) !important; }
+
+  .modal-overlay { inset: 0; padding: 0; z-index: 100; align-items: stretch; background: var(--color-bg-2); }
+  .modal { width: 100%; max-width: none; max-height: 100dvh; min-height: 100dvh; overflow-y: auto; border: 0; border-radius: 0; padding: 20px 18px calc(112px + env(safe-area-inset-bottom)); background: var(--color-bg-2); }
+  .mobile-profile-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+  .modal-head { padding-left: 14px; border-left: 4px solid var(--color-accent); margin-bottom: 3px; min-height: 40px; }
+  .modal-head h2 { font-size: 27px; }
+  .mobile-profile-description { display: block; padding-left: 18px; color: var(--color-text-muted); font-size: 14px; margin-bottom: 30px; }
+  .modal-head .btn-icon { width: 40px; height: 40px; }
+  .form-group label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  .form-group input { min-height: 48px; font-size: 16px; }
+  .phone-prefix { min-width: 48px; justify-content: center; }
+  .form-hint { font-size: 12px; }
+  .profile-key-input input:not(.key-visible) { -webkit-text-security: disc; padding-right: 84px; }
+  .profile-key-input input.key-visible { padding-right: 84px; }
+  .profile-key-toggle { display: inline-flex; position: absolute; right: 5px; top: 5px; height: 38px; padding: 0 8px; background: transparent; color: var(--color-text-muted); font-size: 11px; }
+  .modal-actions { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-top: 28px; }
+  .modal-actions > span { display: none; }
+  .modal-actions > div { width: 100%; }
+  .modal-actions .btn-ghost { display: none; }
+  .modal-save, .btn-whatsapp { width: 100%; min-height: 50px; }
+  .mobile-profile-logout { display: flex; width: 100%; min-height: 48px; margin-top: 12px; background: transparent; border: 1px solid var(--color-border-hover); color: var(--color-text); }
+}

@@ -85,6 +85,7 @@ interface BusAlert {
               <img class="empty-icon" src="assets/icons/icon_onibus.png" alt="" />
               <h3>Nenhum alerta de ônibus</h3>
               <p>Crie um alerta e receba no WhatsApp quando a passagem cair.</p>
+              <button type="button" class="empty-mobile-action" (click)="openModal()">Criar alerta de ônibus</button>
             </div>
           }
           <!-- Cards de alertas -->
