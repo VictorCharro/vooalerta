@@ -75,6 +75,7 @@ app-voos .mobile-profile-location { display: none; }
   }
 
   :is(app-voos, app-onibus) .layout .alerts-list { gap: 14px; }
+  app-voos .layout .alerts-list { grid-template-columns: minmax(0, 1fr); min-width: 0; }
   :is(app-voos, app-onibus) .layout .alert-card {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -114,10 +115,11 @@ app-voos .mobile-profile-location { display: none; }
   :is(app-voos, app-onibus) .layout .card-controls :is(.refresh-btn, .share-btn).btn-cooldown { min-width: 44px; }
   :is(app-voos, app-onibus) .layout .quick-panel { width: 100%; margin: 0; }
   app-voos .layout .desktop-quick-panel { display: none; }
-  app-voos .layout .mobile-quick-panel { display: block; }
+  app-voos .layout .mobile-quick-panel { display: block; min-width: 0; max-width: 100%; overflow: hidden; }
   :is(app-voos, app-onibus) .layout .qp-body { padding: 0 20px 22px; }
   :is(app-voos, app-onibus) .layout .qp-route { min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; }
   :is(app-voos, app-onibus) .layout .qp-item-noicon { padding-left: 0; }
+  app-voos .layout .mobile-quick-panel .qp-value { overflow-wrap: anywhere; }
   :is(app-voos, app-onibus) .layout .toast-container { bottom: 96px; left: 18px; right: 18px; }
 
   :is(app-voos, app-onibus) .layout .detail-header { flex-wrap: wrap; gap: 6px 14px; }
