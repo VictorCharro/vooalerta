@@ -113,6 +113,11 @@ app-voos .mobile-profile-location { display: none; }
     padding: 0;
   }
   :is(app-voos, app-onibus) .layout .card-controls :is(.refresh-btn, .share-btn).btn-cooldown { min-width: 44px; }
+  :is(app-voos, app-onibus) .layout .chevron-btn img { transition: transform 200ms ease; }
+  :is(app-voos, app-onibus) .layout .chevron-btn.active img { transform: rotate(90deg); }
+  @media (prefers-reduced-motion: reduce) {
+    :is(app-voos, app-onibus) .layout .chevron-btn img { transition: none; }
+  }
   :is(app-voos, app-onibus) .layout .quick-panel { width: 100%; margin: 0; }
   app-voos .layout .desktop-quick-panel { display: none; }
   app-voos .layout .mobile-quick-panel { display: block; min-width: 0; max-width: 100%; overflow: hidden; }
