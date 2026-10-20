@@ -26,5 +26,6 @@ npm-debug.log*
 
 # Contexto Claude Code
 CLAUDE.md
+.claude/
 .env.local
 .env
