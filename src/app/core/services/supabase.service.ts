@@ -2,6 +2,7 @@ import {Injectable} from '@angular/core';
 import {createClient, SupabaseClient, User} from '@supabase/supabase-js';
 import {environment} from '@env/environment';
 import {Alert, AlertCreate} from '@core/models/alert.model';
+import {FavoriteRoute, FavoriteRouteCreate} from '@core/models/favorite-route.model';
 
 @Injectable({providedIn: 'root'})
 export class SupabaseService {
@@ -420,6 +421,44 @@ export class SupabaseService {
     });
     if (error || data?.error) return null;
     return data?.preco ?? null;
+  }
+
+  // -- Rotas favoritas -------------------------------------------
+  // A rota favorita guarda os parametros do alerta SEM as datas (tabela
+  // favorite_routes, migration 019). As duas telas usam os mesmos metodos:
+  // o que muda e o "tipo" e o significado dos slugs.
+
+  async getFavoriteRoutes(tipo: 'voo' | 'onibus') {
+    const { data: { session } } = await this.client.auth.getSession();
+    if (!session) return { data: [] as FavoriteRoute[], error: null };
+
+    return this.client
+      .from('favorite_routes')
+      .select('*')
+      .eq('tipo', tipo)
+      .order('criado_em', { ascending: false });
+  }
+
+  // Upsert, nao insert: favoritar a mesma rota de novo cai no indice unico
+  // (user_id, tipo, origem_slug, destino_slug) e atualiza a meta/horario com
+  // os do alerta mais recente, em vez de estourar erro de duplicada.
+  async addFavoriteRoute(payload: FavoriteRouteCreate) {
+    const { data: { session } } = await this.client.auth.getSession();
+    if (!session) return { data: null, error: new Error('Nao autenticado') };
+
+    return this.client
+      .from('favorite_routes')
+      .upsert(
+        { ...payload, user_id: session.user.id },
+        { onConflict: 'user_id,tipo,origem_slug,destino_slug' }
+      );
+  }
+
+  async removeFavoriteRoute(id: string) {
+    return this.client
+      .from('favorite_routes')
+      .delete()
+      .eq('id', id);
   }
 
   subscribeBusPriceCache(callback: () => void) {

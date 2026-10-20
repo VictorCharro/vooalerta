@@ -98,7 +98,8 @@ vooalerta/
         ├── 015_drop_scrape_lock.sql              # remove a tabela órfã scrape_lock (ver 008/009/010)
         ├── 016_bus_alerts_ordem.sql              # coluna ordem em bus_alerts, mesmo drag-and-drop da tela de Ônibus
         ├── 017_refresh_jobs_user_id.sql          # coluna user_id em refresh_jobs — o dono do job, pra /api/job-status não entregar job de outro usuário
-        └── 018_price_history.sql                 # tabela price_history (append-only) — histórico de preço por rota, que o price_cache não guarda
+        ├── 018_price_history.sql                 # tabela price_history (append-only) — histórico de preço por rota, que o price_cache não guarda
+        └── 019_favorite_routes.sql               # tabela favorite_routes — rota salva sem as datas, pros dois tipos de alerta (voo e ônibus)
 ```
 
 ---
@@ -126,6 +127,7 @@ vooalerta/
 - **`price_history`** — append-only: uma linha por coleta bem-sucedida, com o menor preço e a fonte vencedora (`maxmilhas`/`google`). Existe porque o `price_cache` guarda só a foto do momento — a cada coleta as linhas da rota são substituídas e o histórico se perderia. É a base pro gráfico de tendência e pro alerta de queda (#149). RLS igual à do `price_cache`: leitura pública, escrita só via `service_role`.
 - **`notifications`** — controle anti-spam 6h por alerta
 - **`profiles`** — whatsapp + callmebot_key por usuário
+- **`favorite_routes`** — rota salva **sem as datas** (`tipo` voo/onibus, origem/destino + slugs, meta, horario_minimo, so_direto). Serve as duas telas: em voo os slugs são o próprio IATA em minúsculo; em ônibus são os slugs da Buser, porque é o slug que identifica a rota — "Franca-SP" e "Franca-MG" têm o mesmo nome legível e precisam coexistir. Existe porque um alerta morre quando a data de ida passa, mas a rota continua valendo: sem isso o usuário redigitava origem, destino, meta, horário e só-direto na mão pra monitorar a mesma viagem de novo. Índice único em (`user_id`, `tipo`, `origem_slug`, `destino_slug`) — favoritar a mesma rota de novo é upsert e atualiza a meta/horário em vez de duplicar. RLS: cada usuário só vê/edita as próprias.
 - **`refresh_jobs`** — fila de atualização manual (status `pending` → `processing` → `done`/`error`, com preco/link/fontes do resultado). Tem `user_id` (o dono do job): `/api/job-status` filtra por ele, então ninguém lê o resultado de job alheio, e o reaproveitamento de job em cliques repetidos é por rota **e** por usuário. Sem policies públicas: só `service_role` lê/escreve (via `api/*` e worker).
 
 ### Tabelas de ônibus (separadas, sem conflito)
@@ -251,7 +253,15 @@ Redesign em andamento baseado no Figma, migrando de CSS custom pra **PrimeNG** (
 --color-amber:        #D17300
 ```
 
-`providePrimeNG` é registrado em `app.config.ts` com `options.darkModeSelector: false`. O app só tem tema escuro — o toggle de tema claro/escuro e as variáveis `html[data-theme="light"]` foram removidos de vez (não era usado e não estava nos planos ter tema claro). O botão de favoritos na sidebar continua desabilitado, até ser implementado de verdade.
+`providePrimeNG` é registrado em `app.config.ts` com `options.darkModeSelector: false`. O app só tem tema escuro — o toggle de tema claro/escuro e as variáveis `html[data-theme="light"]` foram removidos de vez (não era usado e não estava nos planos ter tema claro). Os dois botões de favoritos (o do header, ao lado de "+ Novo Alerta", e a estrela de cada card) estavam desabilitados com `title="Em breve"` e agora funcionam. São três caminhos pra mesma lista de `favorite_routes`:
+
+- **Estrela do card** — atalho: salva/remove a rota daquele alerta, sem as datas. Estado favoritado = borda e fundo no accent (`.card-favorite-btn.is-favorite`).
+- **Botão do header** — abre o **gerenciador de favoritos**, um modal próprio que não cria alerta nenhum. Lista as rotas salvas (rota, meta e, em voo, horário/só-direto), cada uma com um botão **Usar** e um de excluir, e embaixo um formulário "Nova rota favorita" pra criar do zero, sem precisar ter um alerta antes. **Usar** fecha o gerenciador, abre o modal "Novo alerta" já preenchido e deixa o dropdown marcando a rota. Em ônibus o formulário valida as duas cidades no Buser (em paralelo) antes de salvar — senão o erro só apareceria muito depois, na criação do alerta de verdade.
+- **Dropdown no modal "Novo alerta"** — um `p-select` com as rotas salvas, que preenche tudo menos as datas. É dropdown e não uma fileira de chips porque com muitos favoritos os chips ocupariam meia tela; o filtro de busca aparece sozinho acima de 6 rotas.
+
+As opções do dropdown ficam num campo (`favoriteOptions`), atualizado por `atualizarOpcoesFavoritas()`, e não num getter: um getter devolveria um array novo a cada ciclo de detecção de mudança e o `p-select` remontaria a lista a cada tick.
+
+O único layout novo é o modal do gerenciador, que reaproveita as classes de modal já existentes; o resto ocupa slots que já estavam no design.
 
 Fonte `Mulish` (Google Fonts, carregada em `src/index.html`) é usada especificamente no título de saudação ("Olá, {nome}! Qual será sua próxima viagem?") das páginas de Voos e Ônibus; o resto do texto continua em Inter (`--font-display`/`--font-body`).
 

@@ -4,18 +4,20 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SupabaseService } from '@core/services/supabase.service';
 import { Alert, AlertCreate } from '@core/models/alert.model';
+import { FavoriteRoute } from '@core/models/favorite-route.model';
 import { AirportSearchComponent } from '@shared/components/airport-search/airport-search.component';
 import { DatePickerComponent } from '@shared/components/date-picker/date-picker.component';
 import { TimePickerComponent } from '@shared/components/time-picker/time-picker.component';
 import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
 import { ButtonDirective } from 'primeng/button';
 import { InputNumber } from 'primeng/inputnumber';
+import { Select } from 'primeng/select';
 
 type JobStatus = { status: string; preco: number | null; link?: string; warning?: string; error?: string };
 
 @Component({
     selector: 'app-voos',
-    imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent, ButtonDirective, InputNumber],
+    imports: [CommonModule, FormsModule, AirportSearchComponent, DatePickerComponent, TimePickerComponent, SidebarComponent, ButtonDirective, InputNumber, Select],
     styleUrls: ['./voos.component.css'],
     template: `
     <div class="layout">
@@ -47,7 +49,8 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
               }
             </div>
             <div class="greeting-actions">
-              <button pButton severity="primary" class="favorite-btn" disabled aria-label="Favoritos" title="Em breve">
+              <button pButton severity="primary" class="favorite-btn" (click)="openFavoritos()"
+                aria-label="Rotas favoritas" title="Criar alerta a partir de uma rota favorita">
                 <img src="assets/icons/icon_favorito.png" alt="" />
               </button>
               <button pButton severity="primary" class="new-alert-btn" (click)="openModal()">+ Novo Alerta</button>
@@ -188,7 +191,13 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
                     <button class="chevron-btn" [class.active]="quickViewAlert?.id === alert.id" (click)="openQuickView(alert)" title="Ver detalhes">
                     <img src="assets/icons/icon_expandir.png" alt="" />
                   </button>
-                  <button class="card-favorite-btn" disabled title="Em breve" aria-label="Favoritar">
+                  <button class="card-favorite-btn"
+                    [class.is-favorite]="isFavorite(alert)"
+                    [disabled]="favoritingKey === favKey(alert)"
+                    (click)="toggleFavorite(alert)"
+                    [title]="isFavorite(alert) ? 'Remover dos favoritos' : 'Salvar rota nos favoritos'"
+                    [attr.aria-pressed]="isFavorite(alert)"
+                    aria-label="Favoritar rota">
                     <img src="assets/icons/icon_favorito.png" alt="" />
                   </button>
                   </div>
@@ -511,6 +520,21 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
                   <button class="btn-icon" (click)="closeModal()" aria-label="Fechar">✕</button>
                 </div>
                 <form (ngSubmit)="saveAlert()">
+                  @if (favoriteOptions.length > 0) {
+                    <div class="form-group fav-row">
+                      <label for="m-favorita">Usar uma rota favorita <span class="form-optional">(opcional)</span></label>
+                      <p-select inputId="m-favorita" name="favorita"
+                        [options]="favoriteOptions" optionLabel="label" optionValue="value"
+                        [(ngModel)]="favoritaSelecionada"
+                        placeholder="Selecionar rota favorita"
+                        [showClear]="true"
+                        [filter]="favoriteOptions.length > 6"
+                        filterPlaceholder="Buscar rota"
+                        styleClass="fav-select"
+                        (onChange)="aplicarRotaFavoritaPorId($event.value)" />
+                      <span class="form-hint">Preenche tudo menos as datas</span>
+                    </div>
+                  }
                   <div class="form-row" style="align-items: flex-start">
                     <div class="form-group">
                       <label>Origem</label>
@@ -628,6 +652,110 @@ type JobStatus = { status: string; preco: number | null; link?: string; warning?
                   </div>
                 </div>
               }
+
+          <!-- GERENCIADOR DE FAVORITOS -->
+          @if (showFavModal) {
+            <div class="modal-overlay" (click)="onFavOverlayClick($event)">
+              <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="fav-modal-title">
+                <div class="modal-head">
+                  <h2 id="fav-modal-title">Rotas favoritas</h2>
+                  <button class="btn-icon" (click)="closeFavModal()" aria-label="Fechar">&#10005;</button>
+                </div>
+
+                @if (favorites.length === 0) {
+                  <p class="fav-empty">Nenhuma rota favorita ainda. Crie uma abaixo ou use a estrela no card de um alerta.</p>
+                }
+                @if (favorites.length > 0) {
+                  <ul class="fav-list">
+                    @for (f of favorites; track f.id) {
+                      <li class="fav-item">
+                        <div class="fav-item-info">
+                          <span class="fav-item-rota">{{ f.origem }} &rarr; {{ f.destino }}</span>
+                          <span class="fav-item-sub">
+                            {{ f.meta ? 'Meta R$ ' + (f.meta | number:'1.0-0') : 'Sem meta' }}
+                            @if (f.horario_minimo) {
+                              &middot; a partir de {{ f.horario_minimo.slice(0, 5) }}
+                            }
+                            @if (f.so_direto) {
+                              &middot; s&oacute; direto
+                            }
+                          </span>
+                        </div>
+                        <div class="fav-item-actions">
+                          <button type="button" class="fav-use-btn" (click)="usarFavorito(f)"
+                            title="Criar alerta com esta rota">Usar</button>
+                          <button type="button" class="fav-del-btn" (click)="removerFavorito(f)"
+                            title="Excluir favorito" aria-label="Excluir favorito"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
+                        </div>
+                      </li>
+                    }
+                  </ul>
+                }
+
+                <form (ngSubmit)="salvarFavorito()">
+                  <h3 class="fav-create-title">Nova rota favorita</h3>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Origem</label>
+                      <app-airport-search
+                        inputId="fav-origem"
+                        placeholder="GRU &mdash; S&atilde;o Paulo"
+                        [value]="favForm.origem"
+                        (selected)="favForm.origem = $event">
+                      </app-airport-search>
+                    </div>
+                    <div class="form-group">
+                      <label>Destino</label>
+                      <app-airport-search
+                        inputId="fav-destino"
+                        placeholder="LIS &mdash; Lisboa"
+                        [value]="favForm.destino"
+                        (selected)="favForm.destino = $event">
+                      </app-airport-search>
+                    </div>
+                  </div>
+                  <div class="form-row" style="margin-top:14px">
+                    <div class="form-group">
+                      <label for="fav-meta">Meta de pre&ccedil;o (R$) <span class="form-optional">(opcional)</span></label>
+                      <p-inputNumber inputId="fav-meta" [(ngModel)]="favForm.meta" name="fav_meta"
+                        placeholder="3000" [min]="1" [showButtons]="true" styleClass="meta-input" />
+                    </div>
+                    <div class="form-group">
+                      <label for="fav-horario">Hor&aacute;rio a partir de <span class="form-optional">(opcional)</span></label>
+                      <app-time-picker name="fav_horario"
+                        [value]="favForm.horario_minimo"
+                        (valueChange)="favForm.horario_minimo = $event">
+                      </app-time-picker>
+                    </div>
+                  </div>
+                  <div class="form-group" style="margin-top:14px">
+                    <label class="toggle-label">
+                      <label class="toggle" style="width:38px;height:22px">
+                        <input type="checkbox" [(ngModel)]="favForm.so_direto" name="fav_so_direto" />
+                        <span class="track"></span>
+                        <span class="thumb"></span>
+                      </label>
+                      <span style="font-size:14px;color:var(--color-text)">Somente voos diretos</span>
+                    </label>
+                  </div>
+                  @if (favFormError) {
+                    <div class="error-box" style="margin-top:14px">{{ favFormError }}</div>
+                  }
+                  <div class="modal-actions">
+                    <button type="button" class="btn-ghost" (click)="closeFavModal()">Fechar</button>
+                    <button type="submit" class="btn-primary modal-save" [disabled]="savingFav">
+                      @if (savingFav) {
+                        <span class="spinner"></span>
+                      }
+                      @if (!savingFav) {
+                        <span>Salvar favorito</span>
+                      }
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          }
     
             </div>
     `
@@ -665,6 +793,20 @@ export class VoosComponent implements OnInit, OnDestroy {
   origens: string[] = [];
   origenInput = '';
 
+  favorites: FavoriteRoute[] = [];
+  favoritingKey: string | null = null;
+
+  // Opcoes do dropdown mantidas num campo, e nao num getter: um getter
+  // devolveria um array novo em cada ciclo de deteccao de mudanca e o
+  // p-select remontaria a lista toda a cada tick.
+  favoriteOptions: { label: string; value: string }[] = [];
+  favoritaSelecionada: string | null = null;
+
+  showFavModal = false;
+  savingFav    = false;
+  favFormError = '';
+  favForm      = this.emptyFavForm();
+
   form: Partial<Alert & { so_ida: boolean }> = this.emptyForm();
   readonly today = new Date().toISOString().split('T')[0];
 
@@ -699,7 +841,7 @@ export class VoosComponent implements OnInit, OnDestroy {
     this.missingCallmebotKey = !profile?.callmebot_key;
     this.profileWhatsapp     = this.stripPrefix(profile?.whatsapp ?? '');
     this.profileNome         = profile?.nome ?? '';
-    await this.loadAlerts();
+    await Promise.all([this.loadAlerts(), this.loadFavorites()]);
 
     // Uma coleta salva dezenas de linhas em price_cache (DELETE + INSERT em
     // lote), e cada linha dispara um evento de realtime separado. Sem o
@@ -960,6 +1102,183 @@ export class VoosComponent implements OnInit, OnDestroy {
     this.profileNome = event.nome;
   }
 
+  // -- Rotas favoritas ------------------------------------------
+  // A rota favorita guarda os parametros do alerta sem as datas, porque a
+  // rota se repete e a data nao: quando a data de ida passa o card vira
+  // "Viagem realizada" e antes disso era preciso redigitar tudo pra
+  // monitorar a mesma viagem de novo. Pro voo o slug e o proprio IATA em
+  // minusculo - e o que identifica a rota na tabela (migration 019).
+
+  async loadFavorites() {
+    const { data } = await this.supabase.getFavoriteRoutes('voo');
+    this.favorites = (data as FavoriteRoute[]) ?? [];
+    this.atualizarOpcoesFavoritas();
+  }
+
+  private atualizarOpcoesFavoritas() {
+    this.favoriteOptions = this.favorites.map(f => ({
+      label: `${f.origem} → ${f.destino}` + (f.meta ? ` · R$ ${Math.round(f.meta)}` : ''),
+      value: f.id!
+    }));
+  }
+
+  favKey(alert: Alert): string {
+    return `${alert.origem.toLowerCase()}|${alert.destino.toLowerCase()}`;
+  }
+
+  private getFavorite(alert: Alert): FavoriteRoute | null {
+    return this.favorites.find(f =>
+      f.origem_slug === alert.origem.toLowerCase() &&
+      f.destino_slug === alert.destino.toLowerCase()
+    ) ?? null;
+  }
+
+  isFavorite(alert: Alert): boolean {
+    return this.getFavorite(alert) !== null;
+  }
+
+  async toggleFavorite(alert: Alert) {
+    const key = this.favKey(alert);
+    if (this.favoritingKey === key) return;
+    this.favoritingKey = key;
+
+    const existente = this.getFavorite(alert);
+    if (existente) {
+      const { error } = await this.supabase.removeFavoriteRoute(existente.id!);
+      if (error) {
+        this.showToast('Erro ao remover dos favoritos.');
+      } else {
+        this.favorites = this.favorites.filter(f => f.id !== existente.id);
+        this.atualizarOpcoesFavoritas();
+        this.showToast(`${alert.origem} → ${alert.destino} saiu dos favoritos`);
+      }
+    } else {
+      const { error } = await this.supabase.addFavoriteRoute({
+        tipo:           'voo',
+        origem:         alert.origem,
+        destino:        alert.destino,
+        origem_slug:    alert.origem.toLowerCase(),
+        destino_slug:   alert.destino.toLowerCase(),
+        meta:           alert.meta,
+        horario_minimo: alert.horario_minimo ?? null,
+        so_direto:      alert.so_direto
+      });
+      if (error) {
+        this.showToast('Erro ao salvar nos favoritos.');
+      } else {
+        await this.loadFavorites();
+        this.showToast(`${alert.origem} → ${alert.destino} salvo nos favoritos`);
+      }
+    }
+
+    this.favoritingKey = null;
+  }
+
+  // Leva a rota pro modal de novo alerta ja preenchido: o gerenciador so
+  // gerencia, quem cria alerta e o outro modal.
+  usarFavorito(fav: FavoriteRoute) {
+    this.closeFavModal();
+    this.openModal();
+    this.aplicarRotaFavorita(fav);
+    this.favoritaSelecionada = fav.id!;
+  }
+
+  aplicarRotaFavoritaPorId(id: string | null) {
+    const fav = this.favorites.find(f => f.id === id);
+    if (fav) this.aplicarRotaFavorita(fav);
+  }
+
+  // Preenche tudo menos as datas - elas sao justamente o que muda a cada
+  // viagem. A origem entra como chip porque o modal aceita varias.
+  aplicarRotaFavorita(fav: FavoriteRoute) {
+    if (!this.origens.includes(fav.origem)) this.origens.push(fav.origem);
+    this.form.destino        = fav.destino;
+    this.form.meta           = fav.meta ?? undefined;
+    this.form.horario_minimo = fav.horario_minimo || '00:00';
+    this.form.so_direto      = fav.so_direto;
+    this.formError           = '';
+  }
+
+  async removerFavorito(fav: FavoriteRoute) {
+    const { error } = await this.supabase.removeFavoriteRoute(fav.id!);
+    if (error) {
+      this.showToast('Erro ao remover dos favoritos.');
+      return;
+    }
+    this.favorites = this.favorites.filter(f => f.id !== fav.id);
+    this.atualizarOpcoesFavoritas();
+    if (this.favoritaSelecionada === fav.id) this.favoritaSelecionada = null;
+  }
+
+  // Botao de favoritos do header: gerenciador proprio, sem relacao com o
+  // modal de novo alerta - aqui se cria e se exclui rota favorita, e nada
+  // vira alerta. Pra usar uma favorita existe o dropdown no outro modal.
+  openFavoritos() {
+    this.favForm      = this.emptyFavForm();
+    this.favFormError = '';
+    this.showFavModal = true;
+  }
+
+  closeFavModal() {
+    this.showFavModal = false;
+    this.favFormError = '';
+  }
+
+  onFavOverlayClick(e: Event) {
+    if ((e.target as HTMLElement).classList.contains('modal-overlay')) this.closeFavModal();
+  }
+
+  async salvarFavorito() {
+    const origem  = (this.favForm.origem ?? '').trim().toUpperCase();
+    const destino = (this.favForm.destino ?? '').trim().toUpperCase();
+
+    if (!/^[A-Z]{3}$/.test(origem) || !/^[A-Z]{3}$/.test(destino)) {
+      this.favFormError = 'Escolha origem e destino na lista de aeroportos.';
+      return;
+    }
+    if (origem === destino) {
+      this.favFormError = 'Origem e destino não podem ser iguais.';
+      return;
+    }
+
+    this.savingFav    = true;
+    this.favFormError = '';
+
+    const { error } = await this.supabase.addFavoriteRoute({
+      tipo:           'voo',
+      origem,
+      destino,
+      origem_slug:    origem.toLowerCase(),
+      destino_slug:   destino.toLowerCase(),
+      meta:           this.favForm.meta ?? null,
+      horario_minimo: (this.favForm.horario_minimo && this.favForm.horario_minimo !== '00:00')
+                        ? this.favForm.horario_minimo
+                        : null,
+      so_direto:      this.favForm.so_direto
+    });
+
+    if (error) {
+      this.favFormError = this.supabase.isSessionError(error)
+        ? 'Sua sessão expirou. Faça login novamente.'
+        : 'Erro ao salvar a rota favorita. Tente novamente.';
+    } else {
+      await this.loadFavorites();
+      this.favForm = this.emptyFavForm();
+      this.showToast(`${origem} → ${destino} salvo nos favoritos`);
+    }
+
+    this.savingFav = false;
+  }
+
+  private emptyFavForm() {
+    return {
+      origem: '', destino: '',
+      meta: undefined as number | undefined,
+      horario_minimo: '00:00',
+      so_direto: false
+    };
+  }
+
   openModal() {
     this.editingId     = null;
     this.form          = this.emptyForm();
@@ -967,6 +1286,7 @@ export class VoosComponent implements OnInit, OnDestroy {
     this.formError     = '';
     this.origens       = [];
     this.origenInput   = '';
+    this.favoritaSelecionada = null;
     this.showModal     = true;
   }
 

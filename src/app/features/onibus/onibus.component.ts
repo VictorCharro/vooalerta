@@ -7,6 +7,8 @@ import { DatePickerComponent } from '@shared/components/date-picker/date-picker.
 import { SidebarComponent } from '@shared/components/sidebar/sidebar.component';
 import { ButtonDirective } from 'primeng/button';
 import { InputNumber } from 'primeng/inputnumber';
+import { Select } from 'primeng/select';
+import { FavoriteRoute } from '@core/models/favorite-route.model';
 
 interface BusAlert {
   id: string;
@@ -25,7 +27,7 @@ interface BusAlert {
 
 @Component({
     selector: 'app-onibus',
-    imports: [CommonModule, FormsModule, DatePickerComponent, SidebarComponent, ButtonDirective, InputNumber],
+    imports: [CommonModule, FormsModule, DatePickerComponent, SidebarComponent, ButtonDirective, InputNumber, Select],
     styleUrls: ['./onibus.component.css'],
     template: `
     <div class="layout">
@@ -64,7 +66,8 @@ interface BusAlert {
               }
             </div>
             <div class="greeting-actions">
-              <button pButton severity="primary" class="favorite-btn" disabled aria-label="Favoritos" title="Em breve">
+              <button pButton severity="primary" class="favorite-btn" (click)="openFavoritos()"
+                aria-label="Rotas favoritas" title="Criar alerta a partir de uma rota favorita">
                 <img src="assets/icons/icon_favorito.png" alt="" />
               </button>
               <button pButton severity="primary" class="new-alert-btn" (click)="openModal()">+ Novo Alerta</button>
@@ -192,7 +195,13 @@ interface BusAlert {
                     <button class="chevron-btn" [class.active]="quickViewAlert?.id === alert.id" (click)="openQuickView(alert)" title="Ver detalhes">
                       <img src="assets/icons/icon_expandir.png" alt="" />
                     </button>
-                    <button class="card-favorite-btn" disabled title="Em breve" aria-label="Favoritar">
+                    <button class="card-favorite-btn"
+                      [class.is-favorite]="isFavorite(alert)"
+                      [disabled]="favoritingKey === favKey(alert)"
+                      (click)="toggleFavorite(alert)"
+                      [title]="isFavorite(alert) ? 'Remover dos favoritos' : 'Salvar rota nos favoritos'"
+                      [attr.aria-pressed]="isFavorite(alert)"
+                      aria-label="Favoritar rota">
                       <img src="assets/icons/icon_favorito.png" alt="" />
                     </button>
                   </div>
@@ -463,6 +472,21 @@ interface BusAlert {
                     <button class="btn-icon" (click)="closeModal()" aria-label="Fechar">✕</button>
                   </div>
                   <form (ngSubmit)="saveAlert()">
+                    @if (favoriteOptions.length > 0) {
+                      <div class="form-group fav-row">
+                        <label for="bus-favorita">Usar uma rota favorita <span class="form-optional">(opcional)</span></label>
+                        <p-select inputId="bus-favorita" name="favorita"
+                          [options]="favoriteOptions" optionLabel="label" optionValue="value"
+                          [(ngModel)]="favoritaSelecionada"
+                          placeholder="Selecionar rota favorita"
+                          [showClear]="true"
+                          [filter]="favoriteOptions.length > 6"
+                          filterPlaceholder="Buscar rota"
+                          styleClass="fav-select"
+                          (onChange)="aplicarRotaFavoritaPorId($event.value)" />
+                        <span class="form-hint">Preenche tudo menos as datas</span>
+                      </div>
+                    }
                     <div class="form-row" style="align-items:flex-start">
                       <div class="form-group">
                         <label>Cidade de origem</label>
@@ -556,6 +580,89 @@ interface BusAlert {
                             </div>
                           </div>
                         }
+
+            <!-- GERENCIADOR DE FAVORITOS -->
+            @if (showFavModal) {
+              <div class="modal-overlay" (click)="onFavOverlayClick($event)">
+                <div class="modal fade-up" role="dialog" aria-modal="true" aria-labelledby="bus-fav-modal-title">
+                  <div class="modal-head">
+                    <h2 id="bus-fav-modal-title">Rotas favoritas</h2>
+                    <button class="btn-icon" (click)="closeFavModal()" aria-label="Fechar">&#10005;</button>
+                  </div>
+
+                  @if (favorites.length === 0) {
+                    <p class="fav-empty">Nenhuma rota favorita ainda. Crie uma abaixo ou use a estrela no card de um alerta.</p>
+                  }
+                  @if (favorites.length > 0) {
+                    <ul class="fav-list">
+                      @for (f of favorites; track f.id) {
+                        <li class="fav-item">
+                          <div class="fav-item-info">
+                            <span class="fav-item-rota">{{ f.origem }} &rarr; {{ f.destino }}</span>
+                            <span class="fav-item-sub">
+                              {{ f.meta ? 'Meta R$ ' + (f.meta | number:'1.0-0') : 'Sem meta' }}
+                            </span>
+                          </div>
+                          <div class="fav-item-actions">
+                            <button type="button" class="fav-use-btn" (click)="usarFavorito(f)"
+                              title="Criar alerta com esta rota">Usar</button>
+                            <button type="button" class="fav-del-btn" (click)="removerFavorito(f)"
+                              title="Excluir favorito" aria-label="Excluir favorito"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
+                          </div>
+                        </li>
+                      }
+                    </ul>
+                  }
+
+                  <form (ngSubmit)="salvarFavorito()">
+                    <h3 class="fav-create-title">Nova rota favorita</h3>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label for="fav-origem">Cidade de origem</label>
+                        <input id="fav-origem" [(ngModel)]="favForm.origem" name="fav_origem" placeholder="Ex: Franca" />
+                      </div>
+                      <div class="form-group">
+                        <label for="fav-origem-uf">UF</label>
+                        <input id="fav-origem-uf" class="uf-input" [(ngModel)]="favForm.origem_uf" name="fav_origem_uf"
+                          placeholder="SP" maxlength="2"
+                          (input)="favForm.origem_uf = favForm.origem_uf.toUpperCase()" />
+                      </div>
+                    </div>
+                    <div class="form-row" style="margin-top:14px">
+                      <div class="form-group">
+                        <label for="fav-destino">Cidade de destino</label>
+                        <input id="fav-destino" [(ngModel)]="favForm.destino" name="fav_destino" placeholder="Ex: S&atilde;o Paulo" />
+                      </div>
+                      <div class="form-group">
+                        <label for="fav-destino-uf">UF</label>
+                        <input id="fav-destino-uf" class="uf-input" [(ngModel)]="favForm.destino_uf" name="fav_destino_uf"
+                          placeholder="SP" maxlength="2"
+                          (input)="favForm.destino_uf = favForm.destino_uf.toUpperCase()" />
+                      </div>
+                    </div>
+                    <div class="form-group" style="margin-top:14px">
+                      <label for="fav-meta">Meta de pre&ccedil;o (R$) <span class="form-optional">(opcional)</span></label>
+                      <p-inputNumber inputId="fav-meta" [(ngModel)]="favForm.meta" name="fav_meta"
+                        placeholder="120" [min]="1" [showButtons]="true" styleClass="meta-input" />
+                    </div>
+                    @if (favFormError) {
+                      <div class="error-box" style="margin-top:14px">{{ favFormError }}</div>
+                    }
+                    <div class="modal-actions">
+                      <button type="button" class="btn-ghost" (click)="closeFavModal()">Fechar</button>
+                      <button type="submit" class="btn-primary modal-save" [disabled]="savingFav">
+                        @if (savingFav) {
+                          <span class="spinner"></span>
+                        }
+                        @if (!savingFav) {
+                          <span>Salvar favorito</span>
+                        }
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            }
     
                       </div>
     `
@@ -591,6 +698,19 @@ export class OnibusComponent implements OnInit, OnDestroy {
   cityError: Record<string, string> = {};
   cityChecking: Record<string, boolean> = {};
 
+  favorites: FavoriteRoute[] = [];
+  favoritingKey: string | null = null;
+
+  // Campo, nao getter: um getter devolveria array novo a cada ciclo de
+  // deteccao de mudanca e o p-select remontaria a lista toda a cada tick.
+  favoriteOptions: { label: string; value: string }[] = [];
+  favoritaSelecionada: string | null = null;
+
+  showFavModal = false;
+  savingFav    = false;
+  favFormError = '';
+  favForm      = this.emptyFavForm();
+
 
   form       = this.emptyForm();
   detailForm = this.emptyDetailForm();
@@ -620,7 +740,7 @@ export class OnibusComponent implements OnInit, OnDestroy {
     this.userEmail       = user?.email ?? '';
     this.profileWhatsapp = this.stripPrefix(profile?.whatsapp ?? '');
     this.profileNome     = profile?.nome ?? '';
-    await this.loadAlerts();
+    await Promise.all([this.loadAlerts(), this.loadFavorites()]);
     // Uma coleta altera varias linhas de bus_price_cache e cada uma dispara um
     // evento; sem o debounce isso rodava loadCachedPrices() em rajada e os
     // precos de todos os cards ficavam piscando (#147, mesmo caso dos voos).
@@ -746,12 +866,206 @@ export class OnibusComponent implements OnInit, OnDestroy {
 
   // ── Lista ──────────────────────────────────────────────────
 
+  // -- Rotas favoritas ------------------------------------------
+  // Mesma ideia da tela de voos (migration 019): guarda a rota sem as
+  // datas pra recriar o alerta num clique. Aqui a identidade e o slug da
+  // Buser ("franca-sp"), e nao o nome legivel - "Franca-SP" e "Franca-MG"
+  // tem o mesmo nome e precisam poder coexistir nos favoritos. A UF do
+  // formulario sai do sufixo do slug.
+
+  async loadFavorites() {
+    const { data } = await this.supabase.getFavoriteRoutes('onibus');
+    this.favorites = (data as FavoriteRoute[]) ?? [];
+    this.atualizarOpcoesFavoritas();
+  }
+
+  private atualizarOpcoesFavoritas() {
+    this.favoriteOptions = this.favorites.map(f => ({
+      label: `${f.origem} → ${f.destino}` + (f.meta ? ` · R$ ${Math.round(f.meta)}` : ''),
+      value: f.id!
+    }));
+  }
+
+  favKey(alert: BusAlert): string {
+    return `${alert.origem_slug}|${alert.destino_slug}`;
+  }
+
+  private getFavorite(alert: BusAlert): FavoriteRoute | null {
+    return this.favorites.find(f =>
+      f.origem_slug === alert.origem_slug &&
+      f.destino_slug === alert.destino_slug
+    ) ?? null;
+  }
+
+  isFavorite(alert: BusAlert): boolean {
+    return this.getFavorite(alert) !== null;
+  }
+
+  private ufDoSlug(slug: string): string {
+    return (slug.split('-').pop() ?? '').toUpperCase();
+  }
+
+  async toggleFavorite(alert: BusAlert) {
+    const key = this.favKey(alert);
+    if (this.favoritingKey === key) return;
+    this.favoritingKey = key;
+
+    const existente = this.getFavorite(alert);
+    if (existente) {
+      const { error } = await this.supabase.removeFavoriteRoute(existente.id!);
+      if (error) {
+        this.showToast('Erro ao remover dos favoritos.');
+      } else {
+        this.favorites = this.favorites.filter(f => f.id !== existente.id);
+        this.atualizarOpcoesFavoritas();
+        this.showToast(`${alert.origem} → ${alert.destino} saiu dos favoritos`);
+      }
+    } else {
+      const { error } = await this.supabase.addFavoriteRoute({
+        tipo:         'onibus',
+        origem:       alert.origem,
+        destino:      alert.destino,
+        origem_slug:  alert.origem_slug,
+        destino_slug: alert.destino_slug,
+        meta:         alert.meta,
+        so_direto:    false
+      });
+      if (error) {
+        this.showToast('Erro ao salvar nos favoritos.');
+      } else {
+        await this.loadFavorites();
+        this.showToast(`${alert.origem} → ${alert.destino} salvo nos favoritos`);
+      }
+    }
+
+    this.favoritingKey = null;
+  }
+
+  aplicarRotaFavorita(fav: FavoriteRoute) {
+    this.form.origem     = fav.origem;
+    this.form.origem_uf  = this.ufDoSlug(fav.origem_slug);
+    this.form.destino    = fav.destino;
+    this.form.destino_uf = this.ufDoSlug(fav.destino_slug);
+    this.form.meta       = fav.meta ?? undefined;
+    this.formError       = '';
+    // A rota ja foi validada no Buser quando o alerta original foi criado,
+    // mas limpa o estado pra nao herdar um erro de uma tentativa anterior.
+    this.cityError       = {};
+  }
+
+  async removerFavorito(fav: FavoriteRoute) {
+    const { error } = await this.supabase.removeFavoriteRoute(fav.id!);
+    if (error) {
+      this.showToast('Erro ao remover dos favoritos.');
+      return;
+    }
+    this.favorites = this.favorites.filter(f => f.id !== fav.id);
+    this.atualizarOpcoesFavoritas();
+    if (this.favoritaSelecionada === fav.id) this.favoritaSelecionada = null;
+  }
+
+  // Botao de favoritos do header: gerenciador proprio, sem relacao com o
+  // modal de novo alerta - aqui se cria e se exclui rota favorita, e nada
+  // vira alerta. Pra usar uma favorita existe o dropdown no outro modal.
+  openFavoritos() {
+    this.favForm      = this.emptyFavForm();
+    this.favFormError = '';
+    this.showFavModal = true;
+  }
+
+  closeFavModal() {
+    this.showFavModal = false;
+    this.favFormError = '';
+  }
+
+  onFavOverlayClick(e: Event) {
+    if ((e.target as HTMLElement).classList.contains('modal-overlay')) this.closeFavModal();
+  }
+
+  async salvarFavorito() {
+    const { origem, origem_uf, destino, destino_uf } = this.favForm;
+
+    if (!origem.trim() || !destino.trim() || origem_uf.length < 2 || destino_uf.length < 2) {
+      this.favFormError = 'Preencha cidade e UF de origem e destino.';
+      return;
+    }
+
+    const origemSlug  = this.toSlug(origem) + '-' + origem_uf.toLowerCase();
+    const destinoSlug = this.toSlug(destino) + '-' + destino_uf.toLowerCase();
+
+    if (origemSlug === destinoSlug) {
+      this.favFormError = 'Origem e destino não podem ser iguais.';
+      return;
+    }
+
+    this.savingFav    = true;
+    this.favFormError = '';
+
+    // Valida no Buser antes de salvar: uma favorita com cidade inexistente
+    // so falharia muito depois, na hora de criar o alerta de verdade.
+    const [origemOk, destinoOk] = await Promise.all([
+      this.supabase.validateBuserCity(origemSlug),
+      this.supabase.validateBuserCity(destinoSlug)
+    ]);
+
+    if (!origemOk || !destinoOk) {
+      const ruim = !origemOk ? `${origem} - ${origem_uf}` : `${destino} - ${destino_uf}`;
+      this.favFormError = `"${ruim}" não encontrada no Buser.`;
+      this.savingFav = false;
+      return;
+    }
+
+    const { error } = await this.supabase.addFavoriteRoute({
+      tipo:         'onibus',
+      origem:       this.toTitleCase(origem),
+      destino:      this.toTitleCase(destino),
+      origem_slug:  origemSlug,
+      destino_slug: destinoSlug,
+      meta:         this.favForm.meta ?? null,
+      so_direto:    false
+    });
+
+    if (error) {
+      this.favFormError = this.supabase.isSessionError(error)
+        ? 'Sua sessão expirou. Faça login novamente.'
+        : 'Erro ao salvar a rota favorita. Tente novamente.';
+    } else {
+      await this.loadFavorites();
+      this.showToast(`${this.toTitleCase(origem)} → ${this.toTitleCase(destino)} salvo nos favoritos`);
+      this.favForm = this.emptyFavForm();
+    }
+
+    this.savingFav = false;
+  }
+
+  private emptyFavForm() {
+    return {
+      origem: '', origem_uf: '', destino: '', destino_uf: '',
+      meta: undefined as number | undefined
+    };
+  }
+
+  // Leva a rota pro modal de novo alerta ja preenchido: o gerenciador so
+  // gerencia, quem cria alerta e o outro modal.
+  usarFavorito(fav: FavoriteRoute) {
+    this.closeFavModal();
+    this.openModal();
+    this.aplicarRotaFavorita(fav);
+    this.favoritaSelecionada = fav.id!;
+  }
+
+  aplicarRotaFavoritaPorId(id: string | null) {
+    const fav = this.favorites.find(f => f.id === id);
+    if (fav) this.aplicarRotaFavorita(fav);
+  }
+
   openModal() {
     this.form          = this.emptyForm();
     this.form.whatsapp = this.profileWhatsapp;
     this.formError     = '';
     this.cityError     = {};
     this.cityChecking  = {};
+    this.favoritaSelecionada = null;
     this.showModal     = true;
   }
 
